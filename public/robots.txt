@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://browsernotes.online/sitemap.xml

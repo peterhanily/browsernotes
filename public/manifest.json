@@ -1,0 +1,16 @@
+{
+  "name": "BrowserNotes",
+  "short_name": "BrowserNotes",
+  "description": "A privacy-first, browser-based note-taking app and task manager. No server. No tracking. Your notes are yours.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#030712",
+  "background_color": "#030712",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

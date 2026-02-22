@@ -6,7 +6,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="BrowserNotes — A privacy-first, browser-based note-taking app and task manager. No server. No tracking. Your notes are yours." />
     <meta name="theme-color" content="#030712" />
-    <title>BrowserNotes</title>
+    <meta name="keywords" content="notes, tasks, browser notes, privacy, offline, note-taking, task manager, no tracking, local storage" />
+    <link rel="canonical" href="https://browsernotes.online/" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="./logo.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BrowserNotes" />
+    <meta property="og:title" content="BrowserNotes — Privacy-First Notes & Tasks in Your Browser" />
+    <meta property="og:description" content="A privacy-first, browser-based note-taking app and task manager. No server. No tracking. Your notes are yours." />
+    <meta property="og:url" content="https://browsernotes.online/" />
+    <meta property="og:image" content="https://browsernotes.online/og-image.svg" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BrowserNotes — Privacy-First Notes & Tasks in Your Browser" />
+    <meta name="twitter:description" content="A privacy-first, browser-based note-taking app and task manager. No server. No tracking. Your notes are yours." />
+    <meta name="twitter:image" content="https://browsernotes.online/og-image.svg" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "BrowserNotes",
+      "url": "https://browsernotes.online/",
+      "description": "A privacy-first, browser-based note-taking app and task manager. No server. No tracking. Your notes are yours.",
+      "applicationCategory": "Productivity",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <title>BrowserNotes — Privacy-First Notes & Tasks in Your Browser</title>
   </head>
   <body class="bg-gray-950 text-gray-100">
     <div id="root"></div>

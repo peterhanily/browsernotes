@@ -4,7 +4,7 @@ import type { Note, Tag, EditorMode } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
-import { wordCount, formatFullDate, cn } from '../../lib/utils';
+import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
   note: Note;
@@ -282,7 +282,7 @@ export function NoteEditor({
             onCreateTag={onCreateTag}
           />
         </div>
-        {note.sourceUrl && (
+        {isSafeUrl(note.sourceUrl) && (
           <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-accent hover:text-accent-hover">
             <ExternalLink size={12} />
             <span className="truncate max-w-32">{note.sourceTitle || note.sourceUrl}</span>

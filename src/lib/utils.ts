@@ -52,3 +52,13 @@ export function isOverdue(dueDate?: string): boolean {
 export function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+export function isSafeUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return /^https?:$/.test(parsed.protocol);
+  } catch {
+    return false;
+  }
+}

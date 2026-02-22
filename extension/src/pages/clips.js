@@ -195,6 +195,11 @@ async function getTargetUrl() {
 }
 
 async function requestHostPermission(targetUrl) {
+  // file:// URLs need special permission pattern and are handled differently
+  if (targetUrl.startsWith('file://')) {
+    const granted = await chrome.permissions.request({ origins: ['file:///*'] });
+    return granted;
+  }
   // Build an origin pattern like "*://browsernotes.online/*"
   const url = new URL(targetUrl);
   const origin = `${url.protocol}//${url.host}/*`;

@@ -31,7 +31,7 @@
     "128": "assets/icon-128.png"
   },
 
-  "optional_host_permissions": ["*://*/*"],
+  "optional_host_permissions": ["*://*/*", "file:///*"],
 
   "commands": {
     "capture-selection": {

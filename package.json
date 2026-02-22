@@ -2,6 +2,7 @@
   "name": "browsernotes",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "pnpm@10.29.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

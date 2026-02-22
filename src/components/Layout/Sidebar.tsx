@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   FileText, ListChecks, Paperclip, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
-  PanelLeftClose,
+  PanelLeftClose, Github, Download, Chrome,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, ViewMode } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -248,12 +248,38 @@ export function Sidebar({
         </div>
       </nav>
 
-      <div className="border-t border-gray-800 p-2">
+      <div className="border-t border-gray-800 p-2 space-y-0.5">
         <SidebarItem
           icon={<Settings size={16} />}
           label="Settings"
           onClick={() => nav(onOpenSettings)}
         />
+
+        {/* Links — visible on mobile (md:hidden) since header hides them on mobile */}
+        <div className="md:hidden pt-2 space-y-0.5">
+          <a
+            href="https://github.com/peterhanily/browsernotes"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+          >
+            <Github size={16} />
+            <span>GitHub</span>
+          </a>
+          <a
+            href="./browsernotes-standalone.html"
+            download
+            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+          >
+            <Download size={16} />
+            <span>Download Standalone</span>
+          </a>
+          <span className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-500 cursor-default">
+            <Chrome size={16} />
+            <span>Extension</span>
+            <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full leading-none ml-auto">Soon</span>
+          </span>
+        </div>
       </div>
 
       <ConfirmDialog

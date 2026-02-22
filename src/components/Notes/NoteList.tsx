@@ -19,7 +19,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
 
   return (
-    <div className="w-full md:w-72 border-r border-gray-800 flex flex-col h-full md:shrink-0 overflow-hidden">
+    <div className="w-full border-r border-gray-800 flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
         <span className="text-sm font-medium text-gray-300">{title || 'Notes'} ({notes.length})</span>
         <div className="flex items-center gap-1">

@@ -128,7 +128,7 @@ export function NoteEditor({
   return (
     <div className="flex flex-col h-full w-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-gray-800 shrink-0">
+      <div className="flex items-center gap-0.5 sm:gap-1 px-2 sm:px-4 py-1.5 sm:py-2 border-b border-gray-800 shrink-0">
         {onBack && (
           <button
             onClick={onBack}
@@ -234,7 +234,7 @@ export function NoteEditor({
       </div>
 
       {/* Title */}
-      <div className="px-4 pt-3 shrink-0">
+      <div className="px-2 sm:px-4 pt-2 sm:pt-3 shrink-0">
         <input
           ref={titleRef}
           value={title}
@@ -254,7 +254,7 @@ export function NoteEditor({
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
               onKeyDown={handleEditorKeyDown}
-              className="note-editor flex-1 w-full p-4 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none text-sm leading-relaxed"
+              className="note-editor flex-1 w-full p-2 sm:p-4 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none text-sm leading-relaxed"
               placeholder="Start writing in markdown..."
               readOnly={note.trashed}
               aria-label="Note content editor"
@@ -262,7 +262,7 @@ export function NoteEditor({
           </div>
         )}
         {showPreview && (
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4">
             {content ? (
               <MarkdownPreview content={content} />
             ) : (
@@ -273,7 +273,7 @@ export function NoteEditor({
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-4 text-xs text-gray-500 shrink-0 flex-wrap">
+      <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-t border-gray-800 flex items-center gap-2 sm:gap-4 text-xs text-gray-500 shrink-0 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <TagInput
             selectedTags={note.tags}

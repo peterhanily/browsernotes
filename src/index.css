@@ -281,10 +281,14 @@
 .light .bg-accent\/10 { background-color: rgba(79, 70, 229, 0.1); }
 .light .bg-accent\/15 { background-color: rgba(79, 70, 229, 0.12); }
 
-/* ─── Mobile sidebar ─── */
+/* ─── Mobile sidebar — solid background in overlay ─── */
 @media (max-width: 767px) {
   .sidebar-glass {
-    position: relative;
-    z-index: 51;
+    background: rgb(17, 24, 39);
+    backdrop-filter: none;
+  }
+
+  .light .sidebar-glass {
+    background: rgb(248, 250, 252);
   }
 }

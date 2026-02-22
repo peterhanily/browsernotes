@@ -62,33 +62,37 @@ export function TaskListView({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 shrink-0">
-        <span className="text-sm font-medium text-gray-300">Tasks ({tasks.length})</span>
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-800 shrink-0">
+        <span className="text-sm font-medium text-gray-300 hidden sm:inline">Tasks ({tasks.length})</span>
+        <span className="text-sm font-medium text-gray-300 sm:hidden">{tasks.length}</span>
 
-        <div className="flex items-center gap-1 ml-2">
+        <div className="flex items-center gap-0.5 ml-1">
           <button
             onClick={() => onViewModeChange('list')}
-            className={cn('p-1.5 rounded', viewMode === 'list' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+            className={cn('p-1 rounded', viewMode === 'list' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
             title="List view"
+            aria-label="List view"
           >
             <ListChecks size={16} />
           </button>
           <button
             onClick={() => onViewModeChange('kanban')}
-            className={cn('p-1.5 rounded', viewMode === 'kanban' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+            className={cn('p-1 rounded', viewMode === 'kanban' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
             title="Kanban view"
+            aria-label="Kanban view"
           >
             <LayoutGrid size={16} />
           </button>
         </div>
 
         {viewMode === 'list' && (
-          <div className="flex items-center gap-1 ml-2">
-            <Filter size={14} className="text-gray-500" />
+          <div className="flex items-center gap-1 ml-1">
+            <Filter size={14} className="text-gray-500 hidden sm:block" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as TaskStatus | '')}
-              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none"
+              className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-gray-300 focus:outline-none"
+              aria-label="Filter by status"
             >
               <option value="">All</option>
               <option value="todo">Todo</option>
@@ -100,10 +104,11 @@ export function TaskListView({
 
         <button
           onClick={() => setShowNewTask(true)}
-          className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
+          className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
+          aria-label="New task"
         >
           <Plus size={14} />
-          New Task
+          <span className="hidden sm:inline">New Task</span>
         </button>
       </div>
 

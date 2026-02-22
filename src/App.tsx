@@ -186,6 +186,7 @@ export default function App() {
             onToggleCollapsed={() => updateSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}
             noteCounts={noteCounts}
             taskCounts={tasks.taskCounts}
+            onNavigate={() => setSelectedNoteId(undefined)}
           />
         }
       >
@@ -213,7 +214,10 @@ export default function App() {
         ) : (
           /* Notes & Clips view — responsive: list OR editor on mobile */
           <div className="flex flex-1 overflow-hidden">
-            <div className={cn(selectedNote ? 'hidden md:block' : '')}>
+            <div className={cn(
+              'shrink-0 h-full',
+              selectedNote ? 'hidden md:block md:w-72' : 'w-full md:w-72'
+            )}>
               <NoteList
                 notes={filteredNotes}
                 selectedId={selectedNoteId}
@@ -225,7 +229,7 @@ export default function App() {
                 onEmptyTrash={notes.emptyTrash}
               />
             </div>
-            <div className={cn('flex-1 overflow-hidden', !selectedNote && 'hidden md:block')}>
+            <div className={cn('flex-1 min-w-0 overflow-hidden', !selectedNote && 'hidden md:block')}>
               {selectedNote ? (
                 <NoteEditor
                   note={selectedNote}
@@ -278,7 +282,7 @@ export default function App() {
               onToggleCollapsed={() => setMobileSidebarOpen(false)}
               noteCounts={noteCounts}
               taskCounts={tasks.taskCounts}
-              onNavigate={() => setMobileSidebarOpen(false)}
+              onNavigate={() => { setMobileSidebarOpen(false); setSelectedNoteId(undefined); }}
             />
           </div>
         </div>

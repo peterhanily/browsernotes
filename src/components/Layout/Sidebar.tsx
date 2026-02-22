@@ -5,6 +5,7 @@ import {
   PanelLeftClose,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, ViewMode } from '../../types';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { cn } from '../../lib/utils';
 
 interface SidebarProps {
@@ -58,6 +59,7 @@ export function Sidebar({
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
 
   if (collapsed) return null;
 
@@ -172,7 +174,7 @@ export function Sidebar({
                       onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
                       actions={
                         <button
-                          onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); }}
+                          onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
                           className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
                         >
                           <X size={12} />
@@ -240,6 +242,16 @@ export function Sidebar({
           onClick={onOpenSettings}
         />
       </div>
+
+      <ConfirmDialog
+        open={deletingFolderId !== null}
+        onClose={() => setDeletingFolderId(null)}
+        onConfirm={() => { if (deletingFolderId) onDeleteFolder(deletingFolderId); }}
+        title="Delete Folder"
+        message="This folder will be deleted. Notes and tasks inside it will be moved to &quot;All Items&quot;."
+        confirmLabel="Delete Folder"
+        danger
+      />
     </aside>
   );
 }

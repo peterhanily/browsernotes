@@ -37,16 +37,26 @@ export function NoteEditor({
   const [saved, setSaved] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     setTitle(note.title);
     setContent(note.content);
   }, [note.id, note.title, note.content]);
 
+  // Cleanup pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimeoutRef.current);
+      clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
+
   const save = useCallback((updates: Partial<Note>) => {
     onUpdate(note.id, updates);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    clearTimeout(savedTimeoutRef.current);
+    savedTimeoutRef.current = setTimeout(() => setSaved(false), 1500);
   }, [note.id, onUpdate]);
 
   const handleTitleChange = (value: string) => {

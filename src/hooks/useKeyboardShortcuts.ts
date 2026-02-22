@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ShortcutHandlers {
   onNewNote?: () => void;
@@ -10,41 +10,45 @@ interface ShortcutHandlers {
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const ctrl = e.ctrlKey || e.metaKey;
+      const h = handlersRef.current;
 
       if (ctrl && e.key === 'n') {
         e.preventDefault();
-        handlers.onNewNote?.();
+        h.onNewNote?.();
       }
 
-      if (ctrl && e.key === 'k') {
+      if (ctrl && !e.shiftKey && e.key === 'k') {
         e.preventDefault();
-        handlers.onSearch?.();
+        h.onSearch?.();
       }
 
       if (ctrl && e.key === 's') {
         e.preventDefault();
-        handlers.onSave?.();
+        h.onSave?.();
       }
 
-      if (ctrl && e.shiftKey && e.key === 'T') {
+      if (ctrl && e.shiftKey && (e.key === 'T' || e.key === 't')) {
         e.preventDefault();
-        handlers.onNewTask?.();
+        h.onNewTask?.();
       }
 
       if (ctrl && e.key === '`') {
         e.preventDefault();
-        handlers.onTogglePreview?.();
+        h.onTogglePreview?.();
       }
 
       if (e.key === 'Escape') {
-        handlers.onEscape?.();
+        h.onEscape?.();
       }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlers]);
+  }, []);
 }

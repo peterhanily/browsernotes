@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Download, Upload, FileText, AlertCircle } from 'lucide-react';
 import { exportJSON, importJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
 import type { Note } from '../../types';
 
 interface ExportImportProps {
@@ -12,39 +13,49 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const msgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showMessage = (msg: string) => {
+    setMessage(msg);
+    clearTimeout(msgTimeoutRef.current);
+    msgTimeoutRef.current = setTimeout(() => setMessage(''), 3000);
+  };
 
   const handleExportJSON = async () => {
     const json = await exportJSON();
     downloadFile(json, `browsernotes-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
-    setMessage('Backup exported successfully');
-    setTimeout(() => setMessage(''), 3000);
+    showMessage('Backup exported successfully');
   };
 
   const handleExportMarkdown = () => {
     const activeNotes = notes.filter((n) => !n.trashed && !n.archived);
     const md = exportNotesMarkdown(activeNotes);
     downloadFile(md, `browsernotes-${new Date().toISOString().split('T')[0]}.md`, 'text/markdown');
-    setMessage(`Exported ${activeNotes.length} notes as Markdown`);
-    setTimeout(() => setMessage(''), 3000);
+    showMessage(`Exported ${activeNotes.length} notes as Markdown`);
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) setPendingFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
+  const handleConfirmImport = async () => {
+    if (!pendingFile) return;
     setImporting(true);
     setError('');
     try {
-      const text = await file.text();
+      const text = await pendingFile.text();
       const counts = await importJSON(text);
-      setMessage(`Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} folders, ${counts.tags} tags`);
+      showMessage(`Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} folders, ${counts.tags} tags`);
       onImportComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import');
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setPendingFile(null);
     }
   };
 
@@ -63,10 +74,10 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
           <FileText size={16} />
           Export Markdown
         </button>
-        <label className={`${btnClass} bg-accent hover:bg-accent-hover text-white cursor-pointer`}>
+        <label className={`${btnClass} bg-accent hover:bg-accent-hover text-white cursor-pointer ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
           <Upload size={16} />
           {importing ? 'Importing...' : 'Import JSON Backup'}
-          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} className="hidden" />
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} className="hidden" disabled={importing} />
         </label>
       </div>
 
@@ -79,6 +90,16 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
           {error}
         </p>
       )}
+
+      <ConfirmDialog
+        open={pendingFile !== null}
+        onClose={() => setPendingFile(null)}
+        onConfirm={handleConfirmImport}
+        title="Import Backup"
+        message="This will replace all your current notes, tasks, folders, and tags with the imported data. This cannot be undone."
+        confirmLabel="Import & Replace"
+        danger
+      />
     </div>
   );
 }

@@ -3,9 +3,8 @@ const SHORTCUTS = [
   { keys: 'Ctrl+K', action: 'Focus search' },
   { keys: 'Ctrl+S', action: 'Save current note' },
   { keys: 'Ctrl+Shift+T', action: 'New task' },
-  { keys: 'Ctrl+B', action: 'Bold text' },
-  { keys: 'Ctrl+I', action: 'Italic text' },
-  { keys: 'Ctrl+K', action: 'Insert link' },
+  { keys: 'Ctrl+B', action: 'Bold text (in editor)' },
+  { keys: 'Ctrl+I', action: 'Italic text (in editor)' },
   { keys: 'Ctrl+`', action: 'Toggle editor/preview' },
   { keys: 'Esc', action: 'Close modals' },
 ];

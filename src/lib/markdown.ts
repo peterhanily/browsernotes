@@ -1,5 +1,6 @@
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
+import DOMPurify from 'dompurify';
 
 const marked = new Marked({
   gfm: true,
@@ -17,5 +18,9 @@ const marked = new Marked({
 });
 
 export function renderMarkdown(content: string): string {
-  return marked.parse(content) as string;
+  const raw = marked.parse(content) as string;
+  return DOMPurify.sanitize(raw, {
+    ADD_TAGS: ['input'],
+    ADD_ATTR: ['type', 'checked', 'disabled', 'class'],
+  });
 }

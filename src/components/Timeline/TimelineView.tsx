@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Plus, Search, ArrowUpDown, Star } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, Star, List, Grid3X3 } from 'lucide-react';
 import type { TimelineEvent, TimelineEventType, Tag, Folder } from '../../types';
 import { TimelineFeed } from './TimelineFeed';
 import { EventTypeFilterBar } from './EventTypeFilterBar';
 import { TimelineEventForm } from './TimelineEventForm';
+import { MitreHeatmap } from './MitreHeatmap';
+import { TimelineEventCard } from './TimelineEventCard';
 import { Modal } from '../Common/Modal';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { cn } from '../../lib/utils';
+import { getTechniqueLabel, getParentTechniqueId } from '../../lib/mitre-attack';
 
 interface TimelineViewProps {
   events: TimelineEvent[];
@@ -43,6 +46,8 @@ export function TimelineView({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'feed' | 'heatmap'>('feed');
+  const [heatmapDetailTechId, setHeatmapDetailTechId] = useState<string | null>(null);
 
   const filteredEvents = useMemo(
     () => getFilteredEvents({
@@ -53,6 +58,18 @@ export function TimelineView({
     }),
     [getFilteredEvents, selectedEventTypes, showStarredOnly, searchQuery, sortDir]
   );
+
+  const heatmapDetailEvents = useMemo(() => {
+    if (!heatmapDetailTechId) return [];
+    const parentId = getParentTechniqueId(heatmapDetailTechId);
+    return filteredEvents.filter((e) =>
+      e.mitreAttackIds.some((id) => getParentTechniqueId(id) === parentId)
+    );
+  }, [filteredEvents, heatmapDetailTechId]);
+
+  const handleTechniqueClick = (techniqueId: string) => {
+    setHeatmapDetailTechId(techniqueId);
+  };
 
   const handleSelect = (id: string) => {
     const event = events.find((e) => e.id === id);
@@ -85,6 +102,25 @@ export function TimelineView({
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-800 shrink-0">
         <span className="text-sm font-medium text-gray-300 hidden sm:inline">Timeline ({events.length})</span>
         <span className="text-sm font-medium text-gray-300 sm:hidden">{events.length}</span>
+
+        <div className="flex items-center gap-0.5 ml-2">
+          <button
+            onClick={() => setViewMode('feed')}
+            className={cn('p-1 rounded', viewMode === 'feed' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+            title="Feed view"
+            aria-label="Feed view"
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('heatmap')}
+            className={cn('p-1 rounded', viewMode === 'heatmap' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+            title="ATT&CK Heatmap"
+            aria-label="ATT&CK Heatmap"
+          >
+            <Grid3X3 size={16} />
+          </button>
+        </div>
 
         <div className="flex items-center gap-1 ml-2 flex-1 min-w-0 max-w-xs">
           <Search size={14} className="text-gray-500 shrink-0" />
@@ -130,13 +166,20 @@ export function TimelineView({
         onChange={setSelectedEventTypes}
       />
 
-      {/* Scrollable feed area */}
+      {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto p-4">
-        <TimelineFeed
-          events={filteredEvents}
-          onSelect={handleSelect}
-          onToggleStar={onToggleStar}
-        />
+        {viewMode === 'feed' ? (
+          <TimelineFeed
+            events={filteredEvents}
+            onSelect={handleSelect}
+            onToggleStar={onToggleStar}
+          />
+        ) : (
+          <MitreHeatmap
+            events={filteredEvents}
+            onTechniqueClick={handleTechniqueClick}
+          />
+        )}
       </div>
 
       {/* Edit Event Modal */}
@@ -173,6 +216,32 @@ export function TimelineView({
           onSave={handleSaveNew}
           onCancel={() => setShowNewEvent(false)}
         />
+      </Modal>
+
+      {/* Heatmap Technique Detail Modal */}
+      <Modal
+        open={heatmapDetailTechId !== null}
+        onClose={() => setHeatmapDetailTechId(null)}
+        title={heatmapDetailTechId ? getTechniqueLabel(heatmapDetailTechId) : ''}
+        wide
+      >
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {heatmapDetailEvents.length === 0 ? (
+            <p className="text-sm text-gray-500">No events linked to this technique.</p>
+          ) : (
+            heatmapDetailEvents.map((ev) => (
+              <TimelineEventCard
+                key={ev.id}
+                event={ev}
+                onClick={() => {
+                  setHeatmapDetailTechId(null);
+                  setEditingEvent(ev);
+                }}
+                onToggleStar={() => onToggleStar(ev.id)}
+              />
+            ))
+          )}
+        </div>
       </Modal>
 
       {/* Delete Confirm Dialog */}

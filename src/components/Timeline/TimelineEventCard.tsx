@@ -3,6 +3,7 @@ import { Star, FileText, ListChecks, Shield, Tag } from 'lucide-react';
 import type { TimelineEvent } from '../../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { cn, truncate } from '../../lib/utils';
+import { getTechniqueLabel } from '../../lib/mitre-attack';
 
 interface TimelineEventCardProps {
   event: TimelineEvent;
@@ -91,6 +92,23 @@ export const TimelineEventCard = React.memo(function TimelineEventCard({
           <span className="text-[10px] px-1.5 rounded-full bg-purple-500/15 text-purple-400 truncate max-w-[100px]">
             {event.actor}
           </span>
+        )}
+        {event.mitreAttackIds.length > 0 && (
+          <>
+            {event.mitreAttackIds.slice(0, 3).map((id) => (
+              <span
+                key={id}
+                className="text-[10px] px-1.5 py-0.5 rounded-full font-mono"
+                style={{ backgroundColor: '#14b8a620', color: '#14b8a6' }}
+                title={getTechniqueLabel(id)}
+              >
+                {id}
+              </span>
+            ))}
+            {event.mitreAttackIds.length > 3 && (
+              <span className="text-[10px] text-teal-500">+{event.mitreAttackIds.length - 3}</span>
+            )}
+          </>
         )}
         {event.linkedNoteIds.length > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">

@@ -4,6 +4,7 @@ import type { TimelineEvent, TimelineEventType, ConfidenceLevel, Folder, Tag } f
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { AttributionComboInput } from '../Analysis/AttributionComboInput';
+import { MitreComboInput } from './MitreComboInput';
 import { useSettings } from '../../hooks/useSettings';
 
 interface TimelineEventFormProps {
@@ -45,6 +46,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const [assets, setAssets] = useState(event?.assets.join(', ') || '');
   const [tags, setTags] = useState<string[]>(event?.tags || []);
   const [starred, setStarred] = useState(event?.starred || false);
+  const [mitreAttackIds, setMitreAttackIds] = useState<string[]>(event?.mitreAttackIds || []);
   const [rawData, setRawData] = useState(event?.rawData || '');
   const [rawDataOpen, setRawDataOpen] = useState(false);
 
@@ -58,6 +60,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
       setSource(event.source);
       setFolderId(event.folderId || '');
       setActor(event.actor || '');
+      setMitreAttackIds(event.mitreAttackIds || []);
       setDescription(event.description || '');
       setAssets(event.assets.join(', '));
       setTags(event.tags);
@@ -90,7 +93,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
       linkedIOCIds: event?.linkedIOCIds || [],
       linkedNoteIds: event?.linkedNoteIds || [],
       linkedTaskIds: event?.linkedTaskIds || [],
-      mitreAttackIds: event?.mitreAttackIds || [],
+      mitreAttackIds,
     });
   };
 
@@ -179,6 +182,11 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
           actors={settings.attributionActors || []}
           placeholder="e.g. APT29, Lazarus Group..."
         />
+      </div>
+
+      <div>
+        <label className={labelClass}>MITRE ATT&CK Techniques</label>
+        <MitreComboInput value={mitreAttackIds} onChange={setMitreAttackIds} />
       </div>
 
       <div>

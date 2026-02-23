@@ -287,7 +287,8 @@
       white-space: nowrap;
     }
 
-    .settings-row input[type="text"] {
+    .settings-row input[type="text"],
+    .settings-row input[type="password"] {
       flex: 1;
       padding: 8px 12px;
       background: #111827;
@@ -300,7 +301,8 @@
       transition: border-color 0.2s;
     }
 
-    .settings-row input[type="text"]:focus {
+    .settings-row input[type="text"]:focus,
+    .settings-row input[type="password"]:focus {
       border-color: #6366f1;
     }
 
@@ -432,6 +434,23 @@
         <button class="btn btn-secondary" id="save-settings-btn" style="padding: 8px 14px; font-size: 13px;">Save</button>
       </div>
       <div class="settings-saved" id="settings-saved">Settings saved!</div>
+    </div>
+
+    <div class="settings-section">
+      <h2>OCI Object Storage</h2>
+      <div class="settings-row" style="margin-bottom: 10px;">
+        <label for="oci-write-par">Write PAR:</label>
+        <input type="password" id="oci-write-par" placeholder="https://objectstorage..." />
+      </div>
+      <div class="settings-row" style="margin-bottom: 10px;">
+        <label for="oci-read-par">Read PAR:</label>
+        <input type="password" id="oci-read-par" placeholder="https://objectstorage..." />
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-secondary" id="oci-save-btn" style="padding: 8px 14px; font-size: 13px;">Save</button>
+        <button class="btn btn-primary" id="oci-send-btn" style="padding: 8px 14px; font-size: 13px;">Send Clips to OCI</button>
+      </div>
+      <div class="settings-saved" id="oci-settings-saved">OCI settings saved!</div>
     </div>
   </div>
 

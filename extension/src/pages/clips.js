@@ -306,7 +306,158 @@ clearAllBtn.addEventListener('click', async () => {
   }
 });
 
+// ---- OCI Object Storage ----
+
+const ociWriteParInput = document.getElementById('oci-write-par');
+const ociReadParInput = document.getElementById('oci-read-par');
+const ociSaveBtn = document.getElementById('oci-save-btn');
+const ociSendBtn = document.getElementById('oci-send-btn');
+const ociSettingsSaved = document.getElementById('oci-settings-saved');
+
+function isValidOCIPAR(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === 'https:' && url.includes('/p/') && url.includes('/o/');
+  } catch {
+    return false;
+  }
+}
+
+async function loadOCISettings() {
+  const { ociSettings = {} } = await chrome.storage.local.get(['ociSettings']);
+  ociWriteParInput.value = ociSettings.writePAR || '';
+  ociReadParInput.value = ociSettings.readPAR || '';
+  return ociSettings;
+}
+
+async function saveOCISettings() {
+  const writePAR = ociWriteParInput.value.trim();
+  const readPAR = ociReadParInput.value.trim();
+
+  if (writePAR && !isValidOCIPAR(writePAR)) {
+    showToast('Invalid Write PAR URL — must be HTTPS with /p/ and /o/ segments', true);
+    return;
+  }
+  if (readPAR && !isValidOCIPAR(readPAR)) {
+    showToast('Invalid Read PAR URL — must be HTTPS with /p/ and /o/ segments', true);
+    return;
+  }
+
+  await chrome.storage.local.set({ ociSettings: { writePAR, readPAR } });
+  ociSettingsSaved.classList.add('show');
+  setTimeout(() => ociSettingsSaved.classList.remove('show'), 2000);
+}
+
+async function sendClipsToOCI() {
+  const { ociSettings = {} } = await chrome.storage.local.get(['ociSettings']);
+  const writePAR = ociSettings.writePAR;
+
+  if (!writePAR || !isValidOCIPAR(writePAR)) {
+    showToast('Configure a valid Write PAR URL first', true);
+    return;
+  }
+
+  const captures = await loadCaptures();
+  const unsent = captures.filter(c => !c.sent);
+
+  if (unsent.length === 0) {
+    showToast('No unsent captures to send');
+    return;
+  }
+
+  ociSendBtn.disabled = true;
+  ociSendBtn.textContent = 'Sending...';
+
+  try {
+    // Build envelope
+    const envelope = {
+      version: 1,
+      type: 'clip',
+      sharedBy: 'extension',
+      sharedAt: Date.now(),
+      payload: unsent.map(c => ({
+        id: c.id || crypto.randomUUID(),
+        title: c.sourceTitle || c.sourceUrl || 'Clip',
+        content: c.content || '',
+        tags: [],
+        pinned: false,
+        archived: false,
+        trashed: false,
+        sourceUrl: c.sourceUrl || '',
+        sourceTitle: c.sourceTitle || '',
+        createdAt: c.createdAt || Date.now(),
+        updatedAt: c.createdAt || Date.now(),
+      })),
+    };
+
+    const timestamp = Date.now();
+    const objectPath = 'browsernotes/shared/clips/extension-' + timestamp + '.json';
+    const prefix = writePAR.endsWith('/') ? writePAR : writePAR + '/';
+    const url = prefix + objectPath;
+    const body = JSON.stringify(envelope, null, 2);
+
+    const resp = await fetch(url, {
+      method: 'PUT',
+      body,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!resp.ok) {
+      throw new Error('HTTP ' + resp.status + ': ' + resp.statusText);
+    }
+
+    // Update manifest if read PAR is available
+    const readPAR = ociSettings.readPAR;
+    if (readPAR && isValidOCIPAR(readPAR)) {
+      try {
+        const readPrefix = readPAR.endsWith('/') ? readPAR : readPAR + '/';
+        const manifestUrl = readPrefix + 'browsernotes/manifest.json';
+        const manifestResp = await fetch(manifestUrl);
+        let manifest = { version: 1, updatedAt: Date.now(), items: [] };
+        if (manifestResp.ok) {
+          try { manifest = await manifestResp.json(); } catch { /* use empty */ }
+        }
+        manifest.items.push({
+          objectKey: objectPath,
+          type: 'clip',
+          title: unsent.length + ' clip(s) from extension',
+          sharedBy: 'extension',
+          sharedAt: Date.now(),
+          sizeBytes: new TextEncoder().encode(body).length,
+        });
+        manifest.updatedAt = Date.now();
+        const writePrefix = writePAR.endsWith('/') ? writePAR : writePAR + '/';
+        await fetch(writePrefix + 'browsernotes/manifest.json', {
+          method: 'PUT',
+          body: JSON.stringify(manifest, null, 2),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch {
+        // Manifest update is best-effort
+      }
+    }
+
+    // Mark as sent
+    const allCaptures = await loadCaptures();
+    const sentIds = new Set(unsent.map(c => c.id));
+    const updated = allCaptures.map(c => sentIds.has(c.id) ? { ...c, sent: true } : c);
+    await chrome.storage.local.set({ captures: updated });
+    await refresh();
+    showToast(unsent.length + ' clip(s) sent to OCI!');
+  } catch (error) {
+    showToast('OCI upload failed: ' + error.message, true);
+  } finally {
+    ociSendBtn.disabled = false;
+    ociSendBtn.textContent = 'Send Clips to OCI';
+  }
+}
+
+ociSaveBtn.addEventListener('click', saveOCISettings);
+ociSendBtn.addEventListener('click', sendClipsToOCI);
+
 // ---- Init ----
 
 loadSettings();
+loadOCISettings();
 refresh();

@@ -1,14 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag } from '../types';
-
-interface ExportData {
-  version: 1;
-  exportedAt: number;
-  notes: Note[];
-  tasks: Task[];
-  folders: Folder[];
-  tags: Tag[];
-}
+import type { Note, Task, Folder, Tag, ExportData } from '../types';
 
 export async function exportJSON(): Promise<string> {
   const [notes, tasks, folders, tags] = await Promise.all([

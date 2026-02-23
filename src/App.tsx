@@ -19,6 +19,7 @@ import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { SearchOverlay } from './components/Search/SearchOverlay';
+import { BrowseShared } from './components/Settings/BrowseShared';
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
+  const [browseSharedOpen, setBrowseSharedOpen] = useState(false);
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -310,6 +312,7 @@ export default function App() {
             onUpdateSettings={updateSettings}
             notes={notes.notes}
             onImportComplete={handleImportComplete}
+            onOpenBrowseShared={() => setBrowseSharedOpen(true)}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView
@@ -361,6 +364,8 @@ export default function App() {
                   onEditorModeChange={setEditorMode}
                   onBack={() => setSelectedNoteId(undefined)}
                   isClip={activeView === 'clips'}
+                  clipsFolderId={clipsFolderId}
+                  settings={settings}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">
@@ -431,6 +436,12 @@ export default function App() {
         onNavigateToNote={handleSearchNavigateToNote}
         onNavigateToClip={handleSearchNavigateToClip}
         onNavigateToTask={handleSearchNavigateToTask}
+      />
+
+      <BrowseShared
+        open={browseSharedOpen}
+        onClose={() => setBrowseSharedOpen(false)}
+        onImportComplete={handleImportComplete}
       />
     </>
   );

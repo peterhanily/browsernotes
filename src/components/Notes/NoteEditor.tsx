@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield } from 'lucide-react';
-import type { Note, Tag, EditorMode } from '../../types';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload } from 'lucide-react';
+import type { Note, Tag, EditorMode, Settings } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
 import { IOCPanel } from '../Analysis/IOCPanel';
+import { useOCISync } from '../../hooks/useOCISync';
 import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
@@ -20,6 +21,8 @@ interface NoteEditorProps {
   onEditorModeChange: (mode: EditorMode) => void;
   onBack?: () => void;
   isClip?: boolean;
+  clipsFolderId?: string;
+  settings?: Settings;
 }
 
 export function NoteEditor({
@@ -35,12 +38,16 @@ export function NoteEditor({
   onEditorModeChange,
   onBack,
   isClip,
+  clipsFolderId,
+  settings: externalSettings,
 }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showIOCPanel, setShowIOCPanel] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const oci = useOCISync();
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -228,6 +235,42 @@ export function NoteEditor({
               </span>
             )}
           </button>
+        )}
+
+        {externalSettings?.ociWritePAR && (
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (note.iocAnalysis && isClip) {
+                  setShowShareMenu(!showShareMenu);
+                } else {
+                  oci.shareNote(note, clipsFolderId);
+                }
+              }}
+              disabled={oci.syncing}
+              className="p-1.5 rounded text-gray-500 hover:text-gray-300 disabled:opacity-50"
+              title="Share to OCI"
+              aria-label="Share to OCI Object Storage"
+            >
+              <Upload size={16} />
+            </button>
+            {showShareMenu && (
+              <div className="absolute top-full right-0 mt-1 py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 min-w-40">
+                <button
+                  onClick={() => { oci.shareNote(note, clipsFolderId); setShowShareMenu(false); }}
+                  className="w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  Share Note
+                </button>
+                <button
+                  onClick={() => { oci.shareIOCReport(note); setShowShareMenu(false); }}
+                  className="w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  Share IOC Report
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="ml-auto flex items-center gap-2">

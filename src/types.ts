@@ -61,6 +61,9 @@ export interface Settings {
   editorMode: EditorMode;
   sidebarCollapsed: boolean;
   taskViewMode: TaskViewMode;
+  ociWritePAR?: string;
+  ociReadPAR?: string;
+  ociLabel?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -138,6 +141,39 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
   medium: '#eab308',
   high: '#ef4444',
 };
+
+// OCI Sync types
+export interface SharedItemEnvelope {
+  version: 1;
+  type: 'note' | 'clip' | 'ioc-report' | 'full-backup';
+  sharedBy: string;
+  sharedAt: number;
+  payload: Note | Note[] | Task[] | ExportData;
+}
+
+export interface ExportData {
+  version: 1;
+  exportedAt: number;
+  notes: Note[];
+  tasks: Task[];
+  folders: Folder[];
+  tags: Tag[];
+}
+
+export interface SharedManifest {
+  version: 1;
+  updatedAt: number;
+  items: SharedManifestEntry[];
+}
+
+export interface SharedManifestEntry {
+  objectKey: string;
+  type: SharedItemEnvelope['type'];
+  title: string;
+  sharedBy: string;
+  sharedAt: number;
+  sizeBytes?: number;
+}
 
 export const TAG_COLORS = [
   '#6366f1', '#3b82f6', '#06b6d4', '#10b981',

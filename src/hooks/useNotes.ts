@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../db';
-import type { Note, SortOption, SortDirection } from '../types';
+import type { Note, SortOption, SortDirection, IOCType } from '../types';
 import { nanoid } from 'nanoid';
 
 const TRASH_PURGE_DAYS = 30;
@@ -84,6 +84,7 @@ export function useNotes() {
       search?: string;
       sort?: SortOption;
       sortDir?: SortDirection;
+      iocTypes?: IOCType[];
     }) => {
       let filtered = notes;
 
@@ -114,12 +115,24 @@ export function useNotes() {
         );
       }
 
+      if (opts.iocTypes && opts.iocTypes.length > 0) {
+        filtered = filtered.filter((n) =>
+          n.iocTypes && opts.iocTypes!.some((t) => n.iocTypes!.includes(t))
+        );
+      }
+
       const sort = opts.sort || 'updatedAt';
       const dir = opts.sortDir || 'desc';
 
       filtered.sort((a, b) => {
         // Pinned always first
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+
+        if (sort === 'iocCount') {
+          const aCount = a.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
+          const bCount = b.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
+          return dir === 'asc' ? aCount - bCount : bCount - aCount;
+        }
 
         if (sort === 'title') {
           const cmp = a.title.localeCompare(b.title);

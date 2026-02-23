@@ -1,4 +1,4 @@
-import { Pin } from 'lucide-react';
+import { Pin, Shield } from 'lucide-react';
 import type { Note } from '../../types';
 import { formatDate, truncate, cn } from '../../lib/utils';
 
@@ -35,6 +35,12 @@ export function NoteCard({ note, active, onClick }: NoteCardProps) {
       )}
       <div className="flex items-center gap-2 mt-2">
         <span className="text-[10px] text-gray-600">{formatDate(note.updatedAt)}</span>
+        {(note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] text-accent/70 bg-accent/10 px-1.5 rounded-full">
+            <Shield size={9} />
+            {note.iocAnalysis!.iocs.filter((i) => !i.dismissed).length}
+          </span>
+        )}
         {note.tags.length > 0 && (
           <div className="flex gap-1 flex-1 min-w-0 overflow-hidden">
             {note.tags.slice(0, 3).map((tag) => (

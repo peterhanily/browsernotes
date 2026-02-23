@@ -1,8 +1,12 @@
-import { ArrowUpDown, FileText, Trash2 } from 'lucide-react';
-import type { Note, SortOption } from '../../types';
+import { ArrowUpDown, FileText, Trash2, Download } from 'lucide-react';
+import type { Note, SortOption, IOCType } from '../../types';
 import { NoteCard } from './NoteCard';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
-import { useState } from 'react';
+import { IOCFilterBar } from '../Clips/IOCFilterBar';
+import { useState, useRef, useEffect } from 'react';
+import { formatIOCsJSON, formatIOCsCSV } from '../../lib/ioc-export';
+import type { IOCExportEntry } from '../../lib/ioc-export';
+import { downloadFile } from '../../lib/export';
 
 interface NoteListProps {
   notes: Note[];
@@ -13,10 +17,43 @@ interface NoteListProps {
   title?: string;
   showTrash?: boolean;
   onEmptyTrash?: () => void;
+  isClipsView?: boolean;
+  selectedIOCTypes?: IOCType[];
+  onIOCTypesChange?: (types: IOCType[]) => void;
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash }: NoteListProps) {
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash, isClipsView, selectedIOCTypes, onIOCTypesChange }: NoteListProps) {
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  const notesWithIOCs = isClipsView ? notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed)) : [];
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
+
+  const handleBulkExport = (format: 'json' | 'csv') => {
+    setShowExportMenu(false);
+    const entries: IOCExportEntry[] = notesWithIOCs.map((n) => ({
+      clipTitle: n.title,
+      sourceUrl: n.sourceUrl,
+      iocs: n.iocAnalysis!.iocs,
+    }));
+    const dateStr = new Date().toISOString().slice(0, 10);
+    if (format === 'json') {
+      downloadFile(formatIOCsJSON(entries), `iocs-export-${dateStr}.json`, 'application/json');
+    } else {
+      downloadFile(formatIOCsCSV(entries), `iocs-export-${dateStr}.csv`, 'text/csv');
+    }
+  };
 
   return (
     <div className="w-full border-r border-gray-800 flex flex-col h-full overflow-hidden">
@@ -34,12 +71,30 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               <span className="hidden sm:inline">Empty</span>
             </button>
           )}
+          {isClipsView && notesWithIOCs.length > 0 && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+                title="Download IOCs"
+                aria-label="Download IOCs"
+              >
+                <Download size={14} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                  <button onClick={() => handleBulkExport('json')} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 rounded-t-lg">Export JSON</button>
+                  <button onClick={() => handleBulkExport('csv')} className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 rounded-b-lg">Export CSV</button>
+                </div>
+              )}
+            </div>
+          )}
           <div className="relative group">
             <button className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300" aria-label="Sort notes" title="Sort notes">
               <ArrowUpDown size={14} />
             </button>
             <div className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 hidden group-hover:block">
-              {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title']] as [SortOption, string][]).map(([value, label]) => (
+              {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title'], ...(isClipsView ? [['iocCount', 'IOC Count'] as [SortOption, string]] : [])] as [SortOption, string][]).map(([value, label]) => (
                 <button
                   key={value}
                   onClick={() => onSortChange(value)}
@@ -52,6 +107,10 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
           </div>
         </div>
       </div>
+
+      {isClipsView && selectedIOCTypes && onIOCTypesChange && (
+        <IOCFilterBar selectedTypes={selectedIOCTypes} onChange={onIOCTypesChange} />
+      )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {notes.length === 0 ? (

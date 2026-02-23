@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield } from 'lucide-react';
 import type { Note, Tag, EditorMode } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
+import { IOCPanel } from '../Analysis/IOCPanel';
 import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
@@ -18,6 +19,7 @@ interface NoteEditorProps {
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
   onBack?: () => void;
+  isClip?: boolean;
 }
 
 export function NoteEditor({
@@ -32,11 +34,13 @@ export function NoteEditor({
   editorMode,
   onEditorModeChange,
   onBack,
+  isClip,
 }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showIOCPanel, setShowIOCPanel] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -210,6 +214,22 @@ export function NoteEditor({
           )}
         </div>
 
+        {isClip && (
+          <button
+            onClick={() => setShowIOCPanel(!showIOCPanel)}
+            className={cn('p-1.5 rounded hidden md:flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+            title="IOC Analysis"
+            aria-label="Toggle IOC analysis panel"
+          >
+            <Shield size={16} />
+            {(note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
+              <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
+                {note.iocAnalysis!.iocs.filter((i) => !i.dismissed).length}
+              </span>
+            )}
+          </button>
+        )}
+
         <div className="ml-auto flex items-center gap-2">
           {saved && <span className="text-xs text-green-400" role="status">Saved</span>}
           {note.trashed ? (
@@ -247,29 +267,38 @@ export function NoteEditor({
         />
       </div>
 
-      {/* Editor / Preview */}
+      {/* Editor / Preview + IOC Panel */}
       <div className="flex-1 flex overflow-hidden">
-        {showEditor && (
-          <div className={cn('flex-1 flex flex-col', showPreview && 'border-r border-gray-800')}>
-            <textarea
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onKeyDown={handleEditorKeyDown}
-              className="note-editor flex-1 w-full p-2 sm:p-4 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none text-sm leading-relaxed"
-              placeholder="Start writing in markdown..."
-              readOnly={note.trashed}
-              aria-label="Note content editor"
-            />
-          </div>
-        )}
-        {showPreview && (
-          <div className="flex-1 overflow-y-auto p-2 sm:p-4">
-            {content ? (
-              <MarkdownPreview content={content} />
-            ) : (
-              <p className="text-gray-600 text-sm italic">Nothing to preview</p>
-            )}
-          </div>
+        <div className="flex-1 flex overflow-hidden min-w-0">
+          {showEditor && (
+            <div className={cn('flex-1 flex flex-col', showPreview && 'border-r border-gray-800')}>
+              <textarea
+                value={content}
+                onChange={(e) => handleContentChange(e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                className="note-editor flex-1 w-full p-2 sm:p-4 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none text-sm leading-relaxed"
+                placeholder="Start writing in markdown..."
+                readOnly={note.trashed}
+                aria-label="Note content editor"
+              />
+            </div>
+          )}
+          {showPreview && (
+            <div className="flex-1 overflow-y-auto p-2 sm:p-4">
+              {content ? (
+                <MarkdownPreview content={content} />
+              ) : (
+                <p className="text-gray-600 text-sm italic">Nothing to preview</p>
+              )}
+            </div>
+          )}
+        </div>
+        {showIOCPanel && isClip && (
+          <IOCPanel
+            note={note}
+            onUpdate={onUpdate}
+            onClose={() => setShowIOCPanel(false)}
+          />
         )}
       </div>
 

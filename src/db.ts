@@ -15,4 +15,14 @@ db.version(1).stores({
   tags: 'id, name',
 });
 
+db.version(2).stores({
+  notes: 'id, title, folderId, pinned, archived, trashed, createdAt, updatedAt, *tags, *iocTypes',
+}).upgrade((tx) => {
+  return tx.table('notes').toCollection().modify((note) => {
+    if (!note.iocTypes) {
+      note.iocTypes = [];
+    }
+  });
+});
+
 export { db };

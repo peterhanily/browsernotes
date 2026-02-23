@@ -11,6 +11,8 @@ export interface Note {
   sourceUrl?: string;
   sourceTitle?: string;
   color?: string;
+  iocAnalysis?: IOCAnalysis;
+  iocTypes?: IOCType[];
   createdAt: number;
   updatedAt: number;
 }
@@ -69,7 +71,54 @@ export const DEFAULT_SETTINGS: Settings = {
   taskViewMode: 'list',
 };
 
-export type SortOption = 'updatedAt' | 'createdAt' | 'title';
+// IOC Analysis types
+export type IOCType =
+  | 'ipv4' | 'ipv6' | 'domain' | 'url' | 'email'
+  | 'md5' | 'sha1' | 'sha256'
+  | 'cve' | 'mitre-attack' | 'yara-rule' | 'file-path';
+
+export type ConfidenceLevel = 'low' | 'medium' | 'high' | 'confirmed';
+
+export interface IOCEntry {
+  id: string;
+  type: IOCType;
+  value: string;
+  confidence: ConfidenceLevel;
+  analystNotes?: string;
+  attribution?: string;
+  firstSeen: number;
+  dismissed: boolean;
+}
+
+export interface IOCAnalysis {
+  extractedAt: number;
+  iocs: IOCEntry[];
+  analysisSummary?: string;
+}
+
+export const IOC_TYPE_LABELS: Record<IOCType, { label: string; color: string }> = {
+  ipv4:          { label: 'IPv4',         color: '#3b82f6' },
+  ipv6:          { label: 'IPv6',         color: '#6366f1' },
+  domain:        { label: 'Domain',       color: '#06b6d4' },
+  url:           { label: 'URL',          color: '#8b5cf6' },
+  email:         { label: 'Email',        color: '#ec4899' },
+  md5:           { label: 'MD5',          color: '#f97316' },
+  sha1:          { label: 'SHA-1',        color: '#eab308' },
+  sha256:        { label: 'SHA-256',      color: '#ef4444' },
+  cve:           { label: 'CVE',          color: '#10b981' },
+  'mitre-attack': { label: 'MITRE ATT&CK', color: '#14b8a6' },
+  'yara-rule':   { label: 'YARA Rule',   color: '#a855f7' },
+  'file-path':   { label: 'File Path',   color: '#64748b' },
+};
+
+export const CONFIDENCE_LEVELS: Record<ConfidenceLevel, { label: string; color: string }> = {
+  low:       { label: 'Low',       color: '#6b7280' },
+  medium:    { label: 'Medium',    color: '#eab308' },
+  high:      { label: 'High',      color: '#f97316' },
+  confirmed: { label: 'Confirmed', color: '#ef4444' },
+};
+
+export type SortOption = 'updatedAt' | 'createdAt' | 'title' | 'iocCount';
 export type SortDirection = 'asc' | 'desc';
 
 export const NOTE_COLORS = [

@@ -13,11 +13,12 @@ import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode } from './types';
+import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType } from './types';
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
+import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 
 export default function App() {
   const { settings, updateSettings, toggleTheme } = useSettings();
@@ -43,6 +44,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
 
   // Debounce search for filtering performance
   useEffect(() => {
@@ -61,13 +63,19 @@ export default function App() {
         const clipsFolder = await findOrCreateFolder('Clips');
         let firstNote = null;
         for (const clip of clips) {
+          const content = clip.content || '';
+          const freshIOCs = extractIOCs(content);
+          const iocAnalysis = mergeIOCAnalysis(undefined, freshIOCs);
+          const iocTypes = [...new Set(freshIOCs.filter((i) => !i.dismissed).map((i) => i.type))];
           const note = await notes.createNote({
-            title: clip.title || clip.content?.substring(0, 80) || 'Clip',
-            content: clip.content || '',
+            title: clip.title || content.substring(0, 80) || 'Clip',
+            content,
             folderId: clipsFolder.id,
             sourceUrl: clip.sourceUrl,
             sourceTitle: clip.sourceTitle,
             createdAt: clip.createdAt || Date.now(),
+            iocAnalysis,
+            iocTypes,
           });
           if (!firstNote) firstNote = note;
         }
@@ -103,8 +111,9 @@ export default function App() {
         showArchived: showArchive,
         search: debouncedSearch,
         sort,
+        iocTypes: activeView === 'clips' ? selectedIOCTypes : undefined,
       }),
-    [notes.getFilteredNotes, effectiveFolderId, clipsFolderId, selectedTag, showTrash, showArchive, debouncedSearch, sort]
+    [notes.getFilteredNotes, effectiveFolderId, clipsFolderId, selectedTag, showTrash, showArchive, debouncedSearch, sort, activeView, selectedIOCTypes]
   );
 
   // Filtered tasks
@@ -311,6 +320,9 @@ export default function App() {
                 title={listTitle}
                 showTrash={showTrash}
                 onEmptyTrash={notes.emptyTrash}
+                isClipsView={activeView === 'clips'}
+                selectedIOCTypes={selectedIOCTypes}
+                onIOCTypesChange={setSelectedIOCTypes}
               />
             </div>
             <div className={cn('flex-1 min-w-0 overflow-hidden', !selectedNote && 'hidden md:block')}>
@@ -327,6 +339,7 @@ export default function App() {
                   editorMode={editorMode}
                   onEditorModeChange={setEditorMode}
                   onBack={() => setSelectedNoteId(undefined)}
+                  isClip={activeView === 'clips'}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">

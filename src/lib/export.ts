@@ -1,12 +1,14 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, ExportData } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, ExportData, TimelineEventType, ConfidenceLevel } from '../types';
+import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../types';
 
 export async function exportJSON(): Promise<string> {
-  const [notes, tasks, folders, tags] = await Promise.all([
+  const [notes, tasks, folders, tags, timelineEvents] = await Promise.all([
     db.notes.toArray(),
     db.tasks.toArray(),
     db.folders.toArray(),
     db.tags.toArray(),
+    db.timelineEvents.toArray(),
   ]);
 
   const data: ExportData = {
@@ -16,6 +18,7 @@ export async function exportJSON(): Promise<string> {
     tasks,
     folders,
     tags,
+    timelineEvents,
   };
 
   return JSON.stringify(data, null, 2);
@@ -109,7 +112,37 @@ function sanitizeTag(raw: unknown): Tag | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number }> {
+const VALID_EVENT_TYPES = Object.keys(TIMELINE_EVENT_TYPE_LABELS) as string[];
+const VALID_CONFIDENCE = Object.keys(CONFIDENCE_LEVELS) as string[];
+
+function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    id: str(r.id),
+    timestamp: num(r.timestamp, Date.now()),
+    timestampEnd: r.timestampEnd != null ? num(r.timestampEnd) : undefined,
+    title: str(r.title),
+    description: r.description != null ? str(r.description) : undefined,
+    eventType: (VALID_EVENT_TYPES.includes(str(r.eventType)) ? str(r.eventType) : 'other') as TimelineEventType,
+    source: str(r.source),
+    confidence: (VALID_CONFIDENCE.includes(str(r.confidence)) ? str(r.confidence) : 'low') as ConfidenceLevel,
+    linkedIOCIds: strArr(r.linkedIOCIds),
+    linkedNoteIds: strArr(r.linkedNoteIds),
+    linkedTaskIds: strArr(r.linkedTaskIds),
+    mitreAttackIds: strArr(r.mitreAttackIds),
+    actor: r.actor != null ? str(r.actor) : undefined,
+    assets: strArr(r.assets),
+    tags: strArr(r.tags),
+    rawData: r.rawData != null ? str(r.rawData) : undefined,
+    starred: bool(r.starred),
+    folderId: r.folderId != null ? str(r.folderId) : undefined,
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -129,17 +162,22 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
   const tasks = data.tasks.map(sanitizeTask).filter((t: Task | null): t is Task => t !== null && !!t.id);
   const folders = data.folders.map(sanitizeFolder).filter((f: Folder | null): f is Folder => f !== null && !!f.id);
   const tags = data.tags.map(sanitizeTag).filter((t: Tag | null): t is Tag => t !== null && !!t.id);
+  const timelineEvents = (Array.isArray(data.timelineEvents) ? data.timelineEvents : [])
+    .map(sanitizeTimelineEvent)
+    .filter((e: TimelineEvent | null): e is TimelineEvent => e !== null && !!e.id);
 
-  await db.transaction('rw', db.notes, db.tasks, db.folders, db.tags, async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
     await db.tags.clear();
+    await db.timelineEvents.clear();
 
     await db.notes.bulkAdd(notes);
     await db.tasks.bulkAdd(tasks);
     await db.folders.bulkAdd(folders);
     await db.tags.bulkAdd(tags);
+    await db.timelineEvents.bulkAdd(timelineEvents);
   });
 
   return {
@@ -147,6 +185,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     tasks: tasks.length,
     folders: folders.length,
     tags: tags.length,
+    timelineEvents: timelineEvents.length,
   };
 }
 

@@ -1,0 +1,125 @@
+import React from 'react';
+import { Star, FileText, ListChecks, Shield, Tag } from 'lucide-react';
+import type { TimelineEvent } from '../../types';
+import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
+import { cn, truncate } from '../../lib/utils';
+
+interface TimelineEventCardProps {
+  event: TimelineEvent;
+  active?: boolean;
+  onClick: () => void;
+  onToggleStar: () => void;
+}
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+export const TimelineEventCard = React.memo(function TimelineEventCard({
+  event,
+  active,
+  onClick,
+  onToggleStar,
+}: TimelineEventCardProps) {
+  const typeInfo = TIMELINE_EVENT_TYPE_LABELS[event.eventType];
+  const confidenceInfo = CONFIDENCE_LEVELS[event.confidence];
+  const preview = event.description?.replace(/[#*`_[\]()>-]/g, '').trim() || '';
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left p-3 rounded-lg border transition-colors group',
+        active
+          ? 'bg-accent/10 border-accent/30'
+          : 'bg-gray-800/50 border-gray-800 hover:bg-gray-800 hover:border-gray-700'
+      )}
+    >
+      {/* Top row: time, type badge, confidence, star */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400 font-mono shrink-0">{formatTime(event.timestamp)}</span>
+        <span
+          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
+          style={{
+            backgroundColor: `${typeInfo.color}20`,
+            color: typeInfo.color,
+          }}
+        >
+          {typeInfo.label}
+        </span>
+        <span
+          className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+          style={{
+            backgroundColor: `${confidenceInfo.color}20`,
+            color: confidenceInfo.color,
+          }}
+        >
+          {confidenceInfo.label}
+        </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+          className={cn(
+            'ml-auto p-0.5 rounded transition-colors shrink-0',
+            event.starred
+              ? 'text-yellow-400'
+              : 'text-gray-600 opacity-0 group-hover:opacity-100 hover:text-yellow-400'
+          )}
+          aria-label={event.starred ? 'Unstar event' : 'Star event'}
+        >
+          <Star size={14} fill={event.starred ? 'currentColor' : 'none'} />
+        </button>
+      </div>
+
+      {/* Title */}
+      <h3 className="font-medium text-sm text-gray-200 truncate mt-1.5">
+        {event.title || 'Untitled Event'}
+      </h3>
+
+      {/* Description preview */}
+      {preview && (
+        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{truncate(preview, 150)}</p>
+      )}
+
+      {/* Bottom metadata */}
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        {event.source && (
+          <span className="text-[10px] px-1.5 rounded-full bg-gray-700/50 text-gray-400 truncate max-w-[100px]">
+            {event.source}
+          </span>
+        )}
+        {event.actor && (
+          <span className="text-[10px] px-1.5 rounded-full bg-purple-500/15 text-purple-400 truncate max-w-[100px]">
+            {event.actor}
+          </span>
+        )}
+        {event.linkedNoteIds.length > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+            <FileText size={9} />{event.linkedNoteIds.length}
+          </span>
+        )}
+        {event.linkedTaskIds.length > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+            <ListChecks size={9} />{event.linkedTaskIds.length}
+          </span>
+        )}
+        {event.linkedIOCIds.length > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] text-accent/70">
+            <Shield size={9} />{event.linkedIOCIds.length}
+          </span>
+        )}
+        {event.assets.length > 0 && (
+          <span className="text-[10px] text-gray-500">{event.assets.length} asset{event.assets.length !== 1 ? 's' : ''}</span>
+        )}
+        {event.tags.length > 0 && (
+          <div className="flex gap-1 flex-1 min-w-0 overflow-hidden">
+            {event.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="flex items-center gap-0.5 text-[10px] text-accent/70 bg-accent/10 px-1.5 rounded-full truncate">
+                <Tag size={8} />{tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+});

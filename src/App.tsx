@@ -5,10 +5,12 @@ import { Sidebar } from './components/Layout/Sidebar';
 import { NoteList } from './components/Notes/NoteList';
 import { NoteEditor } from './components/Notes/NoteEditor';
 import { TaskListView } from './components/Tasks/TaskList';
+import { TimelineView } from './components/Timeline/TimelineView';
 import { QuickCapture } from './components/Clips/QuickCapture';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { useNotes } from './hooks/useNotes';
 import { useTasks } from './hooks/useTasks';
+import { useTimeline } from './hooks/useTimeline';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
@@ -27,11 +29,12 @@ export default function App() {
   const { settings, updateSettings, toggleTheme } = useSettings();
   const notes = useNotes();
   const tasks = useTasks();
+  const timeline = useTimeline();
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder } = useFolders();
   const { tags, createTag } = useTags();
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' ? settings.defaultView : 'notes';
   const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
@@ -129,6 +132,16 @@ export default function App() {
     [tasks.getFilteredTasks, selectedFolderId, selectedTag]
   );
 
+  // Filtered timeline events
+  const filteredTimelineEvents = useMemo(
+    () =>
+      timeline.getFilteredEvents({
+        folderId: selectedFolderId,
+        tag: selectedTag,
+      }),
+    [timeline.getFilteredEvents, selectedFolderId, selectedTag]
+  );
+
   // Selected note
   const selectedNote = useMemo(
     () => notes.notes.find((n) => n.id === selectedNoteId),
@@ -185,7 +198,8 @@ export default function App() {
   const handleImportComplete = useCallback(() => {
     notes.reload();
     tasks.reload();
-  }, [notes.reload, tasks.reload]);
+    timeline.reload();
+  }, [notes.reload, tasks.reload, timeline.reload]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {
@@ -212,7 +226,8 @@ export default function App() {
     setPendingImportFile(null);
     notes.reload();
     tasks.reload();
-  }, [pendingImportFile, notes.reload, tasks.reload]);
+    timeline.reload();
+  }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload]);
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
@@ -275,7 +290,8 @@ export default function App() {
     onOpenSettings: () => { setShowSettings(true); },
     noteCounts,
     taskCounts: tasks.taskCounts,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, createFolder, handleDeleteFolder, updateFolder, noteCounts, tasks.taskCounts]);
+    timelineCounts: timeline.eventCounts,
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, createFolder, handleDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts]);
 
   return (
     <>
@@ -312,6 +328,18 @@ export default function App() {
             notes={notes.notes}
             onImportComplete={handleImportComplete}
             onOpenBrowseShared={() => setBrowseSharedOpen(true)}
+          />
+        ) : activeView === 'timeline' ? (
+          <TimelineView
+            events={filteredTimelineEvents}
+            allTags={tags}
+            folders={folders}
+            onCreateTag={createTag}
+            onCreateEvent={(data) => timeline.createEvent(data)}
+            onUpdateEvent={timeline.updateEvent}
+            onDeleteEvent={timeline.deleteEvent}
+            onToggleStar={timeline.toggleStar}
+            getFilteredEvents={timeline.getFilteredEvents}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  FileText, ListChecks, FolderOpen, Tag, Trash2,
+  FileText, ListChecks, Clock, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
   PanelLeftClose, Github, Download, Chrome,
 } from 'lucide-react';
@@ -29,6 +29,7 @@ interface SidebarProps {
   onToggleCollapsed: () => void;
   noteCounts: { total: number; trashed: number; archived: number };
   taskCounts: { todo: number; 'in-progress': number; done: number; total: number };
+  timelineCounts?: { total: number; starred: number };
   onNavigate?: () => void;
 }
 
@@ -53,6 +54,7 @@ export function Sidebar({
   onToggleCollapsed,
   noteCounts,
   taskCounts,
+  timelineCounts,
   onNavigate,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
@@ -116,6 +118,13 @@ export function Sidebar({
           count={taskCounts.total}
           active={activeView === 'tasks' && !selectedFolderId && !selectedTag}
           onClick={() => nav(() => { onViewChange('tasks'); clearFilters(); })}
+        />
+        <SidebarItem
+          icon={<Clock size={18} />}
+          label="Timeline"
+          count={timelineCounts?.total}
+          active={activeView === 'timeline' && !selectedFolderId && !selectedTag}
+          onClick={() => nav(() => { onViewChange('timeline'); clearFilters(); })}
         />
         {/* Folders */}
         <div className="pt-3">

@@ -69,7 +69,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks';
+export type ViewMode = 'notes' | 'tasks' | 'timeline';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -140,6 +140,60 @@ export const CONFIDENCE_LEVELS: Record<ConfidenceLevel, { label: string; color: 
   confirmed: { label: 'Confirmed', color: '#ef4444' },
 };
 
+// Timeline types
+export type TimelineEventType =
+  | 'initial-access' | 'execution' | 'persistence' | 'privilege-escalation'
+  | 'defense-evasion' | 'credential-access' | 'discovery' | 'lateral-movement'
+  | 'collection' | 'exfiltration' | 'command-and-control' | 'impact'
+  | 'detection' | 'containment' | 'eradication' | 'recovery'
+  | 'communication' | 'evidence'
+  | 'other';
+
+export interface TimelineEvent {
+  id: string;
+  timestamp: number;
+  timestampEnd?: number;
+  title: string;
+  description?: string;
+  eventType: TimelineEventType;
+  source: string;
+  confidence: ConfidenceLevel;
+  linkedIOCIds: string[];
+  linkedNoteIds: string[];
+  linkedTaskIds: string[];
+  mitreAttackIds: string[];
+  actor?: string;
+  assets: string[];
+  tags: string[];
+  rawData?: string;
+  starred: boolean;
+  folderId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const TIMELINE_EVENT_TYPE_LABELS: Record<TimelineEventType, { label: string; color: string }> = {
+  'initial-access':        { label: 'Initial Access',        color: '#ef4444' },
+  'execution':             { label: 'Execution',             color: '#f97316' },
+  'persistence':           { label: 'Persistence',           color: '#eab308' },
+  'privilege-escalation':  { label: 'Privilege Escalation',  color: '#f59e0b' },
+  'defense-evasion':       { label: 'Defense Evasion',       color: '#84cc16' },
+  'credential-access':     { label: 'Credential Access',     color: '#22c55e' },
+  'discovery':             { label: 'Discovery',             color: '#10b981' },
+  'lateral-movement':      { label: 'Lateral Movement',      color: '#14b8a6' },
+  'collection':            { label: 'Collection',            color: '#06b6d4' },
+  'exfiltration':          { label: 'Exfiltration',          color: '#0ea5e9' },
+  'command-and-control':   { label: 'C2',                    color: '#3b82f6' },
+  'impact':                { label: 'Impact',                color: '#6366f1' },
+  'detection':             { label: 'Detection',             color: '#8b5cf6' },
+  'containment':           { label: 'Containment',           color: '#a855f7' },
+  'eradication':           { label: 'Eradication',           color: '#d946ef' },
+  'recovery':              { label: 'Recovery',              color: '#ec4899' },
+  'communication':         { label: 'Communication',         color: '#f43f5e' },
+  'evidence':              { label: 'Evidence',              color: '#64748b' },
+  'other':                 { label: 'Other',                 color: '#6b7280' },
+};
+
 export type SortOption = 'updatedAt' | 'createdAt' | 'title' | 'iocCount';
 export type SortDirection = 'asc' | 'desc';
 
@@ -177,6 +231,7 @@ export interface ExportData {
   tasks: Task[];
   folders: Folder[];
   tags: Tag[];
+  timelineEvents?: TimelineEvent[];
 }
 
 export interface SharedManifest {

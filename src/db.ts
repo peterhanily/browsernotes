@@ -1,11 +1,12 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent } from './types';
 
 const db = new Dexie('BrowserNotesDB') as Dexie & {
   notes: EntityTable<Note, 'id'>;
   tasks: EntityTable<Task, 'id'>;
   folders: EntityTable<Folder, 'id'>;
   tags: EntityTable<Tag, 'id'>;
+  timelineEvents: EntityTable<TimelineEvent, 'id'>;
 };
 
 db.version(1).stores({
@@ -31,6 +32,10 @@ db.version(3).stores({
   return tx.table('tasks').toCollection().modify((task) => {
     if (!task.iocTypes) task.iocTypes = [];
   });
+});
+
+db.version(4).stores({
+  timelineEvents: 'id, timestamp, eventType, source, starred, folderId, createdAt, updatedAt, *tags',
 });
 
 export { db };

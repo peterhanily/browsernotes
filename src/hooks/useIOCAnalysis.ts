@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Note, IOCEntry, IOCType, IOCAnalysis } from '../types';
+import type { Note, IOCEntry, IOCAnalysis } from '../types';
 import { extractIOCs, mergeIOCAnalysis } from '../lib/ioc-extractor';
 
 interface UseIOCAnalysisOptions {
@@ -47,20 +47,7 @@ export function useIOCAnalysis({ note, onUpdate }: UseIOCAnalysisOptions) {
     updateIOC(iocId, { dismissed: false });
   }, [updateIOC]);
 
-  const getIOCsByType = useCallback((): Map<IOCType, IOCEntry[]> => {
-    if (!analysis) return new Map();
-    const grouped = new Map<IOCType, IOCEntry[]>();
-    for (const ioc of analysis.iocs) {
-      const list = grouped.get(ioc.type) || [];
-      list.push(ioc);
-      grouped.set(ioc.type, list);
-    }
-    return grouped;
-  }, [analysis]);
-
-  const hasAnalysis = !!analysis;
   const iocCount = analysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
-  const lastAnalyzedAt = analysis?.extractedAt;
 
   const activeIOCs = useMemo(
     () => analysis?.iocs.filter((i) => !i.dismissed) ?? [],
@@ -80,10 +67,7 @@ export function useIOCAnalysis({ note, onUpdate }: UseIOCAnalysisOptions) {
     updateSummary,
     dismissIOC,
     restoreIOC,
-    getIOCsByType,
-    hasAnalysis,
     iocCount,
-    lastAnalyzedAt,
     activeIOCs,
     dismissedIOCs,
   };

@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Modal } from '../components/Common/Modal';
 import { ConfirmDialog } from '../components/Common/ConfirmDialog';
 import { ThemeToggle } from '../components/Common/ThemeToggle';
-import { SearchBar } from '../components/Common/SearchBar';
 import { NoteCard } from '../components/Notes/NoteCard';
 import type { Note } from '../types';
 
@@ -89,29 +88,6 @@ describe('ThemeToggle', () => {
     render(<ThemeToggle theme="dark" onToggle={() => { toggled = true; }} />);
     fireEvent.click(screen.getByRole('button'));
     expect(toggled).toBe(true);
-  });
-});
-
-describe('SearchBar', () => {
-  it('renders with placeholder', () => {
-    render(<SearchBar value="" onChange={() => {}} />);
-    expect(screen.getByPlaceholderText('Search notes & tasks...')).toBeInTheDocument();
-  });
-
-  it('calls onChange on input', () => {
-    let value = '';
-    render(<SearchBar value={value} onChange={(v) => { value = v; }} />);
-    fireEvent.change(screen.getByPlaceholderText('Search notes & tasks...'), {
-      target: { value: 'hello' },
-    });
-    expect(value).toBe('hello');
-  });
-
-  it('shows clear button when value is present', () => {
-    render(<SearchBar value="test" onChange={() => {}} />);
-    // Clear button should exist
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBeGreaterThan(0);
   });
 });
 

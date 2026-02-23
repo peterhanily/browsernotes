@@ -1,0 +1,200 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { useTags } from '../hooks/useTags';
+import { db } from '../db';
+import { TAG_COLORS } from '../types';
+
+describe('useTags', () => {
+  beforeEach(async () => {
+    await db.tags.clear();
+    await db.notes.clear();
+    await db.tasks.clear();
+  });
+
+  it('starts with empty tags', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+    expect(result.current.tags).toEqual([]);
+  });
+
+  it('creates a tag with auto-cycling color', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('work');
+    });
+
+    expect(result.current.tags).toHaveLength(1);
+    expect(result.current.tags[0].name).toBe('work');
+    expect(result.current.tags[0].color).toBe(TAG_COLORS[0]);
+  });
+
+  it('creates a tag with explicit color', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('urgent', '#ff0000');
+    });
+
+    expect(result.current.tags[0].color).toBe('#ff0000');
+  });
+
+  it('deduplicates tags by name (case-insensitive)', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('Work');
+    });
+
+    let dup: Awaited<ReturnType<typeof result.current.createTag>>;
+    await act(async () => {
+      dup = await result.current.createTag('work');
+    });
+
+    expect(result.current.tags).toHaveLength(1);
+    expect(dup!.name).toBe('Work'); // returns existing
+  });
+
+  it('persists tags to IndexedDB', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('persisted');
+    });
+
+    const stored = await db.tags.toArray();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].name).toBe('persisted');
+  });
+
+  it('updates a tag', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('old-name');
+    });
+    const id = result.current.tags[0].id;
+
+    await act(async () => {
+      await result.current.updateTag(id, { color: '#ef4444' });
+    });
+
+    expect(result.current.tags[0].color).toBe('#ef4444');
+  });
+
+  it('propagates tag rename to notes', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('old-tag');
+    });
+    const tagId = result.current.tags[0].id;
+
+    // Add a note with that tag
+    await db.notes.add({
+      id: 'n1', title: 'Tagged note', content: '', tags: ['old-tag'],
+      pinned: false, archived: false, trashed: false,
+      createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await act(async () => {
+      await result.current.updateTag(tagId, { name: 'new-tag' });
+    });
+
+    const note = await db.notes.get('n1');
+    expect(note!.tags).toEqual(['new-tag']);
+  });
+
+  it('propagates tag rename to tasks', async () => {
+    const { result } = renderHook(() => useTags());
+    await act(async () => {});
+
+    await act(async () => {
+      await result.current.createTag('old-tag');
+    });
+    const tagId = result.current.tags[0].id;
+
+    await db.tasks.add({
+      id: 't1', title: 'Tagged task', tags: ['old-tag'],
+      completed: false, priority: 'none', status: 'todo',
+      order: 1, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await act(async () => {
+      await result.current.updateTag(tagId, { name: 'new-tag' });
+    });
+
+    const task = await db.tasks.get('t1');
+    expect(task!.tags).toEqual(['new-tag']);
+  });
+
+  describe('deleteTag', () => {
+    it('removes the tag', async () => {
+      const { result } = renderHook(() => useTags());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createTag('doomed');
+      });
+      const id = result.current.tags[0].id;
+
+      await act(async () => {
+        await result.current.deleteTag(id);
+      });
+
+      expect(result.current.tags).toHaveLength(0);
+    });
+
+    it('removes tag from notes', async () => {
+      const { result } = renderHook(() => useTags());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createTag('remove-me');
+      });
+      const tagId = result.current.tags[0].id;
+
+      await db.notes.add({
+        id: 'n1', title: 'Note', content: '', tags: ['remove-me', 'keep-me'],
+        pinned: false, archived: false, trashed: false,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.deleteTag(tagId);
+      });
+
+      const note = await db.notes.get('n1');
+      expect(note!.tags).toEqual(['keep-me']);
+    });
+
+    it('removes tag from tasks', async () => {
+      const { result } = renderHook(() => useTags());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createTag('remove-me');
+      });
+      const tagId = result.current.tags[0].id;
+
+      await db.tasks.add({
+        id: 't1', title: 'Task', tags: ['remove-me', 'keep-me'],
+        completed: false, priority: 'none', status: 'todo',
+        order: 1, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.deleteTag(tagId);
+      });
+
+      const task = await db.tasks.get('t1');
+      expect(task!.tags).toEqual(['keep-me']);
+    });
+  });
+});

@@ -4,6 +4,7 @@ import { Modal } from '../components/Common/Modal';
 import { ConfirmDialog } from '../components/Common/ConfirmDialog';
 import { ThemeToggle } from '../components/Common/ThemeToggle';
 import { NoteCard } from '../components/Notes/NoteCard';
+import { Header } from '../components/Layout/Header';
 import type { Note } from '../types';
 
 describe('Modal', () => {
@@ -126,5 +127,86 @@ describe('NoteCard', () => {
     const untitled = { ...note, title: '' };
     render(<NoteCard note={untitled} active={false} onClick={() => {}} />);
     expect(screen.getByText('Untitled')).toBeInTheDocument();
+  });
+
+  it('shows folder name badge when folderName is set', () => {
+    render(<NoteCard note={note} active={false} onClick={() => {}} folderName="Work" folderColor="#3b82f6" />);
+    expect(screen.getByText('Work')).toBeInTheDocument();
+  });
+
+  it('does not show folder badge when folderName is not set', () => {
+    render(<NoteCard note={note} active={false} onClick={() => {}} />);
+    expect(screen.queryByText('Work')).not.toBeInTheDocument();
+  });
+
+  it('applies folder color left border when not active', () => {
+    const { container } = render(<NoteCard note={note} active={false} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
+    const button = container.querySelector('button')!;
+    // jsdom normalizes hex to rgb
+    expect(button.style.borderLeftColor).toBe('rgb(239, 68, 68)');
+    expect(parseInt(button.style.borderLeftWidth)).toBe(3);
+  });
+
+  it('does not apply folder color left border when active', () => {
+    const { container } = render(<NoteCard note={note} active={true} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
+    const button = container.querySelector('button')!;
+    expect(button.style.borderLeftColor).toBe('');
+  });
+
+  it('shows IOC count badge when note has active IOCs', () => {
+    const noteWithIOCs: Note = {
+      ...note,
+      iocAnalysis: {
+        extractedAt: Date.now(),
+        iocs: [
+          { id: 'i1', type: 'ipv4', value: '1.2.3.4', confidence: 'high', firstSeen: Date.now(), dismissed: false },
+          { id: 'i2', type: 'domain', value: 'evil.com', confidence: 'high', firstSeen: Date.now(), dismissed: false },
+          { id: 'i3', type: 'md5', value: 'abc', confidence: 'low', firstSeen: Date.now(), dismissed: true },
+        ],
+      },
+    };
+    render(<NoteCard note={noteWithIOCs} active={false} onClick={() => {}} />);
+    expect(screen.getByText('2')).toBeInTheDocument(); // 2 non-dismissed
+  });
+});
+
+describe('Header', () => {
+  const defaultProps = {
+    onOpenSearch: () => {},
+    theme: 'dark' as const,
+    onToggleTheme: () => {},
+    onNewNote: () => {},
+    onNewTask: () => {},
+    onToggleSidebar: () => {},
+    onMobileMenuToggle: () => {},
+    sidebarCollapsed: false,
+    onQuickSave: () => {},
+    onQuickLoad: () => {},
+  };
+
+  it('highlights Note button when activeView is notes', () => {
+    render(<Header {...defaultProps} activeView="notes" />);
+    const noteBtn = screen.getByTitle('New Note (Ctrl+N)');
+    expect(noteBtn.className).toContain('bg-accent');
+  });
+
+  it('does not highlight Note button when activeView is tasks', () => {
+    render(<Header {...defaultProps} activeView="tasks" />);
+    const noteBtn = screen.getByTitle('New Note (Ctrl+N)');
+    expect(noteBtn.className).toContain('bg-gray-700');
+    expect(noteBtn.className).not.toContain('bg-accent');
+  });
+
+  it('highlights Task button when activeView is tasks', () => {
+    render(<Header {...defaultProps} activeView="tasks" />);
+    const taskBtn = screen.getByTitle('New Task (Ctrl+Shift+T)');
+    expect(taskBtn.className).toContain('bg-accent');
+  });
+
+  it('does not highlight Task button when activeView is notes', () => {
+    render(<Header {...defaultProps} activeView="notes" />);
+    const taskBtn = screen.getByTitle('New Task (Ctrl+Shift+T)');
+    expect(taskBtn.className).toContain('bg-gray-700');
+    expect(taskBtn.className).not.toContain('bg-accent');
   });
 });

@@ -18,6 +18,7 @@ import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
+import { SearchOverlay } from './components/Search/SearchOverlay';
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 
 export default function App() {
@@ -34,9 +35,7 @@ export default function App() {
   const [selectedTag, setSelectedTag] = useState<string>();
   const [showTrash, setShowTrash] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [searchFocusRequested, setSearchFocusRequested] = useState(false);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [sort, setSort] = useState<SortOption>('updatedAt');
   const [editorMode, setEditorMode] = useState<EditorMode>(settings.editorMode);
   const [taskViewMode, setTaskViewMode] = useState<TaskViewMode>(settings.taskViewMode);
@@ -45,12 +44,6 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
-
-  // Debounce search for filtering performance
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -112,11 +105,10 @@ export default function App() {
         tag: selectedTag,
         showTrashed: showTrash,
         showArchived: showArchive,
-        search: debouncedSearch,
         sort,
         iocTypes: activeView === 'clips' ? selectedIOCTypes : undefined,
       }),
-    [notes.getFilteredNotes, effectiveFolderId, clipsFolderId, selectedTag, showTrash, showArchive, debouncedSearch, sort, activeView, selectedIOCTypes]
+    [notes.getFilteredNotes, effectiveFolderId, clipsFolderId, selectedTag, showTrash, showArchive, sort, activeView, selectedIOCTypes]
   );
 
   // Filtered tasks
@@ -125,9 +117,8 @@ export default function App() {
       tasks.getFilteredTasks({
         folderId: selectedFolderId,
         tag: selectedTag,
-        search: debouncedSearch,
       }),
-    [tasks.getFilteredTasks, selectedFolderId, selectedTag, debouncedSearch]
+    [tasks.getFilteredTasks, selectedFolderId, selectedTag]
   );
 
   // Selected note
@@ -216,13 +207,37 @@ export default function App() {
   }, [pendingImportFile, notes.reload, tasks.reload]);
 
   // Keyboard shortcuts
+  // Search overlay navigation callbacks
+  const handleSearchNavigateToNote = useCallback((id: string) => {
+    setActiveView('notes');
+    setSelectedNoteId(id);
+    setSelectedFolderId(undefined);
+    setSelectedTag(undefined);
+    setShowTrash(false);
+    setShowArchive(false);
+  }, []);
+
+  const handleSearchNavigateToClip = useCallback((id: string) => {
+    setActiveView('clips');
+    setSelectedNoteId(id);
+    setSelectedFolderId(undefined);
+    setSelectedTag(undefined);
+  }, []);
+
+  const handleSearchNavigateToTask = useCallback((_id: string) => {
+    setActiveView('tasks');
+    setSelectedFolderId(undefined);
+    setSelectedTag(undefined);
+  }, []);
+
   useKeyboardShortcuts({
     onNewNote: handleNewNote,
     onNewTask: handleNewTask,
-    onSearch: () => setSearchFocusRequested(true),
+    onSearch: () => setSearchOverlayOpen(true),
     onSave: handleQuickSave,
     onTogglePreview: handleToggleEditorMode,
     onEscape: () => {
+      setSearchOverlayOpen(false);
       setShowQuickCapture(false);
       setShowSettings(false);
       setMobileSidebarOpen(false);
@@ -245,10 +260,7 @@ export default function App() {
       <AppLayout
         header={
           <Header
-            search={search}
-            onSearchChange={setSearch}
-            searchFocusRequested={searchFocusRequested}
-            onSearchFocusHandled={() => setSearchFocusRequested(false)}
+            onOpenSearch={() => setSearchOverlayOpen(true)}
             theme={settings.theme}
             onToggleTheme={toggleTheme}
             onNewNote={() => setShowQuickCapture(true)}
@@ -402,6 +414,17 @@ export default function App() {
         message="This will replace all your current notes, tasks, folders, and tags with the backup data. This cannot be undone."
         confirmLabel="Replace All Data"
         danger
+      />
+
+      <SearchOverlay
+        open={searchOverlayOpen}
+        onClose={() => setSearchOverlayOpen(false)}
+        notes={notes.notes}
+        tasks={tasks.tasks}
+        clipsFolderId={clipsFolderId}
+        onNavigateToNote={handleSearchNavigateToNote}
+        onNavigateToClip={handleSearchNavigateToClip}
+        onNavigateToTask={handleSearchNavigateToTask}
       />
     </>
   );

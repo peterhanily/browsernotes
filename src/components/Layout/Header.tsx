@@ -1,15 +1,11 @@
-import { Plus, Menu, ListChecks, Github, Download, Chrome, HardDriveDownload, FolderUp } from 'lucide-react';
+import { Plus, Menu, ListChecks, Search, Github, Download, Chrome, HardDriveDownload, FolderUp } from 'lucide-react';
 import { useRef } from 'react';
-import { SearchBar } from '../Common/SearchBar';
 import { ThemeToggle } from '../Common/ThemeToggle';
 import logoSvgRaw from '/logo.svg?raw';
 const logoSvg = `data:image/svg+xml,${encodeURIComponent(logoSvgRaw)}`;
 
 interface HeaderProps {
-  search: string;
-  onSearchChange: (value: string) => void;
-  searchFocusRequested: boolean;
-  onSearchFocusHandled: () => void;
+  onOpenSearch: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onNewNote: () => void;
@@ -22,10 +18,7 @@ interface HeaderProps {
 }
 
 export function Header({
-  search,
-  onSearchChange,
-  searchFocusRequested,
-  onSearchFocusHandled,
+  onOpenSearch,
   theme,
   onToggleTheme,
   onNewNote,
@@ -67,12 +60,15 @@ export function Header({
         </span>
       </a>
 
-      <SearchBar
-        value={search}
-        onChange={onSearchChange}
-        focusRequested={searchFocusRequested}
-        onFocusHandled={onSearchFocusHandled}
-      />
+      <button
+        onClick={onOpenSearch}
+        className="flex items-center gap-2 flex-1 max-w-md pl-3 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-500 hover:text-gray-400 hover:border-gray-600 text-sm transition-colors cursor-pointer"
+        title="Search all (Ctrl+K)"
+      >
+        <Search size={16} />
+        <span className="hidden sm:inline">Search all...</span>
+        <kbd className="hidden sm:inline ml-auto text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-500 border border-gray-600 font-mono">Ctrl+K</kbd>
+      </button>
 
       {/* Links — hidden on mobile, shown on md+ */}
       <div className="hidden md:flex items-center gap-1">

@@ -51,7 +51,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'clips';
+export type ViewMode = 'notes' | 'tasks';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 

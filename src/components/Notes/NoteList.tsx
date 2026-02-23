@@ -1,9 +1,9 @@
 import { ArrowUpDown, FileText, Trash2, Download } from 'lucide-react';
-import type { Note, SortOption, IOCType } from '../../types';
+import type { Note, SortOption, IOCType, Folder } from '../../types';
 import { NoteCard } from './NoteCard';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IOCFilterBar } from '../Clips/IOCFilterBar';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { formatIOCsJSON, formatIOCsCSV } from '../../lib/ioc-export';
 import type { IOCExportEntry } from '../../lib/ioc-export';
 import { downloadFile } from '../../lib/export';
@@ -17,17 +17,25 @@ interface NoteListProps {
   title?: string;
   showTrash?: boolean;
   onEmptyTrash?: () => void;
-  isClipsView?: boolean;
   selectedIOCTypes?: IOCType[];
   onIOCTypesChange?: (types: IOCType[]) => void;
+  folders?: Folder[];
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash, isClipsView, selectedIOCTypes, onIOCTypesChange }: NoteListProps) {
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash, selectedIOCTypes, onIOCTypesChange, folders }: NoteListProps) {
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
-  const notesWithIOCs = isClipsView ? notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed)) : [];
+  const notesWithIOCs = notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed));
+
+  const folderMap = useMemo(() => {
+    const map = new Map<string, Folder>();
+    if (folders) {
+      for (const f of folders) map.set(f.id, f);
+    }
+    return map;
+  }, [folders]);
 
   useEffect(() => {
     if (!showExportMenu) return;
@@ -71,7 +79,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               <span className="hidden sm:inline">Empty</span>
             </button>
           )}
-          {isClipsView && notesWithIOCs.length > 0 && (
+          {notesWithIOCs.length > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -94,7 +102,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               <ArrowUpDown size={14} />
             </button>
             <div className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 hidden group-hover:block">
-              {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title'], ...(isClipsView ? [['iocCount', 'IOC Count'] as [SortOption, string]] : [])] as [SortOption, string][]).map(([value, label]) => (
+              {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title'], ['iocCount', 'IOC Count']] as [SortOption, string][]).map(([value, label]) => (
                 <button
                   key={value}
                   onClick={() => onSortChange(value)}
@@ -108,7 +116,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         </div>
       </div>
 
-      {isClipsView && selectedIOCTypes && onIOCTypesChange && (
+      {notesWithIOCs.length > 0 && selectedIOCTypes && onIOCTypesChange && (
         <IOCFilterBar selectedTypes={selectedIOCTypes} onChange={onIOCTypesChange} />
       )}
 
@@ -120,14 +128,19 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
             {!showTrash && <p className="text-xs mt-1">Press Ctrl+N to create one</p>}
           </div>
         ) : (
-          notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              active={note.id === selectedId}
-              onClick={() => onSelect(note.id)}
-            />
-          ))
+          notes.map((note) => {
+            const folder = note.folderId ? folderMap.get(note.folderId) : undefined;
+            return (
+              <NoteCard
+                key={note.id}
+                note={note}
+                active={note.id === selectedId}
+                onClick={() => onSelect(note.id)}
+                folderColor={folder?.color}
+                folderName={folder?.name}
+              />
+            );
+          })
         )}
       </div>
 

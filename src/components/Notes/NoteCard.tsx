@@ -6,9 +6,11 @@ interface NoteCardProps {
   note: Note;
   active: boolean;
   onClick: () => void;
+  folderColor?: string;
+  folderName?: string;
 }
 
-export function NoteCard({ note, active, onClick }: NoteCardProps) {
+export function NoteCard({ note, active, onClick, folderColor, folderName }: NoteCardProps) {
   const preview = note.content.replace(/[#*`_\[\]()>-]/g, '').trim();
 
   return (
@@ -20,6 +22,7 @@ export function NoteCard({ note, active, onClick }: NoteCardProps) {
           ? 'bg-accent/10 border-accent/30'
           : 'bg-gray-800/50 border-gray-800 hover:bg-gray-800 hover:border-gray-700'
       )}
+      style={folderColor && !active ? { borderLeftColor: folderColor, borderLeftWidth: 3 } : undefined}
     >
       {note.color && (
         <div className="w-full h-0.5 rounded-full mb-2" style={{ backgroundColor: note.color }} />
@@ -35,6 +38,14 @@ export function NoteCard({ note, active, onClick }: NoteCardProps) {
       )}
       <div className="flex items-center gap-2 mt-2">
         <span className="text-[10px] text-gray-600">{formatDate(note.updatedAt)}</span>
+        {folderName && (
+          <span
+            className="text-[10px] px-1.5 rounded-full truncate max-w-[80px]"
+            style={{ backgroundColor: folderColor ? `${folderColor}20` : 'rgba(107,114,128,0.2)', color: folderColor || '#9ca3af' }}
+          >
+            {folderName}
+          </span>
+        )}
         {(note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent/70 bg-accent/10 px-1.5 rounded-full">
             <Shield size={9} />

@@ -1,6 +1,8 @@
 import { Plus, Menu, ListChecks, Search, Github, Download, Chrome, HardDriveDownload, FolderUp } from 'lucide-react';
 import { useRef } from 'react';
 import { ThemeToggle } from '../Common/ThemeToggle';
+import { cn } from '../../lib/utils';
+import type { ViewMode } from '../../types';
 import logoSvgRaw from '/logo.svg?raw';
 const logoSvg = `data:image/svg+xml,${encodeURIComponent(logoSvgRaw)}`;
 
@@ -15,6 +17,7 @@ interface HeaderProps {
   sidebarCollapsed: boolean;
   onQuickSave: () => void;
   onQuickLoad: (file: File) => void;
+  activeView: ViewMode;
 }
 
 export function Header({
@@ -28,6 +31,7 @@ export function Header({
   sidebarCollapsed,
   onQuickSave,
   onQuickLoad,
+  activeView,
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
@@ -106,7 +110,12 @@ export function Header({
       <div className="flex items-center gap-1 ml-auto">
         <button
           onClick={onNewNote}
-          className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
+          className={cn(
+            'flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors',
+            activeView === 'notes'
+              ? 'bg-accent hover:bg-accent-hover text-white'
+              : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+          )}
           title="New Note (Ctrl+N)"
           aria-label="New note"
         >
@@ -115,7 +124,12 @@ export function Header({
         </button>
         <button
           onClick={onNewTask}
-          className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-medium transition-colors"
+          className={cn(
+            'flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors',
+            activeView === 'tasks'
+              ? 'bg-accent hover:bg-accent-hover text-white'
+              : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+          )}
           title="New Task (Ctrl+Shift+T)"
           aria-label="New task"
         >

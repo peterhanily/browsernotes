@@ -13,7 +13,6 @@ interface SearchOverlayProps {
   tasks: Task[];
   clipsFolderId: string | undefined;
   onNavigateToNote: (id: string) => void;
-  onNavigateToClip: (id: string) => void;
   onNavigateToTask: (id: string) => void;
 }
 
@@ -36,7 +35,6 @@ export function SearchOverlay({
   tasks,
   clipsFolderId,
   onNavigateToNote,
-  onNavigateToClip,
   onNavigateToTask,
 }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
@@ -92,11 +90,10 @@ export function SearchOverlay({
   }, [results]);
 
   const handleSelect = useCallback((result: SearchResult) => {
-    if (result.type === 'note') onNavigateToNote(result.id);
-    else if (result.type === 'clip') onNavigateToClip(result.id);
+    if (result.type === 'note' || result.type === 'clip') onNavigateToNote(result.id);
     else onNavigateToTask(result.id);
     onClose();
-  }, [onNavigateToNote, onNavigateToClip, onNavigateToTask, onClose]);
+  }, [onNavigateToNote, onNavigateToTask, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {

@@ -20,7 +20,6 @@ interface NoteEditorProps {
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
   onBack?: () => void;
-  isClip?: boolean;
   clipsFolderId?: string;
   settings?: Settings;
 }
@@ -37,10 +36,10 @@ export function NoteEditor({
   editorMode,
   onEditorModeChange,
   onBack,
-  isClip,
   clipsFolderId,
   settings: externalSettings,
 }: NoteEditorProps) {
+  const hasIOCData = !!(note.iocAnalysis?.iocs.length);
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
@@ -221,7 +220,7 @@ export function NoteEditor({
           )}
         </div>
 
-        {isClip && (
+        {hasIOCData && (
           <button
             onClick={() => setShowIOCPanel(!showIOCPanel)}
             className={cn('p-1.5 rounded hidden md:flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
@@ -241,7 +240,7 @@ export function NoteEditor({
           <div className="relative">
             <button
               onClick={() => {
-                if (note.iocAnalysis && isClip) {
+                if (note.iocAnalysis && hasIOCData) {
                   setShowShareMenu(!showShareMenu);
                 } else {
                   oci.shareNote(note, clipsFolderId);
@@ -336,7 +335,7 @@ export function NoteEditor({
             </div>
           )}
         </div>
-        {showIOCPanel && isClip && (
+        {showIOCPanel && hasIOCData && (
           <IOCPanel
             note={note}
             onUpdate={onUpdate}

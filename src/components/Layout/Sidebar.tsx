@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  FileText, ListChecks, Paperclip, FolderOpen, Tag, Trash2,
+  FileText, ListChecks, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
   PanelLeftClose, Github, Download, Chrome,
 } from 'lucide-react';
@@ -117,13 +117,6 @@ export function Sidebar({
           active={activeView === 'tasks' && !selectedFolderId && !selectedTag}
           onClick={() => nav(() => { onViewChange('tasks'); clearFilters(); })}
         />
-        <SidebarItem
-          icon={<Paperclip size={18} />}
-          label="Clips"
-          active={activeView === 'clips'}
-          onClick={() => nav(() => { onViewChange('clips'); clearFilters(); })}
-        />
-
         {/* Folders */}
         <div className="pt-3">
           <button

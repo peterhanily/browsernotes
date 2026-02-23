@@ -29,8 +29,9 @@ export default function App() {
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder } = useFolders();
   const { tags, createTag } = useTags();
 
-  // UI state
-  const [activeView, setActiveView] = useState<ViewMode>(settings.defaultView);
+  // UI state — guard against stale 'clips' defaultView in localStorage
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' ? settings.defaultView : 'notes';
+  const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
   const [selectedTag, setSelectedTag] = useState<string>();
@@ -83,8 +84,8 @@ export default function App() {
           });
           if (!firstNote) firstNote = note;
         }
-        setActiveView('clips');
-        setSelectedFolderId(undefined);
+        setActiveView('notes');
+        setSelectedFolderId(clipsFolder.id);
         if (firstNote) setSelectedNoteId(firstNote.id);
       } catch (error) {
         console.error('Failed to import clips:', error);
@@ -95,28 +96,24 @@ export default function App() {
     return () => window.removeEventListener('message', handler);
   }, [findOrCreateFolder, notes.createNote]);
 
-  // Hide Clips folder from the main "All Notes" view
+  // Track Clips folder ID for OCI envelope type detection
   const clipsFolderId = useMemo(
     () => folders.find((f) => f.name === 'Clips')?.id,
     [folders]
   );
 
-  // When Clips view is active, show notes from the Clips folder
-  const effectiveFolderId = activeView === 'clips' ? clipsFolderId : selectedFolderId;
-
   // Filtered notes
   const filteredNotes = useMemo(
     () =>
       notes.getFilteredNotes({
-        folderId: effectiveFolderId,
-        excludeFolderIds: !effectiveFolderId && !showTrash && !showArchive && clipsFolderId ? [clipsFolderId] : undefined,
+        folderId: selectedFolderId,
         tag: selectedTag,
         showTrashed: showTrash,
         showArchived: showArchive,
         sort,
-        iocTypes: activeView === 'clips' ? selectedIOCTypes : undefined,
+        iocTypes: selectedIOCTypes.length > 0 ? selectedIOCTypes : undefined,
       }),
-    [notes.getFilteredNotes, effectiveFolderId, clipsFolderId, selectedTag, showTrash, showArchive, sort, activeView, selectedIOCTypes]
+    [notes.getFilteredNotes, selectedFolderId, selectedTag, showTrash, showArchive, sort, selectedIOCTypes]
   );
 
   // Filtered tasks
@@ -143,12 +140,12 @@ export default function App() {
     }
   }, [selectedNoteId, filteredNotes]);
 
-  // Note counts (exclude Clips folder from total)
+  // Note counts (include all notes)
   const noteCounts = useMemo(() => ({
-    total: notes.notes.filter((n) => !n.trashed && !n.archived && n.folderId !== clipsFolderId).length,
+    total: notes.notes.filter((n) => !n.trashed && !n.archived).length,
     trashed: notes.notes.filter((n) => n.trashed).length,
     archived: notes.notes.filter((n) => n.archived && !n.trashed).length,
-  }), [notes.notes, clipsFolderId]);
+  }), [notes.notes]);
 
   // Handlers
   const handleDeleteFolder = useCallback(async (id: string) => {
@@ -225,13 +222,6 @@ export default function App() {
     setShowArchive(false);
   }, []);
 
-  const handleSearchNavigateToClip = useCallback((id: string) => {
-    setActiveView('clips');
-    setSelectedNoteId(id);
-    setSelectedFolderId(undefined);
-    setSelectedTag(undefined);
-  }, []);
-
   const handleSearchNavigateToTask = useCallback((_id: string) => {
     setActiveView('tasks');
     setSelectedFolderId(undefined);
@@ -254,8 +244,7 @@ export default function App() {
 
   // Determine list title
   let listTitle = 'Notes';
-  if (activeView === 'clips') listTitle = 'Clips';
-  else if (showTrash) listTitle = 'Trash';
+  if (showTrash) listTitle = 'Trash';
   else if (showArchive) listTitle = 'Archive';
   else if (selectedFolderId) {
     const folder = folders.find((f) => f.id === selectedFolderId);
@@ -278,6 +267,7 @@ export default function App() {
             sidebarCollapsed={settings.sidebarCollapsed}
             onQuickSave={handleQuickSave}
             onQuickLoad={handleQuickLoad}
+            activeView={activeView}
           />
         }
         sidebar={
@@ -329,7 +319,7 @@ export default function App() {
             getTasksByStatus={(status) => tasks.getTasksByStatus(status, selectedFolderId)}
           />
         ) : (
-          /* Notes & Clips view — responsive: list OR editor on mobile */
+          /* Notes view — responsive: list OR editor on mobile */
           <div className="flex flex-1 overflow-hidden">
             <div className={cn(
               'shrink-0 h-full',
@@ -344,9 +334,9 @@ export default function App() {
                 title={listTitle}
                 showTrash={showTrash}
                 onEmptyTrash={notes.emptyTrash}
-                isClipsView={activeView === 'clips'}
                 selectedIOCTypes={selectedIOCTypes}
                 onIOCTypesChange={setSelectedIOCTypes}
+                folders={folders}
               />
             </div>
             <div className={cn('flex-1 min-w-0 overflow-hidden', !selectedNote && 'hidden md:block')}>
@@ -363,7 +353,6 @@ export default function App() {
                   editorMode={editorMode}
                   onEditorModeChange={setEditorMode}
                   onBack={() => setSelectedNoteId(undefined)}
-                  isClip={activeView === 'clips'}
                   clipsFolderId={clipsFolderId}
                   settings={settings}
                 />
@@ -434,7 +423,6 @@ export default function App() {
         tasks={tasks.tasks}
         clipsFolderId={clipsFolderId}
         onNavigateToNote={handleSearchNavigateToNote}
-        onNavigateToClip={handleSearchNavigateToClip}
         onNavigateToTask={handleSearchNavigateToTask}
       />
 

@@ -63,17 +63,20 @@ export default function App() {
         const clipsFolder = await findOrCreateFolder('Clips');
         let firstNote = null;
         for (const clip of clips) {
-          const content = clip.content || '';
-          const freshIOCs = extractIOCs(content);
+          const rawContent = clip.content || '';
+          const createdAt = clip.createdAt || Date.now();
+          const timestamp = new Date(createdAt).toLocaleString();
+          const content = `*Clipped ${timestamp}*\n\n${rawContent}`;
+          const freshIOCs = extractIOCs(rawContent);
           const iocAnalysis = mergeIOCAnalysis(undefined, freshIOCs);
           const iocTypes = [...new Set(freshIOCs.filter((i) => !i.dismissed).map((i) => i.type))];
           const note = await notes.createNote({
-            title: clip.title || content.substring(0, 80) || 'Clip',
+            title: clip.sourceUrl || clip.title || rawContent.substring(0, 80) || 'Clip',
             content,
             folderId: clipsFolder.id,
             sourceUrl: clip.sourceUrl,
             sourceTitle: clip.sourceTitle,
-            createdAt: clip.createdAt || Date.now(),
+            createdAt,
             iocAnalysis,
             iocTypes,
           });

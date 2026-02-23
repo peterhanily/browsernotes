@@ -88,8 +88,13 @@ const IOC_PATTERNS: { type: IOCType; pattern: RegExp; validate?: (match: string)
   },
 ];
 
+const MAX_IOC_INPUT_LEN = 5_000_000; // 5 MB max content to scan
+const MAX_IOCS_PER_TYPE = 500;
+const MAX_TOTAL_IOCS = 5_000;
+
 export function extractIOCs(content: string): IOCEntry[] {
-  const normalized = defang(content);
+  // Truncate very large content to prevent excessive processing
+  const normalized = defang(content.length > MAX_IOC_INPUT_LEN ? content.slice(0, MAX_IOC_INPUT_LEN) : content);
   const entries: IOCEntry[] = [];
   const seen = new Set<string>();
   // Track domains found inside URLs and emails for dedup
@@ -100,8 +105,10 @@ export function extractIOCs(content: string): IOCEntry[] {
     // Reset lastIndex for each pattern
     pattern.lastIndex = 0;
     let match: RegExpExecArray | null;
+    let typeCount = 0;
 
     while ((match = pattern.exec(normalized)) !== null) {
+      if (typeCount >= MAX_IOCS_PER_TYPE || entries.length >= MAX_TOTAL_IOCS) break;
       // For MITRE ATT&CK, use capture group 1; for YARA, use group 1
       let value = type === 'mitre-attack' || type === 'yara-rule'
         ? (match[1] || match[0]).trim()
@@ -146,6 +153,7 @@ export function extractIOCs(content: string): IOCEntry[] {
         firstSeen: Date.now(),
         dismissed: false,
       });
+      typeCount++;
     }
   }
 

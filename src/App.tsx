@@ -48,6 +48,8 @@ export default function App() {
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
     const handler = async (event: MessageEvent) => {
+      // Only accept messages from our own origin (extension injects into same page)
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type !== 'BROWSERNOTES_IMPORT_CLIPS') return;
       const clips = event.data.clips;
       if (!Array.isArray(clips) || clips.length === 0) return;
@@ -56,19 +58,23 @@ export default function App() {
         const clipsFolder = await findOrCreateFolder('Clips');
         let firstNote = null;
         for (const clip of clips) {
-          const rawContent = clip.content || '';
-          const createdAt = clip.createdAt || Date.now();
+          // Sanitize clip fields — only accept expected string/number types
+          const rawContent = typeof clip.content === 'string' ? clip.content : '';
+          const sourceUrl = typeof clip.sourceUrl === 'string' ? clip.sourceUrl : '';
+          const sourceTitle = typeof clip.sourceTitle === 'string' ? clip.sourceTitle : '';
+          const clipTitle = typeof clip.title === 'string' ? clip.title : '';
+          const createdAt = typeof clip.createdAt === 'number' ? clip.createdAt : Date.now();
           const timestamp = new Date(createdAt).toLocaleString();
           const content = `*Clipped ${timestamp}*\n\n${rawContent}`;
           const freshIOCs = extractIOCs(rawContent);
           const iocAnalysis = mergeIOCAnalysis(undefined, freshIOCs);
           const iocTypes = [...new Set(freshIOCs.filter((i) => !i.dismissed).map((i) => i.type))];
           const note = await notes.createNote({
-            title: clip.sourceUrl || clip.title || rawContent.substring(0, 80) || 'Clip',
+            title: sourceUrl || clipTitle || rawContent.substring(0, 80) || 'Clip',
             content,
             folderId: clipsFolder.id,
-            sourceUrl: clip.sourceUrl,
-            sourceTitle: clip.sourceTitle,
+            sourceUrl,
+            sourceTitle,
             createdAt,
             iocAnalysis,
             iocTypes,

@@ -25,6 +25,9 @@ export interface UnifiedSearchResult {
 }
 
 const MAX_RESULTS = 50;
+const MAX_REGEX_INPUT_LEN = 50_000; // Truncate text before applying user regex to prevent ReDoS
+const MAX_QUERY_LEN = 1_000; // Max length of raw query input
+const MAX_TOKENS = 200; // Max tokens in advanced query parser
 
 export function unifiedSearch(
   notes: Note[],
@@ -33,6 +36,7 @@ export function unifiedSearch(
   query: SearchQuery
 ): UnifiedSearchResult {
   if (!query.raw.trim()) return { results: [] };
+  if (query.raw.length > MAX_QUERY_LEN) return { results: [], error: 'Query too long' };
 
   const activeNotes = notes.filter((n) => !n.trashed && !n.archived);
   const results: SearchResult[] = [];
@@ -132,18 +136,22 @@ function findSimpleTaskMatchField(task: Task, lower: string): string | null {
 }
 
 // --- Regex mode helpers ---
+// Truncate text before testing user-supplied regex to mitigate ReDoS
+function safeRegexTest(regex: RegExp, text: string): boolean {
+  return regex.test(text.slice(0, MAX_REGEX_INPUT_LEN));
+}
 
 function findRegexMatchField(note: Note, regex: RegExp): string | null {
-  if (regex.test(note.title)) return 'title';
-  if (regex.test(note.content)) return 'content';
-  if (note.tags.some((t) => regex.test(t))) return 'tags';
+  if (safeRegexTest(regex, note.title)) return 'title';
+  if (safeRegexTest(regex, note.content)) return 'content';
+  if (note.tags.some((t) => safeRegexTest(regex, t))) return 'tags';
   return null;
 }
 
 function findRegexTaskMatchField(task: Task, regex: RegExp): string | null {
-  if (regex.test(task.title)) return 'title';
-  if (task.description && regex.test(task.description)) return 'description';
-  if (task.tags.some((t) => regex.test(t))) return 'tags';
+  if (safeRegexTest(regex, task.title)) return 'title';
+  if (task.description && safeRegexTest(regex, task.description)) return 'description';
+  if (task.tags.some((t) => safeRegexTest(regex, t))) return 'tags';
   return null;
 }
 
@@ -223,6 +231,7 @@ function tokenize(input: string): Token[] {
   let i = 0;
 
   while (i < input.length) {
+    if (tokens.length >= MAX_TOKENS) throw new Error('Query too complex');
     // Skip whitespace
     if (/\s/.test(input[i])) { i++; continue; }
 

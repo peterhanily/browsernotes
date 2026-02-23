@@ -256,11 +256,12 @@ async function sendToTarget(targetUrl, captures) {
   await new Promise(resolve => setTimeout(resolve, 2500));
 
   // Inject script in MAIN world so postMessage reaches the React app directly
+  // Use the page's own origin as the target (not '*') to prevent cross-origin leaks
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     world: 'MAIN',
     func: (clips) => {
-      window.postMessage({ type: 'BROWSERNOTES_IMPORT_CLIPS', clips }, '*');
+      window.postMessage({ type: 'BROWSERNOTES_IMPORT_CLIPS', clips }, window.location.origin);
     },
     args: [captures]
   });

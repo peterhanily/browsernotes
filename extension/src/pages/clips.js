@@ -73,6 +73,16 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function isSafeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    return /^https?:$/.test(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
 function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString();
 }
@@ -87,6 +97,10 @@ async function loadSettings() {
 
 async function saveSettings() {
   const targetUrl = targetUrlInput.value.trim() || DEFAULT_TARGET_URL;
+  if (!isSafeUrl(targetUrl)) {
+    showToast('Invalid target URL — only http/https allowed', true);
+    return;
+  }
   await chrome.storage.local.set({ settings: { targetUrl } });
   settingsSaved.classList.add('show');
   setTimeout(() => settingsSaved.classList.remove('show'), 2000);
@@ -129,9 +143,11 @@ function renderCaptures(captures) {
   capturesList.innerHTML = sorted.map(capture => {
     const sentClass = capture.sent ? ' sent' : '';
     const sentBadge = capture.sent ? '<span class="sent-badge">Sent</span>' : '';
-    const sourceLink = capture.sourceUrl
+    const sourceLink = capture.sourceUrl && isSafeUrl(capture.sourceUrl)
       ? `<a class="capture-source" href="${escapeHtml(capture.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(capture.sourceUrl)}</a>`
-      : '<span class="capture-source" style="color: #6b7280;">No source URL</span>';
+      : capture.sourceUrl
+        ? `<span class="capture-source">${escapeHtml(capture.sourceUrl)}</span>`
+        : '<span class="capture-source" style="color: #6b7280;">No source URL</span>';
     const sourceTitle = capture.sourceTitle
       ? `<div class="capture-source-title">${escapeHtml(capture.sourceTitle)}</div>`
       : '';
@@ -195,11 +211,7 @@ async function getTargetUrl() {
 }
 
 async function requestHostPermission(targetUrl) {
-  // file:// URLs need special permission pattern and are handled differently
-  if (targetUrl.startsWith('file://')) {
-    const granted = await chrome.permissions.request({ origins: ['file:///*'] });
-    return granted;
-  }
+  if (!isSafeUrl(targetUrl)) return false;
   // Build an origin pattern like "*://browsernotes.online/*"
   const url = new URL(targetUrl);
   const origin = `${url.protocol}//${url.host}/*`;

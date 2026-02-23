@@ -2,6 +2,101 @@
 
 const MAX_CAPTURES = 500;
 
+// Injected into the page to capture selection as markdown
+function getSelectionAsMarkdown() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return '';
+
+  const range = sel.getRangeAt(0);
+  const frag = range.cloneContents();
+
+  // Put fragment in a temporary div so we can walk it
+  const div = document.createElement('div');
+  div.appendChild(frag);
+
+  // If there are no element nodes, just return plain text
+  if (!div.querySelector('*')) return sel.toString();
+
+  // Resolve relative URLs to absolute
+  div.querySelectorAll('img[src]').forEach(img => {
+    try { img.src = new URL(img.getAttribute('src'), document.baseURI).href; } catch {}
+  });
+  div.querySelectorAll('a[href]').forEach(a => {
+    try { a.href = new URL(a.getAttribute('href'), document.baseURI).href; } catch {}
+  });
+
+  function walk(node, ctx) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+    const tag = node.tagName.toLowerCase();
+
+    // Skip script/style
+    if (tag === 'script' || tag === 'style') return '';
+
+    // Images
+    if (tag === 'img') {
+      const src = node.getAttribute('src') || '';
+      // Skip large data URIs
+      if (src.startsWith('data:') && src.length > 100000) return '';
+      const alt = node.getAttribute('alt') || '';
+      return `![${alt}](${src})`;
+    }
+
+    // Recurse into children
+    const inner = Array.from(node.childNodes).map(c => walk(c, ctx)).join('');
+
+    switch (tag) {
+      case 'a': {
+        const href = node.getAttribute('href') || '';
+        return inner.trim() ? `[${inner.trim()}](${href})` : '';
+      }
+      case 'strong': case 'b':
+        return inner.trim() ? `**${inner.trim()}**` : '';
+      case 'em': case 'i':
+        return inner.trim() ? `*${inner.trim()}*` : '';
+      case 'h1': return `\n\n# ${inner.trim()}\n\n`;
+      case 'h2': return `\n\n## ${inner.trim()}\n\n`;
+      case 'h3': return `\n\n### ${inner.trim()}\n\n`;
+      case 'h4': return `\n\n#### ${inner.trim()}\n\n`;
+      case 'h5': return `\n\n##### ${inner.trim()}\n\n`;
+      case 'h6': return `\n\n###### ${inner.trim()}\n\n`;
+      case 'p': return `\n\n${inner.trim()}\n\n`;
+      case 'br': return '\n';
+      case 'hr': return '\n\n---\n\n';
+      case 'pre': {
+        const code = node.querySelector('code');
+        const text = code ? code.textContent : node.textContent;
+        return `\n\n\`\`\`\n${text}\n\`\`\`\n\n`;
+      }
+      case 'code':
+        // Only inline code — <pre><code> handled above
+        if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') return inner;
+        return `\`${inner}\``;
+      case 'blockquote':
+        return '\n\n' + inner.trim().split('\n').map(l => `> ${l}`).join('\n') + '\n\n';
+      case 'ul': case 'ol':
+        return `\n\n${inner}\n\n`;
+      case 'li': {
+        const parent = node.parentElement;
+        const ordered = parent && parent.tagName.toLowerCase() === 'ol';
+        const idx = ordered ? Array.from(parent.children).indexOf(node) + 1 : 0;
+        const prefix = ordered ? `${idx}. ` : '- ';
+        return `${prefix}${inner.trim()}\n`;
+      }
+      default:
+        return inner;
+    }
+  }
+
+  let md = walk(div, {});
+  // Clean up excessive newlines
+  md = md.replace(/\n{3,}/g, '\n\n').trim();
+  return md || sel.toString();
+}
+
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -14,7 +109,17 @@ chrome.runtime.onInstalled.addListener(() => {
 // Handle context menu click
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'save-to-browsernotes' && info.selectionText) {
-    await captureAndSave(info.selectionText, tab);
+    let text = info.selectionText;
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: getSelectionAsMarkdown
+      });
+      if (result && result.result) text = result.result;
+    } catch {
+      // Restricted page — fall back to info.selectionText
+    }
+    await captureAndSave(text, tab);
   }
 });
 
@@ -24,11 +129,11 @@ chrome.commands.onCommand.addListener(async (command) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
 
-    // Get selected text from the active tab
+    // Get selected text as markdown from the active tab
     try {
       const [result] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => window.getSelection().toString()
+        func: getSelectionAsMarkdown
       });
 
       if (result && result.result) {
@@ -118,7 +223,9 @@ async function sendToTarget(targetUrl, captures) {
 }
 
 async function captureAndSave(text, tab) {
-  const title = text.substring(0, 80).replace(/\n/g, ' ');
+  const stripped = text.replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
+  const titleSource = stripped || text;
+  const title = titleSource.substring(0, 80).replace(/\n/g, ' ');
   const note = {
     title,
     content: text,

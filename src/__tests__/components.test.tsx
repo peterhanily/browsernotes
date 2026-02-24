@@ -141,7 +141,8 @@ describe('NoteCard', () => {
 
   it('applies folder color left border when not active', () => {
     const { container } = render(<NoteCard note={note} active={false} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
-    const button = container.querySelector('button')!;
+    const button = container.querySelector('button') as HTMLButtonElement;
+    expect(button).toBeTruthy();
     // jsdom normalizes hex to rgb
     expect(button.style.borderLeftColor).toBe('rgb(239, 68, 68)');
     expect(parseInt(button.style.borderLeftWidth)).toBe(3);
@@ -149,7 +150,8 @@ describe('NoteCard', () => {
 
   it('does not apply folder color left border when active', () => {
     const { container } = render(<NoteCard note={note} active={true} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
-    const button = container.querySelector('button')!;
+    const button = container.querySelector('button') as HTMLButtonElement;
+    expect(button).toBeTruthy();
     expect(button.style.borderLeftColor).toBe('');
   });
 

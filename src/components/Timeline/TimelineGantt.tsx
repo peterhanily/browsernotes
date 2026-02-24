@@ -105,7 +105,10 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
 
   // Time range
   const { minTime, maxTime, span } = useMemo(() => {
-    if (sortedEvents.length === 0) return { minTime: Date.now(), maxTime: Date.now() + 86400000, span: 86400000 };
+    if (sortedEvents.length === 0) {
+      const now = 0;
+      return { minTime: now, maxTime: now + 86400000, span: 86400000 };
+    }
     let min = Infinity;
     let max = -Infinity;
     for (const ev of sortedEvents) {

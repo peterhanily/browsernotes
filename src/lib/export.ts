@@ -254,6 +254,21 @@ export async function exportTimelineJSON(timelineId: string): Promise<string> {
   return JSON.stringify(data, null, 2);
 }
 
+export function exportEventsJSON(events: TimelineEvent[], timelineMeta?: { name?: string; description?: string; color?: string }): string {
+  const data: TimelineExportData = {
+    format: 'browsernotes-timeline',
+    version: 1,
+    exportedAt: Date.now(),
+    timeline: { name: timelineMeta?.name ?? 'All Events', description: timelineMeta?.description, color: timelineMeta?.color },
+    events,
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+function eventFingerprint(e: TimelineEvent): string {
+  return `${e.timestamp}|${e.title}|${e.eventType}|${e.source}`;
+}
+
 export function parseTimelineImport(json: string): TimelineExportData {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`File too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
@@ -307,21 +322,25 @@ export async function importTimelineAsNew(parsed: TimelineExportData): Promise<{
   return { timelineId: newTimelineId, eventCount: events.length };
 }
 
-export async function mergeTimelineInto(parsed: TimelineExportData, targetTimelineId: string): Promise<{ added: number; updated: number }> {
+export async function mergeTimelineInto(parsed: TimelineExportData, targetTimelineId: string): Promise<{ added: number; updated: number; skipped: number }> {
   const existing = await db.timelineEvents.where('timelineId').equals(targetTimelineId).toArray();
   const existingById = new Map(existing.map((e) => [e.id, e]));
+  const existingByFingerprint = new Map(existing.map((e) => [eventFingerprint(e), e]));
 
   let added = 0;
   let updated = 0;
+  let skipped = 0;
   const toAdd: TimelineEvent[] = [];
   const toUpdate: { id: string; changes: Partial<TimelineEvent> }[] = [];
 
   for (const incoming of parsed.events) {
-    const match = existingById.get(incoming.id);
+    const match = existingById.get(incoming.id) ?? existingByFingerprint.get(eventFingerprint(incoming));
     if (match) {
       if (incoming.updatedAt > match.updatedAt) {
         toUpdate.push({ id: match.id, changes: { ...incoming, id: match.id, timelineId: targetTimelineId } });
         updated++;
+      } else {
+        skipped++;
       }
     } else {
       toAdd.push({ ...incoming, id: nanoid(), timelineId: targetTimelineId });
@@ -336,7 +355,7 @@ export async function mergeTimelineInto(parsed: TimelineExportData, targetTimeli
     }
   });
 
-  return { added, updated };
+  return { added, updated, skipped };
 }
 
 export function downloadFile(content: string, filename: string, type: string) {

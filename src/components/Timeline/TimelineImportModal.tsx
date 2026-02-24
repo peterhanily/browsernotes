@@ -59,7 +59,9 @@ export function TimelineImportModal({ open, onClose, timelines, selectedTimeline
       } else {
         if (!selectedTimelineId) return;
         const res = await mergeTimelineInto(parsed, selectedTimelineId);
-        setResult(`Merged: ${res.added} added, ${res.updated} updated`);
+        const parts = [`${res.added} added`, `${res.updated} updated`];
+        if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
+        setResult(`Merged: ${parts.join(', ')}`);
       }
       onComplete();
     } catch (err) {

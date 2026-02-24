@@ -12,7 +12,7 @@ import { Modal } from '../Common/Modal';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { cn } from '../../lib/utils';
 import { getTechniqueLabel, getParentTechniqueId, buildNavigatorLayer, buildMitreCSV } from '../../lib/mitre-attack';
-import { downloadFile, exportTimelineJSON } from '../../lib/export';
+import { downloadFile, exportTimelineJSON, exportEventsJSON } from '../../lib/export';
 import { TimelineImportModal } from './TimelineImportModal';
 
 interface TimelineViewProps {
@@ -37,7 +37,7 @@ interface TimelineViewProps {
   onEventsReload?: () => void;
 }
 
-function ExportDropdown({ events, selectedTimelineId, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; onImportClick: () => void }) {
+function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; timelines: Timeline[]; onImportClick: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -63,10 +63,16 @@ function ExportDropdown({ events, selectedTimelineId, onImportClick }: { events:
   };
 
   const handleTimelineExport = async () => {
-    if (!selectedTimelineId) return;
     try {
-      const json = await exportTimelineJSON(selectedTimelineId);
-      downloadFile(json, 'timeline-export.json', 'application/json');
+      if (selectedTimelineId) {
+        const json = await exportTimelineJSON(selectedTimelineId);
+        const timeline = timelines.find((t) => t.id === selectedTimelineId);
+        const filename = timeline ? `timeline-${timeline.name.toLowerCase().replace(/\s+/g, '-')}.json` : 'timeline-export.json';
+        downloadFile(json, filename, 'application/json');
+      } else {
+        const json = exportEventsJSON(events);
+        downloadFile(json, 'all-events-export.json', 'application/json');
+      }
     } catch (err) {
       console.error('Timeline export failed:', err);
     }
@@ -85,14 +91,12 @@ function ExportDropdown({ events, selectedTimelineId, onImportClick }: { events:
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-30 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1">
-          {selectedTimelineId && (
-            <button
-              onClick={handleTimelineExport}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 transition-colors"
-            >
-              Export Timeline JSON
-            </button>
-          )}
+          <button
+            onClick={handleTimelineExport}
+            className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 transition-colors"
+          >
+            {selectedTimelineId ? 'Export Timeline JSON' : 'Export All Events JSON'}
+          </button>
           <button
             onClick={() => { setOpen(false); onImportClick(); }}
             className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 transition-colors flex items-center gap-1.5"
@@ -286,6 +290,7 @@ export function TimelineView({
         <ExportDropdown
           events={filteredEvents}
           selectedTimelineId={selectedTimelineId}
+          timelines={timelines}
           onImportClick={() => setShowImportModal(true)}
         />
 

@@ -412,6 +412,7 @@ export default function App() {
                   onTogglePin={notes.togglePin}
                   onToggleArchive={notes.toggleArchive}
                   allTags={tags}
+                  folders={folders}
                   onCreateTag={createTag}
                   editorMode={editorMode}
                   onEditorModeChange={setEditorMode}

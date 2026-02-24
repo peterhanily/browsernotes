@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload } from 'lucide-react';
-import type { Note, Tag, EditorMode, Settings } from '../../types';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload, FolderOpen } from 'lucide-react';
+import type { Note, Tag, Folder, EditorMode, Settings } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -19,6 +19,7 @@ interface NoteEditorProps {
   onTogglePin: (id: string) => void;
   onToggleArchive: (id: string) => void;
   allTags: Tag[];
+  folders: Folder[];
   onCreateTag: (name: string) => Promise<Tag>;
   editorMode: EditorMode;
   onEditorModeChange: (mode: EditorMode) => void;
@@ -35,6 +36,7 @@ export function NoteEditor({
   onTogglePin,
   onToggleArchive,
   allTags,
+  folders,
   onCreateTag,
   editorMode,
   onEditorModeChange,
@@ -380,6 +382,20 @@ export function NoteEditor({
       {/* Footer */}
       <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-t border-gray-800 flex items-center gap-2 sm:gap-4 text-xs text-gray-500 shrink-0 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1 shrink-0">
+            <FolderOpen size={12} className="text-gray-500" />
+            <select
+              value={note.folderId || ''}
+              onChange={(e) => onUpdate(note.id, { folderId: e.target.value || undefined })}
+              className="bg-transparent border border-gray-700 rounded px-1.5 py-0.5 text-xs text-gray-300 focus:outline-none focus:border-accent cursor-pointer"
+              aria-label="Move to folder"
+            >
+              <option value="">No folder</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
           <TagInput
             selectedTags={note.tags}
             allTags={allTags}

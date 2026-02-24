@@ -150,6 +150,17 @@ export default function App() {
     [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId]
   );
 
+  // Filtered whiteboards
+  const filteredWhiteboards = useMemo(
+    () => {
+      let wbs = whiteboards;
+      if (selectedFolderId) wbs = wbs.filter((w) => w.folderId === selectedFolderId);
+      if (selectedTag) wbs = wbs.filter((w) => w.tags.includes(selectedTag));
+      return wbs;
+    },
+    [whiteboards, selectedFolderId, selectedTag]
+  );
+
   // Timeline event counts per timeline
   const timelineEventCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -387,7 +398,7 @@ export default function App() {
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
-            whiteboards={whiteboards}
+            whiteboards={filteredWhiteboards}
             folders={folders}
             allTags={tags}
             onCreateWhiteboard={createWhiteboard}

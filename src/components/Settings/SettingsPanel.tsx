@@ -1,7 +1,6 @@
 import { Github, Download } from 'lucide-react';
 import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
-import { AttributionActors } from './AttributionActors';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
 import { OCISync } from './OCISync';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
@@ -11,10 +10,9 @@ interface SettingsPanelProps {
   onUpdateSettings: (updates: Partial<Settings>) => void;
   notes: Note[];
   onImportComplete: () => void;
-  onOpenBrowseShared: () => void;
 }
 
-export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, onOpenBrowseShared }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete }: SettingsPanelProps) {
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
 
@@ -70,15 +68,11 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
 
       <hr className="border-gray-800" />
 
-      <AttributionActors />
-
-      <hr className="border-gray-800" />
-
       <ThreatIntelConfig />
 
       <hr className="border-gray-800" />
 
-      <OCISync onOpenBrowseShared={onOpenBrowseShared} onImportComplete={onImportComplete} />
+      <OCISync />
 
       <hr className="border-gray-800" />
 

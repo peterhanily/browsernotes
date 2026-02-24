@@ -1,28 +1,20 @@
 import { useState, useRef } from 'react';
-import { AlertCircle, CheckCircle, Cloud, Upload, Download, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Cloud, Upload, Loader2 } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useOCISync } from '../../hooks/useOCISync';
 import { testPAR } from '../../lib/oci-sync';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 
-interface OCISyncProps {
-  onOpenBrowseShared: () => void;
-  onImportComplete: () => void;
-}
-
-export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) {
+export function OCISync() {
   const { settings, updateSettings } = useSettings();
   const oci = useOCISync();
 
   const [writePAR, setWritePAR] = useState(settings.ociWritePAR || '');
-  const [readPAR, setReadPAR] = useState(settings.ociReadPAR || '');
   const [label, setLabel] = useState(settings.ociLabel || '');
   const [testingWrite, setTestingWrite] = useState(false);
-  const [testingRead, setTestingRead] = useState(false);
-  const [testResult, setTestResult] = useState<{ type: string; ok: boolean; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
   const [message, setMessage] = useState('');
   const [confirmPush, setConfirmPush] = useState(false);
-  const [confirmPull, setConfirmPull] = useState(false);
 
   const msgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -35,7 +27,6 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
   const handleSave = () => {
     updateSettings({
       ociWritePAR: writePAR.trim() || undefined,
-      ociReadPAR: readPAR.trim() || undefined,
       ociLabel: label.trim() || undefined,
     });
     showMessage('OCI settings saved');
@@ -45,18 +36,9 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
     if (!writePAR.trim()) return;
     setTestingWrite(true);
     setTestResult(null);
-    const result = await testPAR(writePAR.trim(), 'write');
-    setTestResult({ type: 'write', ...result });
+    const result = await testPAR(writePAR.trim());
+    setTestResult(result);
     setTestingWrite(false);
-  };
-
-  const handleTestRead = async () => {
-    if (!readPAR.trim()) return;
-    setTestingRead(true);
-    setTestResult(null);
-    const result = await testPAR(readPAR.trim(), 'read');
-    setTestResult({ type: 'read', ...result });
-    setTestingRead(false);
   };
 
   const handlePushBackup = async () => {
@@ -64,15 +46,6 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
     await oci.pushFullBackup();
     if (!oci.error) {
       showMessage('Backup pushed successfully');
-    }
-  };
-
-  const handlePullBackup = async () => {
-    setConfirmPull(false);
-    await oci.pullFullBackup();
-    if (!oci.error) {
-      showMessage('Backup pulled successfully');
-      onImportComplete();
     }
   };
 
@@ -118,30 +91,10 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">Read PAR URL</label>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={readPAR}
-              onChange={(e) => setReadPAR(e.target.value)}
-              className={`flex-1 ${inputClass}`}
-              placeholder="https://objectstorage..."
-            />
-            <button
-              onClick={handleTestRead}
-              disabled={!readPAR.trim() || testingRead}
-              className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50`}
-            >
-              {testingRead ? <Loader2 size={14} className="animate-spin" /> : 'Test'}
-            </button>
-          </div>
-        </div>
-
         {testResult && (
           <p className={`text-sm flex items-center gap-1 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
             {testResult.ok ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-            {testResult.type === 'write' ? 'Write' : 'Read'} PAR: {testResult.ok ? 'Connected successfully' : testResult.error}
+            Write PAR: {testResult.ok ? 'Connected successfully' : testResult.error}
           </p>
         )}
 
@@ -165,30 +118,10 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
             {oci.syncing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
             Push Backup
           </button>
-          <button
-            onClick={() => setConfirmPull(true)}
-            disabled={!settings.ociReadPAR || oci.syncing}
-            className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50`}
-          >
-            {oci.syncing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Pull Backup
-          </button>
         </div>
         {oci.lastSyncAt && (
           <p className="text-xs text-gray-500">Last sync: {new Date(oci.lastSyncAt).toLocaleString()}</p>
         )}
-      </div>
-
-      {/* Shared Items */}
-      <div className="pt-2 border-t border-gray-800 space-y-3">
-        <h4 className="text-sm font-semibold text-gray-400">Shared Items</h4>
-        <button
-          onClick={onOpenBrowseShared}
-          disabled={!settings.ociReadPAR}
-          className={`${btnClass} bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50`}
-        >
-          Browse Shared Items
-        </button>
       </div>
 
       {/* Status */}
@@ -214,16 +147,6 @@ export function OCISync({ onOpenBrowseShared, onImportComplete }: OCISyncProps) 
         title="Push Backup"
         message="This will upload your entire database to OCI Object Storage. Continue?"
         confirmLabel="Push Backup"
-      />
-
-      <ConfirmDialog
-        open={confirmPull}
-        onClose={() => setConfirmPull(false)}
-        onConfirm={handlePullBackup}
-        title="Pull Backup"
-        message="This will replace all local data with the latest backup from OCI. This cannot be undone."
-        confirmLabel="Pull & Replace"
-        danger
       />
     </div>
   );

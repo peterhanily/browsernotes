@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useSettings } from './useSettings';
-import { exportJSON, importJSON, sanitizeNote } from '../lib/export';
-import { db } from '../db';
-import type { Note, SharedManifestEntry, SharedItemEnvelope, ExportData } from '../types';
+import { exportJSON } from '../lib/export';
+import type { Note, ExportData } from '../types';
 import {
   validatePAR,
   buildNoteEnvelope,
@@ -10,10 +9,9 @@ import {
   buildFullBackupEnvelope,
   buildObjectKey,
   ociPut,
-  ociGet,
-  fetchManifest,
-  updateManifest,
 } from '../lib/oci-sync';
+import { formatIOCsFlatJSON, slugify } from '../lib/ioc-export';
+import type { IOCExportEntry, ThreatIntelExportConfig } from '../lib/ioc-export';
 
 export function useOCISync() {
   const { settings } = useSettings();
@@ -22,21 +20,20 @@ export function useOCISync() {
   const [error, setError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
 
-  const requirePAR = useCallback((mode: 'read' | 'write'): string => {
-    const par = mode === 'write' ? settings.ociWritePAR : settings.ociReadPAR;
-    if (!par) throw new Error(`No ${mode} PAR URL configured. Go to Settings > OCI Object Storage to set one.`);
+  const requireWritePAR = useCallback((): string => {
+    const par = settings.ociWritePAR;
+    if (!par) throw new Error('No write PAR URL configured. Go to Settings > OCI Object Storage to set one.');
     const validation = validatePAR(par);
     if (!validation.valid) throw new Error(validation.error);
     return par;
-  }, [settings.ociWritePAR, settings.ociReadPAR]);
+  }, [settings.ociWritePAR]);
 
   const pushFullBackup = useCallback(async () => {
     setSyncing(true);
     setError(null);
     setProgress('Exporting data...');
     try {
-      const writePAR = requirePAR('write');
-      const readPAR = settings.ociReadPAR || writePAR;
+      const writePAR = requireWritePAR();
       const label = settings.ociLabel || 'default';
 
       const json = await exportJSON();
@@ -51,18 +48,6 @@ export function useOCISync() {
       const result = await ociPut(writePAR, objectKey, data);
       if (!result.ok) throw new Error(result.error || 'Upload failed');
 
-      setProgress('Updating manifest...');
-      const entry: SharedManifestEntry = {
-        objectKey,
-        type: 'full-backup',
-        title: `Full Backup by ${label}`,
-        sharedBy: label,
-        sharedAt: Date.now(),
-        sizeBytes: new TextEncoder().encode(data).length,
-      };
-      const manifestResult = await updateManifest(writePAR, readPAR, entry);
-      if (!manifestResult.ok) throw new Error(manifestResult.error || 'Failed to update manifest');
-
       setLastSyncAt(Date.now());
       setProgress('Backup uploaded successfully');
     } catch (err) {
@@ -71,54 +56,14 @@ export function useOCISync() {
     } finally {
       setSyncing(false);
     }
-  }, [requirePAR, settings.ociReadPAR, settings.ociLabel]);
-
-  const pullFullBackup = useCallback(async () => {
-    setSyncing(true);
-    setError(null);
-    setProgress('Fetching manifest...');
-    try {
-      const readPAR = requirePAR('read');
-
-      const manifest = await fetchManifest(readPAR);
-      const backups = manifest.items
-        .filter((i) => i.type === 'full-backup')
-        .sort((a, b) => b.sharedAt - a.sharedAt);
-
-      if (backups.length === 0) throw new Error('No backups found in the bucket');
-
-      const latest = backups[0];
-      setProgress(`Downloading backup from ${latest.sharedBy}...`);
-      const result = await ociGet(readPAR, latest.objectKey);
-      if (!result.ok || !result.data) throw new Error(result.error || 'Download failed');
-
-      setProgress('Importing data...');
-      const envelope: SharedItemEnvelope = JSON.parse(result.data);
-      if (envelope.version !== 1 || envelope.type !== 'full-backup') {
-        throw new Error('Invalid backup envelope');
-      }
-
-      const exportData = envelope.payload as ExportData;
-      const json = JSON.stringify(exportData);
-      await importJSON(json);
-
-      setLastSyncAt(Date.now());
-      setProgress('Backup restored successfully');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Pull failed');
-      setProgress('');
-    } finally {
-      setSyncing(false);
-    }
-  }, [requirePAR]);
+  }, [requireWritePAR, settings.ociLabel]);
 
   const shareNote = useCallback(async (note: Note, clipsFolderId?: string) => {
     setSyncing(true);
     setError(null);
     setProgress('Sharing note...');
     try {
-      const writePAR = requirePAR('write');
-      const readPAR = settings.ociReadPAR || writePAR;
+      const writePAR = requireWritePAR();
       const label = settings.ociLabel || 'default';
 
       const envelope = buildNoteEnvelope(note, label, clipsFolderId);
@@ -128,18 +73,6 @@ export function useOCISync() {
       const result = await ociPut(writePAR, objectKey, data);
       if (!result.ok) throw new Error(result.error || 'Upload failed');
 
-      setProgress('Updating manifest...');
-      const entry: SharedManifestEntry = {
-        objectKey,
-        type: envelope.type,
-        title: note.title || 'Untitled',
-        sharedBy: label,
-        sharedAt: Date.now(),
-        sizeBytes: new TextEncoder().encode(data).length,
-      };
-      const manifestResult = await updateManifest(writePAR, readPAR, entry);
-      if (!manifestResult.ok) throw new Error(manifestResult.error || 'Failed to update manifest');
-
       setProgress('Shared successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Share failed');
@@ -147,15 +80,14 @@ export function useOCISync() {
     } finally {
       setSyncing(false);
     }
-  }, [requirePAR, settings.ociReadPAR, settings.ociLabel]);
+  }, [requireWritePAR, settings.ociLabel]);
 
   const shareIOCReport = useCallback(async (note: Note) => {
     setSyncing(true);
     setError(null);
     setProgress('Sharing IOC report...');
     try {
-      const writePAR = requirePAR('write');
-      const readPAR = settings.ociReadPAR || writePAR;
+      const writePAR = requireWritePAR();
       const label = settings.ociLabel || 'default';
 
       const envelope = buildIOCReportEnvelope(note, label);
@@ -165,18 +97,6 @@ export function useOCISync() {
       const result = await ociPut(writePAR, objectKey, data);
       if (!result.ok) throw new Error(result.error || 'Upload failed');
 
-      setProgress('Updating manifest...');
-      const entry: SharedManifestEntry = {
-        objectKey,
-        type: 'ioc-report',
-        title: `IOC Report: ${note.title || 'Untitled'}`,
-        sharedBy: label,
-        sharedAt: Date.now(),
-        sizeBytes: new TextEncoder().encode(data).length,
-      };
-      const manifestResult = await updateManifest(writePAR, readPAR, entry);
-      if (!manifestResult.ok) throw new Error(manifestResult.error || 'Failed to update manifest');
-
       setProgress('IOC report shared successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Share failed');
@@ -184,46 +104,37 @@ export function useOCISync() {
     } finally {
       setSyncing(false);
     }
-  }, [requirePAR, settings.ociReadPAR, settings.ociLabel]);
+  }, [requireWritePAR, settings.ociLabel]);
 
-  const listShared = useCallback(async (): Promise<SharedManifestEntry[]> => {
-    const readPAR = requirePAR('read');
-    const manifest = await fetchManifest(readPAR);
-    return manifest.items.sort((a, b) => b.sharedAt - a.sharedAt);
-  }, [requirePAR]);
-
-  const importSharedItem = useCallback(async (entry: SharedManifestEntry) => {
+  const pushIOCs = useCallback(async (
+    entries: IOCExportEntry[],
+    slug: string,
+    typeSlug?: string,
+    tiExportConfig?: ThreatIntelExportConfig,
+  ) => {
     setSyncing(true);
     setError(null);
-    setProgress(`Importing ${entry.title}...`);
+    setProgress('Pushing IOCs...');
     try {
-      const readPAR = requirePAR('read');
+      const writePAR = requireWritePAR();
+      const data = formatIOCsFlatJSON(entries, tiExportConfig);
+      const timestamp = Date.now();
+      const safeSlug = slugify(slug) || 'iocs';
+      const objectKey = typeSlug
+        ? `browsernotes/iocs/${safeSlug}-${typeSlug}-${timestamp}.json`
+        : `browsernotes/iocs/${safeSlug}-${timestamp}.json`;
 
-      const result = await ociGet(readPAR, entry.objectKey);
-      if (!result.ok || !result.data) throw new Error(result.error || 'Download failed');
+      const result = await ociPut(writePAR, objectKey, data);
+      if (!result.ok) throw new Error(result.error || 'Upload failed');
 
-      const envelope: SharedItemEnvelope = JSON.parse(result.data);
-      if (envelope.version !== 1) throw new Error('Unsupported envelope version');
-
-      if (envelope.type === 'full-backup') {
-        const exportData = envelope.payload as ExportData;
-        const json = JSON.stringify(exportData);
-        await importJSON(json);
-        setProgress('Full backup imported successfully');
-      } else {
-        // Single note/clip/ioc-report — sanitize through allowlisted field extractor
-        const note = sanitizeNote(envelope.payload);
-        if (!note || !note.id) throw new Error('Invalid note in envelope');
-        await db.notes.put(note);
-        setProgress(`Imported: ${note.title || 'Untitled'}`);
-      }
+      setProgress('IOCs pushed successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
+      setError(err instanceof Error ? err.message : 'Push failed');
       setProgress('');
     } finally {
       setSyncing(false);
     }
-  }, [requirePAR]);
+  }, [requireWritePAR]);
 
   return {
     syncing,
@@ -231,10 +142,8 @@ export function useOCISync() {
     error,
     lastSyncAt,
     pushFullBackup,
-    pullFullBackup,
     shareNote,
     shareIOCReport,
-    listShared,
-    importSharedItem,
+    pushIOCs,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   validatePAR,
   buildObjectUrl,
@@ -6,9 +6,8 @@ import {
   buildIOCReportEnvelope,
   buildFullBackupEnvelope,
   buildObjectKey,
-  fetchManifest,
 } from '../lib/oci-sync';
-import type { Note, ExportData, SharedManifest } from '../types';
+import type { Note, ExportData } from '../types';
 
 // ---- validatePAR ----
 
@@ -215,69 +214,5 @@ describe('buildObjectKey', () => {
     expect(labelPart).not.toContain('/');
     expect(labelPart).not.toContain('!');
     expect(key).toMatch(/^browsernotes\/backups\//);
-  });
-});
-
-// ---- Manifest Parsing ----
-
-describe('fetchManifest', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns empty manifest when fetch fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network error'));
-    const manifest = await fetchManifest('https://objectstorage.example.com/p/t/n/ns/b/b/o/');
-    expect(manifest.version).toBe(1);
-    expect(manifest.items).toEqual([]);
-  });
-
-  it('returns empty manifest for 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response('Not found', { status: 404 })
-    );
-    const manifest = await fetchManifest('https://objectstorage.example.com/p/t/n/ns/b/b/o/');
-    expect(manifest.version).toBe(1);
-    expect(manifest.items).toEqual([]);
-  });
-
-  it('parses valid manifest JSON', async () => {
-    const validManifest: SharedManifest = {
-      version: 1,
-      updatedAt: 1000,
-      items: [
-        {
-          objectKey: 'browsernotes/shared/notes/n1-1000.json',
-          type: 'note',
-          title: 'Test Note',
-          sharedBy: 'Alice',
-          sharedAt: 1000,
-        },
-      ],
-    };
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify(validManifest), { status: 200 })
-    );
-    const manifest = await fetchManifest('https://objectstorage.example.com/p/t/n/ns/b/b/o/');
-    expect(manifest.version).toBe(1);
-    expect(manifest.items).toHaveLength(1);
-    expect(manifest.items[0].title).toBe('Test Note');
-  });
-
-  it('returns empty manifest for malformed JSON', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response('not json {{{', { status: 200 })
-    );
-    const manifest = await fetchManifest('https://objectstorage.example.com/p/t/n/ns/b/b/o/');
-    expect(manifest.version).toBe(1);
-    expect(manifest.items).toEqual([]);
-  });
-
-  it('returns empty manifest for wrong version', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ version: 2, items: [{ x: 1 }] }), { status: 200 })
-    );
-    const manifest = await fetchManifest('https://objectstorage.example.com/p/t/n/ns/b/b/o/');
-    expect(manifest.items).toEqual([]);
   });
 });

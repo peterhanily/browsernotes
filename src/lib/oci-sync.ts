@@ -1,4 +1,4 @@
-import type { Note, SharedItemEnvelope, SharedManifest, SharedManifestEntry, ExportData } from '../types';
+import type { Note, SharedItemEnvelope, ExportData } from '../types';
 
 // ---- Validation ----
 
@@ -82,65 +82,6 @@ export async function ociPut(
   }
 }
 
-export async function ociGet(
-  readPAR: string,
-  objectPath: string
-): Promise<{ ok: boolean; data?: string; error?: string }> {
-  const url = buildObjectUrl(readPAR, objectPath);
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      return { ok: false, error: `HTTP ${resp.status}: ${resp.statusText}` };
-    }
-    const data = await resp.text();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
-  }
-}
-
-export async function ociList(
-  readPAR: string,
-  prefix?: string
-): Promise<{ ok: boolean; keys?: string[]; error?: string }> {
-  // OCI PAR list: GET on the prefix returns XML with <Key> elements
-  const url = prefix ? buildObjectUrl(readPAR, prefix) : readPAR;
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      return { ok: false, error: `HTTP ${resp.status}: ${resp.statusText}` };
-    }
-    const xml = await resp.text();
-    const keys: string[] = [];
-    const regex = /<Key>([^<]+)<\/Key>/g;
-    let match;
-    while ((match = regex.exec(xml)) !== null) {
-      keys.push(match[1]);
-    }
-    return { ok: true, keys };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
-  }
-}
-
-export async function ociHead(
-  readPAR: string,
-  objectPath: string
-): Promise<{ ok: boolean; status: number; contentLength?: number; error?: string }> {
-  const url = buildObjectUrl(readPAR, objectPath);
-  try {
-    const resp = await fetch(url, { method: 'HEAD' });
-    const contentLength = resp.headers.get('content-length');
-    return {
-      ok: resp.ok,
-      status: resp.status,
-      contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
-    };
-  } catch (err) {
-    return { ok: false, status: 0, error: err instanceof Error ? err.message : 'Network error' };
-  }
-}
-
 // ---- Envelope Helpers ----
 
 export function buildNoteEnvelope(note: Note, label: string, clipsFolderId?: string): SharedItemEnvelope {
@@ -197,57 +138,15 @@ export function buildObjectKey(type: SharedItemEnvelope['type'], id: string, lab
   }
 }
 
-// ---- Manifest Management ----
-
-export async function fetchManifest(readPAR: string): Promise<SharedManifest> {
-  const result = await ociGet(readPAR, 'browsernotes/manifest.json');
-  if (!result.ok || !result.data) {
-    return { version: 1, updatedAt: Date.now(), items: [] };
-  }
-  try {
-    const parsed = JSON.parse(result.data);
-    if (parsed && parsed.version === 1 && Array.isArray(parsed.items)) {
-      return parsed as SharedManifest;
-    }
-    return { version: 1, updatedAt: Date.now(), items: [] };
-  } catch {
-    return { version: 1, updatedAt: Date.now(), items: [] };
-  }
-}
-
-export async function updateManifest(
-  writePAR: string,
-  readPAR: string,
-  newEntry: SharedManifestEntry
-): Promise<{ ok: boolean; error?: string }> {
-  const manifest = await fetchManifest(readPAR);
-  manifest.items.push(newEntry);
-  manifest.updatedAt = Date.now();
-
-  const data = JSON.stringify(manifest, null, 2);
-  return ociPut(writePAR, 'browsernotes/manifest.json', data);
-}
-
 // ---- Test PAR Connectivity ----
 
-export async function testPAR(parUrl: string, mode: 'read' | 'write'): Promise<{ ok: boolean; error?: string }> {
+export async function testPAR(parUrl: string): Promise<{ ok: boolean; error?: string }> {
   const validation = validatePAR(parUrl);
   if (!validation.valid) {
     return { ok: false, error: validation.error };
   }
 
-  if (mode === 'read') {
-    // Try to HEAD a known path
-    const result = await ociHead(parUrl, 'browsernotes/manifest.json');
-    // 404 is OK for read (manifest may not exist yet), only network errors are failures
-    if (result.status === 0 && result.error) {
-      return { ok: false, error: result.error };
-    }
-    return { ok: true };
-  } else {
-    // For write, try a small test PUT
-    const testKey = 'browsernotes/.connectivity-test';
-    const result = await ociPut(parUrl, testKey, JSON.stringify({ test: true, at: Date.now() }));
-    return result;
-  }
+  const testKey = 'browsernotes/.connectivity-test';
+  const result = await ociPut(parUrl, testKey, JSON.stringify({ test: true, at: Date.now() }));
+  return result;
 }

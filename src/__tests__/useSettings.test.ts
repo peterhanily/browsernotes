@@ -78,7 +78,6 @@ describe('useSettings', () => {
     act(() => {
       result.current.updateSettings({
         ociWritePAR: 'https://example.com/p/write/o/',
-        ociReadPAR: 'https://example.com/p/read/o/',
         ociLabel: 'my-device',
       });
     });

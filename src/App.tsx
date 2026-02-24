@@ -24,7 +24,6 @@ import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { SearchOverlay } from './components/Search/SearchOverlay';
-import { BrowseShared } from './components/Settings/BrowseShared';
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
@@ -63,7 +62,6 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
-  const [browseSharedOpen, setBrowseSharedOpen] = useState(false);
   const [selectedTimelineId, setSelectedTimelineId] = useState<string>();
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string>();
 
@@ -419,7 +417,6 @@ export default function App() {
             onUpdateSettings={updateSettings}
             notes={notes.notes}
             onImportComplete={handleImportComplete}
-            onOpenBrowseShared={() => setBrowseSharedOpen(true)}
           />
         ) : activeView === 'timeline' ? (
           <TimelineView
@@ -563,12 +560,6 @@ export default function App() {
         whiteboards={whiteboards}
         onNavigateToTimeline={handleSearchNavigateToTimeline}
         onNavigateToWhiteboard={handleSearchNavigateToWhiteboard}
-      />
-
-      <BrowseShared
-        open={browseSharedOpen}
-        onClose={() => setBrowseSharedOpen(false)}
-        onImportComplete={handleImportComplete}
       />
 
       {tour.isActive && tour.currentStep && (

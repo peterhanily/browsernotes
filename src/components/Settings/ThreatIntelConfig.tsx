@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Upload, X, ShieldCheck, FileJson } from 'lucide-react';
+import { Upload, X, ShieldCheck, FileJson, Users } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 
 interface ConfigCategory {
@@ -14,17 +14,21 @@ const CATEGORIES: ConfigCategory[] = [
   { key: 'tiIocStatuses', label: 'IOC Statuses' },
 ];
 
-const BULK_KEY_MAP: Record<string, ConfigCategory['key']> = {
+const BULK_KEY_MAP: Record<string, ConfigCategory['key'] | 'attributionActors'> = {
   cls_levels: 'tiClsLevels',
   ioc_subtypes: 'tiIocSubtypes',
   relationship_types: 'tiRelationshipTypes',
   ioc_statuses: 'tiIocStatuses',
+  attribution_actors: 'attributionActors',
 };
 
 export function ThreatIntelConfig() {
   const { settings, updateSettings } = useSettings();
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const bulkRef = useRef<HTMLInputElement>(null);
+  const actorsRef = useRef<HTMLInputElement>(null);
+
+  const actors = settings.attributionActors ?? [];
 
   const getValues = (key: ConfigCategory['key']): string[] => settings[key] ?? [];
 
@@ -45,6 +49,22 @@ export function ThreatIntelConfig() {
     e.target.value = '';
   };
 
+  const handleActorsImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const parsed = text.split(/[\n,]/).map((s) => s.trim()).filter((s) => s.length > 0);
+      const unique = [...new Set([...actors, ...parsed])].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base' })
+      );
+      updateSettings({ attributionActors: unique });
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -52,14 +72,21 @@ export function ThreatIntelConfig() {
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        const updates: Partial<Record<ConfigCategory['key'], string[]>> = {};
+        const updates: Partial<Record<string, string[]>> = {};
         for (const [jsonKey, settingsKey] of Object.entries(BULK_KEY_MAP)) {
           if (Array.isArray(data[jsonKey])) {
-            const current = getValues(settingsKey);
             const parsed = (data[jsonKey] as unknown[]).map(String).filter((s) => s.length > 0);
-            updates[settingsKey] = [...new Set([...current, ...parsed])].sort((a, b) =>
-              a.localeCompare(b, undefined, { sensitivity: 'base' })
-            );
+            if (settingsKey === 'attributionActors') {
+              const current = actors;
+              updates[settingsKey] = [...new Set([...current, ...parsed])].sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: 'base' })
+              );
+            } else {
+              const current = getValues(settingsKey);
+              updates[settingsKey] = [...new Set([...current, ...parsed])].sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: 'base' })
+              );
+            }
           }
         }
         if (Object.keys(updates).length > 0) {
@@ -97,7 +124,7 @@ export function ThreatIntelConfig() {
           Bulk JSON Import
         </button>
         <p className="text-xs text-gray-600 mt-1">
-          Accepts {'{'} cls_levels: [...], ioc_subtypes: [...], relationship_types: [...], ioc_statuses: [...] {'}'}
+          Accepts {'{'} cls_levels, ioc_subtypes, relationship_types, ioc_statuses, attribution_actors {'}'}
         </p>
       </div>
 
@@ -126,6 +153,56 @@ export function ThreatIntelConfig() {
             placeholder="e.g. Internal"
           />
         </div>
+      </div>
+
+      {/* Attribution Actors */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-400 flex items-center gap-1.5">
+            <Users size={12} />
+            Attribution Actors
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              ref={actorsRef}
+              type="file"
+              accept=".csv,.txt"
+              onChange={handleActorsImport}
+              className="hidden"
+            />
+            <button
+              onClick={() => actorsRef.current?.click()}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-700 hover:bg-gray-600 text-gray-300"
+            >
+              <Upload size={12} />
+              Import CSV
+            </button>
+            {actors.length > 0 && (
+              <button
+                onClick={() => updateSettings({ attributionActors: [] })}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors bg-gray-700 hover:bg-gray-600 text-red-400"
+              >
+                <X size={12} />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        {actors.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-1">{actors.length} actor{actors.length !== 1 ? 's' : ''} loaded</p>
+            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+              {actors.map((v) => (
+                <span
+                  key={v}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-800 text-gray-300 border border-gray-700"
+                >
+                  {v}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <hr className="border-gray-800" />

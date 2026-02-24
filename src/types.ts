@@ -81,7 +81,6 @@ export interface Settings {
   taskViewMode: TaskViewMode;
   tourCompleted?: boolean;
   ociWritePAR?: string;
-  ociReadPAR?: string;
   ociLabel?: string;
   attributionActors?: string[];
   tiDefaultClsLevel?: string;
@@ -277,21 +276,6 @@ export interface ExportData {
   timelineEvents?: TimelineEvent[];
   timelines?: Timeline[];
   whiteboards?: Whiteboard[];
-}
-
-export interface SharedManifest {
-  version: 1;
-  updatedAt: number;
-  items: SharedManifestEntry[];
-}
-
-export interface SharedManifestEntry {
-  objectKey: string;
-  type: SharedItemEnvelope['type'];
-  title: string;
-  sharedBy: string;
-  sharedAt: number;
-  sizeBytes?: number;
 }
 
 export const TAG_COLORS = [

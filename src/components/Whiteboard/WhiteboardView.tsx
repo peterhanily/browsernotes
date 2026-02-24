@@ -46,34 +46,38 @@ export function WhiteboardView({
 
   if (selectedWhiteboard) {
     return (
-      <Suspense
-        fallback={
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3">
-            <Loader2 size={32} className="animate-spin" />
-            <p className="text-sm">Loading whiteboard...</p>
-          </div>
-        }
-      >
-        <WhiteboardEditor
-          whiteboard={selectedWhiteboard}
-          allTags={allTags}
-          folders={folders}
-          onUpdate={onUpdateWhiteboard}
-          onCreateTag={onCreateTag}
-          onBack={() => setSelectedId(null)}
-        />
-      </Suspense>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Suspense
+          fallback={
+            <div className="flex flex-col items-center justify-center flex-1 text-gray-500 gap-3">
+              <Loader2 size={32} className="animate-spin" />
+              <p className="text-sm">Loading whiteboard...</p>
+            </div>
+          }
+        >
+          <WhiteboardEditor
+            whiteboard={selectedWhiteboard}
+            allTags={allTags}
+            folders={folders}
+            onUpdate={onUpdateWhiteboard}
+            onCreateTag={onCreateTag}
+            onBack={() => setSelectedId(null)}
+          />
+        </Suspense>
+      </div>
     );
   }
 
   return (
-    <WhiteboardList
-      whiteboards={whiteboards}
-      folders={folders}
-      onSelect={setSelectedId}
-      onCreate={handleCreate}
-      onDelete={handleDelete}
-      onRename={(id, name) => onUpdateWhiteboard(id, { name })}
-    />
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <WhiteboardList
+        whiteboards={whiteboards}
+        folders={folders}
+        onSelect={setSelectedId}
+        onCreate={handleCreate}
+        onDelete={handleDelete}
+        onRename={(id, name) => onUpdateWhiteboard(id, { name })}
+      />
+    </div>
   );
 }

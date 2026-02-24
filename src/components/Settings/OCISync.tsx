@@ -1,13 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Cloud, Upload, Loader2 } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useOCISync } from '../../hooks/useOCISync';
 import { testPAR } from '../../lib/oci-sync';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
 
 export function OCISync() {
   const { settings, updateSettings } = useSettings();
   const oci = useOCISync();
+  const logActivity = useLogActivity();
 
   const [writePAR, setWritePAR] = useState(settings.ociWritePAR || '');
   const [label, setLabel] = useState(settings.ociLabel || '');
@@ -17,6 +19,9 @@ export function OCISync() {
   const [confirmPush, setConfirmPush] = useState(false);
 
   const msgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // A1: Clean up message timeout on unmount
+  useEffect(() => () => clearTimeout(msgTimeoutRef.current), []);
 
   const showMessage = (msg: string) => {
     setMessage(msg);
@@ -46,6 +51,7 @@ export function OCISync() {
     await oci.pushFullBackup();
     if (!oci.error) {
       showMessage('Backup pushed successfully');
+      logActivity('sync', 'backup', 'Pushed full backup to OCI');
     }
   };
 

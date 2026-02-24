@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
-  PanelLeftClose, Github, Download, Chrome, PenTool,
+  PanelLeftClose, Github, Download, Chrome, PenTool, Activity,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -229,6 +229,12 @@ export function Sidebar({
             onClick={() => nav(() => { onViewChange('whiteboard'); clearFilters(); })}
           />
         </div>
+        <SidebarItem
+          icon={<Activity size={18} />}
+          label="Activity"
+          active={activeView === 'activity'}
+          onClick={() => nav(() => { onViewChange('activity'); clearFilters(); })}
+        />
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
           <div className="pt-3">

@@ -69,7 +69,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard';
+export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -284,3 +284,39 @@ export const TAG_COLORS = [
   '#84cc16', '#eab308', '#f97316', '#ef4444',
   '#ec4899', '#a855f7',
 ];
+
+// Activity Log types
+export type ActivityCategory =
+  | 'note' | 'task' | 'timeline' | 'whiteboard'
+  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data';
+
+export type ActivityAction =
+  | 'create' | 'update' | 'delete'
+  | 'trash' | 'restore' | 'pin' | 'unpin' | 'archive' | 'unarchive' | 'empty-trash'
+  | 'complete' | 'reopen'
+  | 'star' | 'unstar'
+  | 'analyze' | 'dismiss' | 'push-iocs'
+  | 'export' | 'import' | 'share' | 'backup' | 'share-ioc-report'
+  | 'rename';
+
+export interface ActivityLogEntry {
+  id: string;
+  action: ActivityAction;
+  category: ActivityCategory;
+  detail: string;
+  itemId?: string;
+  itemTitle?: string;
+  timestamp: number;
+}
+
+export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string; color: string }> = {
+  note:       { label: 'Note',       color: '#3b82f6' },
+  task:       { label: 'Task',       color: '#22c55e' },
+  timeline:   { label: 'Timeline',   color: '#f97316' },
+  whiteboard: { label: 'Whiteboard', color: '#a855f7' },
+  folder:     { label: 'Folder',     color: '#eab308' },
+  tag:        { label: 'Tag',        color: '#ec4899' },
+  ioc:        { label: 'IOC',        color: '#ef4444' },
+  sync:       { label: 'Sync',       color: '#06b6d4' },
+  data:       { label: 'Data',       color: '#6366f1' },
+};

@@ -7,6 +7,7 @@ import { NoteEditor } from './components/Notes/NoteEditor';
 import { TaskListView } from './components/Tasks/TaskList';
 import { TimelineView } from './components/Timeline/TimelineView';
 import { WhiteboardView } from './components/Whiteboard/WhiteboardView';
+import { ActivityLogView } from './components/Activity/ActivityLogView';
 import { QuickCapture } from './components/Clips/QuickCapture';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { useNotes } from './hooks/useNotes';
@@ -18,6 +19,8 @@ import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useActivityLog } from './hooks/useActivityLog';
+import { ActivityLogContext } from './hooks/ActivityLogContext';
 import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType } from './types';
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
@@ -45,8 +48,135 @@ export default function App() {
     onComplete: () => updateSettings({ tourCompleted: true }),
   });
 
+  const activityLog = useActivityLog();
+
+  // Instrumented wrappers for activity logging
+  const loggedCreateNote = useCallback(async (partial?: Partial<Note>) => {
+    const note = await notes.createNote(partial);
+    activityLog.log('note', 'create', `Created note "${note.title}"`, note.id, note.title);
+    return note;
+  }, [notes.createNote, activityLog.log]);
+
+  const loggedTrashNote = useCallback(async (id: string) => {
+    const note = notes.notes.find((n) => n.id === id);
+    await notes.trashNote(id);
+    activityLog.log('note', 'trash', `Trashed note "${note?.title || 'Untitled'}"`, id, note?.title);
+  }, [notes.trashNote, notes.notes, activityLog.log]);
+
+  const loggedRestoreNote = useCallback(async (id: string) => {
+    const note = notes.notes.find((n) => n.id === id);
+    await notes.restoreNote(id);
+    activityLog.log('note', 'restore', `Restored note "${note?.title || 'Untitled'}"`, id, note?.title);
+  }, [notes.restoreNote, notes.notes, activityLog.log]);
+
+  const loggedTogglePin = useCallback(async (id: string) => {
+    const note = notes.notes.find((n) => n.id === id);
+    await notes.togglePin(id);
+    const action = note?.pinned ? 'unpin' : 'pin';
+    activityLog.log('note', action, `${action === 'pin' ? 'Pinned' : 'Unpinned'} note "${note?.title || 'Untitled'}"`, id, note?.title);
+  }, [notes.togglePin, notes.notes, activityLog.log]);
+
+  const loggedToggleArchive = useCallback(async (id: string) => {
+    const note = notes.notes.find((n) => n.id === id);
+    await notes.toggleArchive(id);
+    const action = note?.archived ? 'unarchive' : 'archive';
+    activityLog.log('note', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} note "${note?.title || 'Untitled'}"`, id, note?.title);
+  }, [notes.toggleArchive, notes.notes, activityLog.log]);
+
+  const loggedEmptyTrash = useCallback(async () => {
+    const count = notes.notes.filter((n) => n.trashed).length;
+    await notes.emptyTrash();
+    activityLog.log('note', 'empty-trash', `Emptied trash (${count} notes)`);
+  }, [notes.emptyTrash, notes.notes, activityLog.log]);
+
+  const loggedCreateTask = useCallback(async (partial?: Partial<import('./types').Task>) => {
+    const task = await tasks.createTask(partial);
+    activityLog.log('task', 'create', `Created task "${task.title || 'Untitled'}"`, task.id, task.title);
+    return task;
+  }, [tasks.createTask, activityLog.log]);
+
+  const loggedDeleteTask = useCallback(async (id: string) => {
+    const task = tasks.tasks.find((t) => t.id === id);
+    await tasks.deleteTask(id);
+    activityLog.log('task', 'delete', `Deleted task "${task?.title || 'Untitled'}"`, id, task?.title);
+  }, [tasks.deleteTask, tasks.tasks, activityLog.log]);
+
+  const loggedToggleComplete = useCallback(async (id: string) => {
+    const task = tasks.tasks.find((t) => t.id === id);
+    await tasks.toggleComplete(id);
+    const action = task?.completed ? 'reopen' : 'complete';
+    activityLog.log('task', action, `${action === 'complete' ? 'Completed' : 'Reopened'} task "${task?.title || 'Untitled'}"`, id, task?.title);
+  }, [tasks.toggleComplete, tasks.tasks, activityLog.log]);
+
+  const loggedCreateEvent = useCallback(async (data: Partial<import('./types').TimelineEvent>) => {
+    const event = await timeline.createEvent(data);
+    activityLog.log('timeline', 'create', `Created timeline event "${event.title || 'Untitled'}"`, event.id, event.title);
+    return event;
+  }, [timeline.createEvent, activityLog.log]);
+
+  const loggedDeleteEvent = useCallback(async (id: string) => {
+    const event = timeline.events.find((e) => e.id === id);
+    await timeline.deleteEvent(id);
+    activityLog.log('timeline', 'delete', `Deleted timeline event "${event?.title || 'Untitled'}"`, id, event?.title);
+  }, [timeline.deleteEvent, timeline.events, activityLog.log]);
+
+  const loggedToggleStar = useCallback(async (id: string) => {
+    const event = timeline.events.find((e) => e.id === id);
+    await timeline.toggleStar(id);
+    const action = event?.starred ? 'unstar' : 'star';
+    activityLog.log('timeline', action, `${action === 'star' ? 'Starred' : 'Unstarred'} event "${event?.title || 'Untitled'}"`, id, event?.title);
+  }, [timeline.toggleStar, timeline.events, activityLog.log]);
+
+  const loggedCreateTimeline = useCallback(async (name: string) => {
+    const tl = await createTimeline(name);
+    activityLog.log('timeline', 'create', `Created timeline "${name}"`, tl.id, name);
+    return tl;
+  }, [createTimeline, activityLog.log]);
+
+  const loggedDeleteTimeline = useCallback(async (id: string) => {
+    const tl = timelines.find((t) => t.id === id);
+    await deleteTimeline(id);
+    activityLog.log('timeline', 'delete', `Deleted timeline "${tl?.name || 'Untitled'}"`, id, tl?.name);
+  }, [deleteTimeline, timelines, activityLog.log]);
+
+  const loggedCreateWhiteboard = useCallback(async (name?: string) => {
+    const wb = await createWhiteboard(name);
+    activityLog.log('whiteboard', 'create', `Created whiteboard "${wb.name}"`, wb.id, wb.name);
+    return wb;
+  }, [createWhiteboard, activityLog.log]);
+
+  const loggedDeleteWhiteboard = useCallback(async (id: string) => {
+    const wb = whiteboards.find((w) => w.id === id);
+    await deleteWhiteboard(id);
+    activityLog.log('whiteboard', 'delete', `Deleted whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
+  }, [deleteWhiteboard, whiteboards, activityLog.log]);
+
+  const loggedCreateFolder = useCallback(async (name: string) => {
+    const folder = await createFolder(name);
+    activityLog.log('folder', 'create', `Created folder "${name}"`, folder.id, name);
+    return folder;
+  }, [createFolder, activityLog.log]);
+
+  const loggedDeleteFolder = useCallback(async (id: string) => {
+    const folder = folders.find((f) => f.id === id);
+    await deleteFolder(id);
+    activityLog.log('folder', 'delete', `Deleted folder "${folder?.name || 'Untitled'}"`, id, folder?.name);
+  }, [deleteFolder, folders, activityLog.log]);
+
+  const loggedCreateTag = useCallback(async (name: string) => {
+    const tag = await createTag(name);
+    activityLog.log('tag', 'create', `Created tag "${name}"`, tag.id, name);
+    return tag;
+  }, [createTag, activityLog.log]);
+
+  const loggedDeleteTag = useCallback(async (id: string) => {
+    const tag = tags.find((t) => t.id === id);
+    await deleteTag(id);
+    activityLog.log('tag', 'delete', `Deleted tag "${tag?.name || ''}"`, id, tag?.name);
+  }, [deleteTag, tags, activityLog.log]);
+
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' ? settings.defaultView : 'notes';
   const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
@@ -93,7 +223,7 @@ export default function App() {
           const freshIOCs = extractIOCs(rawContent);
           const iocAnalysis = mergeIOCAnalysis(undefined, freshIOCs);
           const iocTypes = [...new Set(freshIOCs.filter((i) => !i.dismissed).map((i) => i.type))];
-          const note = await notes.createNote({
+          const note = await loggedCreateNote({
             title: sourceUrl || clipTitle || rawContent.substring(0, 80) || 'Clip',
             content,
             folderId: clipsFolder.id,
@@ -115,7 +245,7 @@ export default function App() {
 
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [findOrCreateFolder, notes.createNote]);
+  }, [findOrCreateFolder, loggedCreateNote]);
 
   // Track Clips folder ID for OCI envelope type detection
   const clipsFolderId = useMemo(
@@ -199,15 +329,6 @@ export default function App() {
     archived: notes.notes.filter((n) => n.archived && !n.trashed).length,
   }), [notes.notes]);
 
-  // Handlers
-  const handleDeleteFolder = useCallback(async (id: string) => {
-    await deleteFolder(id);
-    if (selectedFolderId === id) {
-      setSelectedFolderId(undefined);
-      setSelectedNoteId(undefined);
-    }
-  }, [deleteFolder, selectedFolderId]);
-
   const handleMoveNoteToFolder = useCallback((noteId: string, folderId: string) => {
     notes.updateNote(noteId, { folderId });
   }, [notes.updateNote]);
@@ -218,11 +339,11 @@ export default function App() {
     setActiveView('notes');
     setShowTrash(false);
     setShowArchive(false);
-    const note = await notes.createNote({
+    const note = await loggedCreateNote({
       folderId: selectedFolderId,
     });
     setSelectedNoteId(note.id);
-  }, [notes.createNote, selectedFolderId, showQuickCapture]);
+  }, [loggedCreateNote, selectedFolderId, showQuickCapture]);
 
   const handleNewTask = useCallback(async () => {
     setShowSettings(false);
@@ -230,10 +351,10 @@ export default function App() {
   }, []);
 
   const handleQuickCapture = useCallback(async (data: Partial<Note>) => {
-    const note = await notes.createNote(data);
+    const note = await loggedCreateNote(data);
     setActiveView('notes');
     setSelectedNoteId(note.id);
-  }, [notes.createNote]);
+  }, [loggedCreateNote]);
 
   const handleImportComplete = useCallback(() => {
     notes.reload();
@@ -341,8 +462,8 @@ export default function App() {
     onShowTrash: setShowTrash,
     showArchive,
     onShowArchive: setShowArchive,
-    onCreateFolder: (name: string) => createFolder(name),
-    onDeleteFolder: handleDeleteFolder,
+    onCreateFolder: (name: string) => loggedCreateFolder(name),
+    onDeleteFolder: (id: string) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
     onRenameFolder: (id: string, name: string) => updateFolder(id, { name }),
     onOpenSettings: () => { setShowSettings(true); },
     noteCounts,
@@ -351,21 +472,21 @@ export default function App() {
     timelines,
     selectedTimelineId,
     onTimelineSelect: setSelectedTimelineId,
-    onCreateTimeline: (name: string) => createTimeline(name),
-    onDeleteTimeline: (id: string) => { deleteTimeline(id); if (selectedTimelineId === id) setSelectedTimelineId(undefined); },
+    onCreateTimeline: (name: string) => loggedCreateTimeline(name),
+    onDeleteTimeline: (id: string) => { loggedDeleteTimeline(id); if (selectedTimelineId === id) setSelectedTimelineId(undefined); },
     onRenameTimeline: (id: string, name: string) => updateTimeline(id, { name }),
     timelineEventCounts,
     whiteboards,
     selectedWhiteboardId,
     onWhiteboardSelect: (id: string) => setSelectedWhiteboardId(id),
-    onCreateWhiteboard: createWhiteboard,
-    onDeleteWhiteboard: (id: string) => { deleteWhiteboard(id); if (selectedWhiteboardId === id) setSelectedWhiteboardId(undefined); },
+    onCreateWhiteboard: loggedCreateWhiteboard,
+    onDeleteWhiteboard: (id: string) => { loggedDeleteWhiteboard(id); if (selectedWhiteboardId === id) setSelectedWhiteboardId(undefined); },
     onRenameWhiteboard: (id: string, name: string) => updateWhiteboard(id, { name }),
     whiteboardCount: whiteboards.length,
     onMoveNoteToFolder: handleMoveNoteToFolder,
     onRenameTag: (id: string, name: string) => updateTag(id, { name }),
-    onDeleteTag: deleteTag,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, createFolder, handleDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, createTimeline, deleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, createWhiteboard, deleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, deleteTag]);
+    onDeleteTag: loggedDeleteTag,
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -381,7 +502,7 @@ export default function App() {
   ) : null;
 
   return (
-    <>
+    <ActivityLogContext.Provider value={activityLog.log}>
       <AppLayout
         header={
           <Header
@@ -418,16 +539,22 @@ export default function App() {
             notes={notes.notes}
             onImportComplete={handleImportComplete}
           />
+        ) : activeView === 'activity' ? (
+          <ActivityLogView
+            entries={activityLog.entries}
+            getFiltered={activityLog.getFiltered}
+            onClear={activityLog.clear}
+          />
         ) : activeView === 'timeline' ? (
           <TimelineView
             events={filteredTimelineEvents}
             allTags={tags}
             folders={folders}
-            onCreateTag={createTag}
-            onCreateEvent={(data) => timeline.createEvent({ ...data, timelineId: selectedTimelineId || timelines[0]?.id || '' })}
+            onCreateTag={loggedCreateTag}
+            onCreateEvent={(data) => loggedCreateEvent({ ...data, timelineId: selectedTimelineId || timelines[0]?.id || '' })}
             onUpdateEvent={timeline.updateEvent}
-            onDeleteEvent={timeline.deleteEvent}
-            onToggleStar={timeline.toggleStar}
+            onDeleteEvent={loggedDeleteEvent}
+            onToggleStar={loggedToggleStar}
             getFilteredEvents={timeline.getFilteredEvents}
             timelines={timelines}
             selectedTimelineId={selectedTimelineId}
@@ -439,10 +566,10 @@ export default function App() {
             whiteboards={filteredWhiteboards}
             folders={folders}
             allTags={tags}
-            onCreateWhiteboard={createWhiteboard}
+            onCreateWhiteboard={loggedCreateWhiteboard}
             onUpdateWhiteboard={updateWhiteboard}
-            onDeleteWhiteboard={deleteWhiteboard}
-            onCreateTag={createTag}
+            onDeleteWhiteboard={loggedDeleteWhiteboard}
+            onCreateTag={loggedCreateTag}
             selectedWhiteboardId={selectedWhiteboardId ?? null}
             onWhiteboardSelect={(id) => setSelectedWhiteboardId(id ?? undefined)}
           />
@@ -451,11 +578,11 @@ export default function App() {
             tasks={filteredTasks}
             allTags={tags}
             folders={folders}
-            onCreateTag={createTag}
-            onToggleComplete={tasks.toggleComplete}
+            onCreateTag={loggedCreateTag}
+            onToggleComplete={loggedToggleComplete}
             onUpdateTask={tasks.updateTask}
-            onDeleteTask={tasks.deleteTask}
-            onCreateTask={(data) => tasks.createTask(data)}
+            onDeleteTask={loggedDeleteTask}
+            onCreateTask={(data) => loggedCreateTask(data)}
             viewMode={taskViewMode}
             onViewModeChange={setTaskViewMode}
             getTasksByStatus={(status) => tasks.getTasksByStatus(status, selectedFolderId)}
@@ -475,7 +602,7 @@ export default function App() {
                 onSortChange={setSort}
                 title={listTitle}
                 showTrash={showTrash}
-                onEmptyTrash={notes.emptyTrash}
+                onEmptyTrash={loggedEmptyTrash}
                 selectedIOCTypes={selectedIOCTypes}
                 onIOCTypesChange={setSelectedIOCTypes}
                 folders={folders}
@@ -490,13 +617,13 @@ export default function App() {
                 <NoteEditor
                   note={selectedNote}
                   onUpdate={notes.updateNote}
-                  onTrash={notes.trashNote}
-                  onRestore={notes.restoreNote}
-                  onTogglePin={notes.togglePin}
-                  onToggleArchive={notes.toggleArchive}
+                  onTrash={loggedTrashNote}
+                  onRestore={loggedRestoreNote}
+                  onTogglePin={loggedTogglePin}
+                  onToggleArchive={loggedToggleArchive}
                   allTags={tags}
                   folders={folders}
-                  onCreateTag={createTag}
+                  onCreateTag={loggedCreateTag}
                   editorMode={editorMode}
                   onEditorModeChange={setEditorMode}
                   onBack={() => setSelectedNoteId(undefined)}
@@ -576,6 +703,6 @@ export default function App() {
           />
         </>
       )}
-    </>
+    </ActivityLogContext.Provider>
   );
 }

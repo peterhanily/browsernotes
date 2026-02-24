@@ -37,7 +37,12 @@ export function useOCISync() {
       const label = settings.ociLabel || 'default';
 
       const json = await exportJSON();
-      const exportData: ExportData = JSON.parse(json);
+      let exportData: ExportData;
+      try {
+        exportData = JSON.parse(json);
+      } catch {
+        throw new Error('Failed to parse export data — backup may be corrupted');
+      }
 
       setProgress('Building envelope...');
       const envelope = buildFullBackupEnvelope(exportData, label);

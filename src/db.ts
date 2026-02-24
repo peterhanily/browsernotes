@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry } from './types';
 
 const db = new Dexie('BrowserNotesDB') as Dexie & {
   notes: EntityTable<Note, 'id'>;
@@ -9,6 +9,7 @@ const db = new Dexie('BrowserNotesDB') as Dexie & {
   timelineEvents: EntityTable<TimelineEvent, 'id'>;
   timelines: EntityTable<Timeline, 'id'>;
   whiteboards: EntityTable<Whiteboard, 'id'>;
+  activityLog: EntityTable<ActivityLogEntry, 'id'>;
 };
 
 db.version(1).stores({
@@ -63,6 +64,10 @@ db.version(5).stores({
 
 db.version(6).stores({
   whiteboards: 'id, name, folderId, order, createdAt, updatedAt, *tags',
+});
+
+db.version(7).stores({
+  activityLog: 'id, category, action, timestamp',
 });
 
 export { db };

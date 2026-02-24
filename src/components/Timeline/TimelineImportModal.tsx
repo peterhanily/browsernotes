@@ -3,6 +3,7 @@ import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import type { Timeline, TimelineExportData } from '../../types';
 import { parseTimelineImport, importTimelineAsNew, mergeTimelineInto } from '../../lib/export';
 import { Modal } from '../Common/Modal';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
 
 interface TimelineImportModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface TimelineImportModalProps {
 }
 
 export function TimelineImportModal({ open, onClose, timelines, selectedTimelineId, onComplete }: TimelineImportModalProps) {
+  const logActivity = useLogActivity();
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<TimelineExportData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -56,12 +58,15 @@ export function TimelineImportModal({ open, onClose, timelines, selectedTimeline
       if (mode === 'new') {
         const res = await importTimelineAsNew(parsed);
         setResult(`Created timeline with ${res.eventCount} events`);
+        logActivity('timeline', 'import', `Imported timeline "${parsed.timeline.name}" with ${res.eventCount} events`);
       } else {
         if (!selectedTimelineId) return;
         const res = await mergeTimelineInto(parsed, selectedTimelineId);
         const parts = [`${res.added} added`, `${res.updated} updated`];
         if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
         setResult(`Merged: ${parts.join(', ')}`);
+        const selectedTimeline = timelines.find((t) => t.id === selectedTimelineId);
+        logActivity('timeline', 'import', `Merged timeline into "${selectedTimeline?.name || 'Unknown'}": ${parts.join(', ')}`, selectedTimelineId, selectedTimeline?.name);
       }
       onComplete();
     } catch (err) {

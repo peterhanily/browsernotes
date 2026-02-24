@@ -55,6 +55,7 @@ export function SearchOverlay({
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(undefined);
   const { searches, saveSearch, deleteSearch, clearAll } = useSavedSearches();
 
   // Debounce query
@@ -67,12 +68,13 @@ export function SearchOverlay({
   useEffect(() => {
     if (open) {
       // Small delay to ensure DOM is ready
-      requestAnimationFrame(() => inputRef.current?.focus());
+      rafRef.current = requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setQuery('');
       setDebouncedQuery('');
       setActiveIndex(0);
     }
+    return () => { if (rafRef.current !== undefined) cancelAnimationFrame(rafRef.current); };
   }, [open]);
 
   // Search results

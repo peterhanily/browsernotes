@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Download, Upload, FileText, AlertCircle } from 'lucide-react';
 import { exportJSON, importJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
 import type { Note } from '../../types';
 
 interface ExportImportProps {
@@ -10,6 +11,7 @@ interface ExportImportProps {
 }
 
 export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
+  const logActivity = useLogActivity();
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -27,6 +29,7 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
     const json = await exportJSON();
     downloadFile(json, `browsernotes-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
     showMessage('Backup exported successfully');
+    logActivity('data', 'export', 'Exported JSON backup');
   };
 
   const handleExportMarkdown = () => {
@@ -34,6 +37,7 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
     const md = exportNotesMarkdown(activeNotes);
     downloadFile(md, `browsernotes-${new Date().toISOString().split('T')[0]}.md`, 'text/markdown');
     showMessage(`Exported ${activeNotes.length} notes as Markdown`);
+    logActivity('data', 'export', `Exported ${activeNotes.length} notes as Markdown`);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +54,7 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
       const text = await pendingFile.text();
       const counts = await importJSON(text);
       showMessage(`Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} folders, ${counts.tags} tags`);
+      logActivity('data', 'import', `Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} folders, ${counts.tags} tags`);
       onImportComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import');

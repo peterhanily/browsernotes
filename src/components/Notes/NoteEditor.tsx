@@ -9,6 +9,7 @@ import { IOCPanel } from '../Analysis/IOCPanel';
 import { ResizeHandle } from '../Common/ResizeHandle';
 import { useOCISync } from '../../hooks/useOCISync';
 import { useResizable } from '../../hooks/useResizable';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
 import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
@@ -53,6 +54,7 @@ export function NoteEditor({
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareMessage, setShareMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const oci = useOCISync();
+  const logActivity = useLogActivity();
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -268,6 +270,7 @@ export function NoteEditor({
               const merged = mergeIOCAnalysis(note.iocAnalysis, fresh);
               const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];
               onUpdate(note.id, { iocAnalysis: merged, iocTypes });
+              logActivity('ioc', 'analyze', `Analyzed IOCs in "${note.title}" (${merged.iocs.length} found)`, note.id, note.title);
             }
             setShowIOCPanel(!showIOCPanel);
           }}
@@ -292,6 +295,7 @@ export function NoteEditor({
                   setShowShareMenu(!showShareMenu);
                 } else {
                   oci.shareNote(note, clipsFolderId);
+                  logActivity('sync', 'share', `Shared note "${note.title}"`, note.id, note.title);
                 }
               }}
               disabled={oci.syncing}
@@ -304,14 +308,14 @@ export function NoteEditor({
             {showShareMenu && (
               <div className="absolute top-full right-0 mt-1 py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 min-w-40">
                 <button
-                  onClick={() => { if (oci.syncing) return; oci.shareNote(note, clipsFolderId); setShowShareMenu(false); }}
+                  onClick={() => { if (oci.syncing) return; oci.shareNote(note, clipsFolderId); logActivity('sync', 'share', `Shared note "${note.title}"`, note.id, note.title); setShowShareMenu(false); }}
                   disabled={oci.syncing}
                   className="w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-50"
                 >
                   Share Note
                 </button>
                 <button
-                  onClick={() => { if (oci.syncing) return; oci.shareIOCReport(note); setShowShareMenu(false); }}
+                  onClick={() => { if (oci.syncing) return; oci.shareIOCReport(note); logActivity('sync', 'share-ioc-report', `Shared IOC report for "${note.title}"`, note.id, note.title); setShowShareMenu(false); }}
                   disabled={oci.syncing}
                   className="w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-50"
                 >
@@ -422,6 +426,7 @@ export function NoteEditor({
                 defaultReportSource: externalSettings.tiDefaultReportSource,
               } : undefined}
               onPushIOCs={(entries, slug, typeSlug) => {
+                logActivity('ioc', 'push-iocs', `Pushed ${entries.length} IOCs from "${note.title}"`, note.id, note.title);
                 return oci.pushIOCs(entries, slug, typeSlug, externalSettings ? {
                   defaultClsLevel: externalSettings.tiDefaultClsLevel,
                   defaultReportSource: externalSettings.tiDefaultReportSource,

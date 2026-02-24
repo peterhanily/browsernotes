@@ -26,7 +26,11 @@ export function TagInput({ selectedTags, allTags, onChange, onCreateTag }: TagIn
     if (!trimmed || selectedTags.includes(trimmed)) return;
     // Create if not exists
     if (!allTags.find((t) => t.name.toLowerCase() === trimmed.toLowerCase())) {
-      await onCreateTag(trimmed);
+      try {
+        await onCreateTag(trimmed);
+      } catch {
+        return; // tag creation failed — silently recover
+      }
     }
     onChange([...selectedTags, trimmed]);
     setInput('');

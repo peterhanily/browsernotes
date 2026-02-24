@@ -15,6 +15,7 @@ import { cn } from '../../lib/utils';
 import { getTechniqueLabel, getParentTechniqueId, buildNavigatorLayer, buildMitreCSV } from '../../lib/mitre-attack';
 import { downloadFile, exportTimelineJSON, exportEventsJSON } from '../../lib/export';
 import { TimelineImportModal } from './TimelineImportModal';
+import { useLogActivity } from '../../hooks/ActivityLogContext';
 
 interface TimelineViewProps {
   events: TimelineEvent[];
@@ -39,6 +40,7 @@ interface TimelineViewProps {
 }
 
 function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; timelines: Timeline[]; onImportClick: () => void }) {
+  const logActivity = useLogActivity();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,12 +56,14 @@ function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }
   const handleNavigatorExport = () => {
     const layer = buildNavigatorLayer(events, 'BrowserNotes Export');
     downloadFile(JSON.stringify(layer, null, 2), 'attack-navigator-layer.json', 'application/json');
+    logActivity('timeline', 'export', 'Exported ATT&CK Navigator layer');
     setOpen(false);
   };
 
   const handleCSVExport = () => {
     const csv = buildMitreCSV(events);
     downloadFile(csv, 'mitre-mappings.csv', 'text/csv');
+    logActivity('timeline', 'export', 'Exported MITRE mappings CSV');
     setOpen(false);
   };
 
@@ -70,9 +74,11 @@ function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }
         const timeline = timelines.find((t) => t.id === selectedTimelineId);
         const filename = timeline ? `timeline-${timeline.name.toLowerCase().replace(/\s+/g, '-')}.json` : 'timeline-export.json';
         downloadFile(json, filename, 'application/json');
+        logActivity('timeline', 'export', `Exported timeline "${timeline?.name || 'Unknown'}"`, selectedTimelineId, timeline?.name);
       } else {
         const json = exportEventsJSON(events);
         downloadFile(json, 'all-events-export.json', 'application/json');
+        logActivity('timeline', 'export', `Exported all events (${events.length})`);
       }
     } catch (err) {
       console.error('Timeline export failed:', err);

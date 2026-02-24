@@ -6,12 +6,14 @@ import { NoteList } from './components/Notes/NoteList';
 import { NoteEditor } from './components/Notes/NoteEditor';
 import { TaskListView } from './components/Tasks/TaskList';
 import { TimelineView } from './components/Timeline/TimelineView';
+import { WhiteboardView } from './components/Whiteboard/WhiteboardView';
 import { QuickCapture } from './components/Clips/QuickCapture';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { useNotes } from './hooks/useNotes';
 import { useTasks } from './hooks/useTasks';
 import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
+import { useWhiteboards } from './hooks/useWhiteboards';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
@@ -32,11 +34,12 @@ export default function App() {
   const tasks = useTasks();
   const timeline = useTimeline();
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
+  const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, reload: reloadWhiteboards } = useWhiteboards();
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder } = useFolders();
   const { tags, createTag } = useTags();
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' ? settings.defaultView : 'notes';
   const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
@@ -54,6 +57,7 @@ export default function App() {
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
   const [browseSharedOpen, setBrowseSharedOpen] = useState(false);
   const [selectedTimelineId, setSelectedTimelineId] = useState<string>();
+  const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string>();
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -217,7 +221,8 @@ export default function App() {
     tasks.reload();
     timeline.reload();
     reloadTimelines();
-  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines]);
+    reloadWhiteboards();
+  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {
@@ -246,7 +251,8 @@ export default function App() {
     tasks.reload();
     timeline.reload();
     reloadTimelines();
-  }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload, reloadTimelines]);
+    reloadWhiteboards();
+  }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
@@ -317,8 +323,15 @@ export default function App() {
     onDeleteTimeline: (id: string) => { deleteTimeline(id); if (selectedTimelineId === id) setSelectedTimelineId(undefined); },
     onRenameTimeline: (id: string, name: string) => updateTimeline(id, { name }),
     timelineEventCounts,
+    whiteboards,
+    selectedWhiteboardId,
+    onWhiteboardSelect: (id: string) => setSelectedWhiteboardId(id),
+    onCreateWhiteboard: createWhiteboard,
+    onDeleteWhiteboard: (id: string) => { deleteWhiteboard(id); if (selectedWhiteboardId === id) setSelectedWhiteboardId(undefined); },
+    onRenameWhiteboard: (id: string, name: string) => updateWhiteboard(id, { name }),
+    whiteboardCount: whiteboards.length,
     onMoveNoteToFolder: handleMoveNoteToFolder,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, createFolder, handleDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, createTimeline, deleteTimeline, updateTimeline, timelineEventCounts, handleMoveNoteToFolder]);
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, createFolder, handleDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, createTimeline, deleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, createWhiteboard, deleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder]);
 
   return (
     <>
@@ -371,6 +384,16 @@ export default function App() {
             selectedTimelineId={selectedTimelineId}
             onTimelineReload={reloadTimelines}
             onEventsReload={timeline.reload}
+          />
+        ) : activeView === 'whiteboard' ? (
+          <WhiteboardView
+            whiteboards={whiteboards}
+            folders={folders}
+            allTags={tags}
+            onCreateWhiteboard={createWhiteboard}
+            onUpdateWhiteboard={updateWhiteboard}
+            onDeleteWhiteboard={deleteWhiteboard}
+            onCreateTag={createTag}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView

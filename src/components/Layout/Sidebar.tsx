@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
-  PanelLeftClose, Github, Download, Chrome,
+  PanelLeftClose, Github, Download, Chrome, PenTool,
 } from 'lucide-react';
-import type { Folder, Tag as TagType, Timeline, ViewMode } from '../../types';
+import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { cn } from '../../lib/utils';
 
@@ -37,6 +37,13 @@ interface SidebarProps {
   onDeleteTimeline?: (id: string) => void;
   onRenameTimeline?: (id: string, name: string) => void;
   timelineEventCounts?: Record<string, number>;
+  whiteboards?: Whiteboard[];
+  selectedWhiteboardId?: string;
+  onWhiteboardSelect?: (id: string) => void;
+  onCreateWhiteboard?: (name?: string) => Promise<Whiteboard>;
+  onDeleteWhiteboard?: (id: string) => void;
+  onRenameWhiteboard?: (id: string, name: string) => void;
+  whiteboardCount?: number;
   onNavigate?: () => void;
   onMoveNoteToFolder?: (noteId: string, folderId: string) => void;
 }
@@ -70,6 +77,13 @@ export function Sidebar({
   onDeleteTimeline,
   onRenameTimeline,
   timelineEventCounts = {},
+  whiteboards = [],
+  selectedWhiteboardId,
+  onWhiteboardSelect,
+  onCreateWhiteboard,
+  onDeleteWhiteboard,
+  onRenameWhiteboard,
+  whiteboardCount,
   onNavigate,
   onMoveNoteToFolder,
 }: SidebarProps) {
@@ -88,6 +102,13 @@ export function Sidebar({
   const [editingTimeline, setEditingTimeline] = useState<string | null>(null);
   const [editTimelineName, setEditTimelineName] = useState('');
   const [deletingTimelineId, setDeletingTimelineId] = useState<string | null>(null);
+
+  const [whiteboardsOpen, setWhiteboardsOpen] = useState(true);
+  const [newWhiteboardName, setNewWhiteboardName] = useState('');
+  const [showNewWhiteboard, setShowNewWhiteboard] = useState(false);
+  const [editingWhiteboard, setEditingWhiteboard] = useState<string | null>(null);
+  const [editWhiteboardName, setEditWhiteboardName] = useState('');
+  const [deletingWhiteboardId, setDeletingWhiteboardId] = useState<string | null>(null);
 
   if (collapsed) return null;
 
@@ -118,6 +139,21 @@ export function Sidebar({
     if (editTimelineName.trim() && onRenameTimeline) {
       onRenameTimeline(id, editTimelineName.trim());
       setEditingTimeline(null);
+    }
+  };
+
+  const handleCreateWhiteboard = () => {
+    if (newWhiteboardName.trim() && onCreateWhiteboard) {
+      onCreateWhiteboard(newWhiteboardName.trim());
+      setNewWhiteboardName('');
+      setShowNewWhiteboard(false);
+    }
+  };
+
+  const handleRenameWhiteboard = (id: string) => {
+    if (editWhiteboardName.trim() && onRenameWhiteboard) {
+      onRenameWhiteboard(id, editWhiteboardName.trim());
+      setEditingWhiteboard(null);
     }
   };
 
@@ -165,6 +201,92 @@ export function Sidebar({
           active={activeView === 'timeline' && !selectedFolderId && !selectedTag}
           onClick={() => nav(() => { onViewChange('timeline'); clearFilters(); })}
         />
+        <SidebarItem
+          icon={<PenTool size={18} />}
+          label="Whiteboards"
+          count={whiteboardCount}
+          active={activeView === 'whiteboard' && !selectedFolderId && !selectedTag}
+          onClick={() => nav(() => { onViewChange('whiteboard'); clearFilters(); })}
+        />
+        {/* Whiteboards — only in whiteboard view */}
+        {activeView === 'whiteboard' && (
+          <div className="pt-3">
+            <button
+              onClick={() => setWhiteboardsOpen(!whiteboardsOpen)}
+              className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300"
+              aria-expanded={whiteboardsOpen}
+            >
+              {whiteboardsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              Whiteboards
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowNewWhiteboard(true); }}
+                className="ml-auto p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                aria-label="Create whiteboard"
+                title="Create whiteboard"
+              >
+                <Plus size={14} />
+              </button>
+            </button>
+
+            {whiteboardsOpen && (
+              <div className="mt-1 space-y-0.5">
+                {showNewWhiteboard && (
+                  <div className="flex items-center gap-1 px-2">
+                    <input
+                      autoFocus
+                      value={newWhiteboardName}
+                      onChange={(e) => setNewWhiteboardName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateWhiteboard(); if (e.key === 'Escape') setShowNewWhiteboard(false); }}
+                      placeholder="Whiteboard name"
+                      aria-label="New whiteboard name"
+                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                    />
+                    <button onClick={handleCreateWhiteboard} className="text-accent hover:text-accent-hover" aria-label="Confirm create whiteboard" title="Create whiteboard">
+                      <Plus size={14} />
+                    </button>
+                    <button onClick={() => setShowNewWhiteboard(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                {whiteboards.map((wb) => (
+                  <div key={wb.id} className="group relative">
+                    {editingWhiteboard === wb.id ? (
+                      <div className="flex items-center gap-1 px-2">
+                        <input
+                          autoFocus
+                          value={editWhiteboardName}
+                          onChange={(e) => setEditWhiteboardName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleRenameWhiteboard(wb.id); if (e.key === 'Escape') setEditingWhiteboard(null); }}
+                          aria-label="Rename whiteboard"
+                          className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                    ) : (
+                      <SidebarItem
+                        icon={<PenTool size={16} />}
+                        label={wb.name}
+                        active={selectedWhiteboardId === wb.id}
+                        onClick={() => nav(() => { onWhiteboardSelect?.(wb.id); })}
+                        onDoubleClick={() => { setEditingWhiteboard(wb.id); setEditWhiteboardName(wb.name); }}
+                        actions={
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingWhiteboardId(wb.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            aria-label={`Delete whiteboard ${wb.name}`}
+                            title="Delete whiteboard"
+                          >
+                            <X size={12} />
+                          </button>
+                        }
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {/* Timelines — only in timeline view */}
         {activeView === 'timeline' && (
           <div className="pt-3">
@@ -447,6 +569,16 @@ export function Sidebar({
         title="Delete Timeline"
         message="This timeline and all its events will be permanently deleted. This cannot be undone."
         confirmLabel="Delete Timeline"
+        danger
+      />
+
+      <ConfirmDialog
+        open={deletingWhiteboardId !== null}
+        onClose={() => setDeletingWhiteboardId(null)}
+        onConfirm={() => { if (deletingWhiteboardId) { onDeleteWhiteboard?.(deletingWhiteboardId); setDeletingWhiteboardId(null); } }}
+        title="Delete Whiteboard"
+        message="This whiteboard will be permanently deleted. This cannot be undone."
+        confirmLabel="Delete Whiteboard"
         danger
       />
     </aside>

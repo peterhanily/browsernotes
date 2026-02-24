@@ -15,6 +15,7 @@
     "build:extension": "cd extension && npm run build"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "dexie": "^4.3.0",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",

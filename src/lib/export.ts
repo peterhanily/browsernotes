@@ -1,16 +1,17 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../types';
 import { nanoid } from 'nanoid';
 
 export async function exportJSON(): Promise<string> {
-  const [notes, tasks, folders, tags, timelineEvents, timelines] = await Promise.all([
+  const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards] = await Promise.all([
     db.notes.toArray(),
     db.tasks.toArray(),
     db.folders.toArray(),
     db.tags.toArray(),
     db.timelineEvents.toArray(),
     db.timelines.toArray(),
+    db.whiteboards.toArray(),
   ]);
 
   const data: ExportData = {
@@ -22,6 +23,7 @@ export async function exportJSON(): Promise<string> {
     tags,
     timelineEvents,
     timelines,
+    whiteboards,
   };
 
   return JSON.stringify(data, null, 2);
@@ -160,7 +162,23 @@ function sanitizeTimeline(raw: unknown): Timeline | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number }> {
+function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    id: str(r.id),
+    name: str(r.name),
+    elements: str(r.elements, '[]'),
+    appState: r.appState != null ? str(r.appState) : undefined,
+    folderId: r.folderId != null ? str(r.folderId) : undefined,
+    tags: strArr(r.tags),
+    order: num(r.order),
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -187,6 +205,10 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     .map(sanitizeTimeline)
     .filter((t: Timeline | null): t is Timeline => t !== null && !!t.id);
 
+  const whiteboards = (Array.isArray(data.whiteboards) ? data.whiteboards : [])
+    .map(sanitizeWhiteboard)
+    .filter((w: Whiteboard | null): w is Whiteboard => w !== null && !!w.id);
+
   // If we have timeline events but no timelines, create a Default and assign all events
   if (timelineEvents.length > 0 && timelines.length === 0) {
     const defaultId = nanoid();
@@ -197,13 +219,14 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     }
   }
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines], async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
     await db.tags.clear();
     await db.timelineEvents.clear();
     await db.timelines.clear();
+    await db.whiteboards.clear();
 
     await db.notes.bulkAdd(notes);
     await db.tasks.bulkAdd(tasks);
@@ -211,6 +234,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.tags.bulkAdd(tags);
     await db.timelineEvents.bulkAdd(timelineEvents);
     await db.timelines.bulkAdd(timelines);
+    await db.whiteboards.bulkAdd(whiteboards);
   });
 
   return {
@@ -220,6 +244,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     tags: tags.length,
     timelineEvents: timelineEvents.length,
     timelines: timelines.length,
+    whiteboards: whiteboards.length,
   };
 }
 

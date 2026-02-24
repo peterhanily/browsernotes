@@ -69,7 +69,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'timeline';
+export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -183,6 +183,18 @@ export interface Timeline {
   updatedAt: number;
 }
 
+export interface Whiteboard {
+  id: string;
+  name: string;
+  elements: string;     // JSON.stringify(ExcalidrawElement[])
+  appState?: string;    // JSON.stringify({zoom, scrollX, scrollY, theme})
+  folderId?: string;
+  tags: string[];
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TimelineExportData {
   format: 'browsernotes-timeline';
   version: 1;
@@ -252,6 +264,7 @@ export interface ExportData {
   tags: Tag[];
   timelineEvents?: TimelineEvent[];
   timelines?: Timeline[];
+  whiteboards?: Whiteboard[];
 }
 
 export interface SharedManifest {

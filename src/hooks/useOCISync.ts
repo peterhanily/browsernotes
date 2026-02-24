@@ -111,7 +111,7 @@ export function useOCISync() {
     slug: string,
     typeSlug?: string,
     tiExportConfig?: ThreatIntelExportConfig,
-  ) => {
+  ): Promise<boolean> => {
     setSyncing(true);
     setError(null);
     setProgress('Pushing IOCs...');
@@ -128,9 +128,11 @@ export function useOCISync() {
       if (!result.ok) throw new Error(result.error || 'Upload failed');
 
       setProgress('IOCs pushed successfully');
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Push failed');
       setProgress('');
+      return false;
     } finally {
       setSyncing(false);
     }

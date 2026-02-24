@@ -6,7 +6,8 @@ import { useIOCAnalysis } from '../../hooks/useIOCAnalysis';
 import { IOCItem } from './IOCItem';
 import type { ThreatIntelConfigProps } from './IOCItem';
 import { AttributionComboInput } from './AttributionComboInput';
-import { cn } from '../../lib/utils';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
+import { cn, formatDate } from '../../lib/utils';
 import { formatIOCsJSON, formatIOCsCSV, formatIOCsFlatJSON, formatIOCsFlatCSV, slugify } from '../../lib/ioc-export';
 import type { IOCExportEntry, ThreatIntelExportConfig } from '../../lib/ioc-export';
 import { downloadFile } from '../../lib/export';
@@ -18,13 +19,15 @@ interface IOCPanelProps {
   attributionActors?: string[];
   threatIntelConfig?: ThreatIntelConfigProps;
   tiExportConfig?: ThreatIntelExportConfig;
-  onPushIOCs?: (entries: IOCExportEntry[], slug: string, typeSlug?: string) => void;
+  onPushIOCs?: (entries: IOCExportEntry[], slug: string, typeSlug?: string) => Promise<boolean>;
   ociPushing?: boolean;
   ociWritePARConfigured?: boolean;
+  lastPushedAt?: number;
+  onPushComplete?: () => void;
   style?: React.CSSProperties;
 }
 
-export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatIntelConfig, tiExportConfig, onPushIOCs, ociPushing, ociWritePARConfigured, style }: IOCPanelProps) {
+export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatIntelConfig, tiExportConfig, onPushIOCs, ociPushing, ociWritePARConfigured, lastPushedAt, onPushComplete, style }: IOCPanelProps) {
   const {
     analysis,
     analyzing,
@@ -46,8 +49,12 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
   const [attributionForType, setAttributionForType] = useState<IOCType | null>(null);
   const [attributionInput, setAttributionInput] = useState('');
   const [exportForType, setExportForType] = useState<IOCType | null>(null);
+  const [pushMessage, setPushMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmPushAll, setConfirmPushAll] = useState(false);
+  const [confirmPushCategory, setConfirmPushCategory] = useState<IOCType | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const categoryExportRef = useRef<HTMLDivElement>(null);
+  const pushMsgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (!showExportMenu) return;
@@ -70,6 +77,65 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [exportForType]);
+
+  useEffect(() => {
+    return () => clearTimeout(pushMsgTimeoutRef.current);
+  }, []);
+
+  const showPushMessage = (type: 'success' | 'error', text: string) => {
+    setPushMessage({ type, text });
+    clearTimeout(pushMsgTimeoutRef.current);
+    if (type === 'success') {
+      pushMsgTimeoutRef.current = setTimeout(() => setPushMessage(null), 5000);
+    }
+  };
+
+  const doPushAll = async () => {
+    if (!onPushIOCs || !analysis) return;
+    const entries = [{ clipTitle: item.title, sourceUrl: item.sourceUrl, iocs: analysis.iocs }];
+    const slug = slugify(item.title) || 'item';
+    const ok = await onPushIOCs(entries, slug);
+    if (ok) {
+      showPushMessage('success', 'Pushed to OCI');
+      onPushComplete?.();
+    } else {
+      showPushMessage('error', 'Push failed');
+    }
+  };
+
+  const doPushCategory = async (type: IOCType) => {
+    if (!onPushIOCs || !analysis) return;
+    const typeIOCs = analysis.iocs.filter((ioc) => ioc.type === type && !ioc.dismissed);
+    if (typeIOCs.length === 0) return;
+    const entries = [{ clipTitle: item.title, sourceUrl: item.sourceUrl, iocs: typeIOCs }];
+    const slug = slugify(item.title) || 'item';
+    const typeSlug = type.replace(/[^a-z0-9]/g, '-');
+    const ok = await onPushIOCs(entries, slug, typeSlug);
+    if (ok) {
+      showPushMessage('success', 'Pushed to OCI');
+      onPushComplete?.();
+    } else {
+      showPushMessage('error', 'Push failed');
+    }
+  };
+
+  const handlePushAll = () => {
+    if (!ociWritePARConfigured || !onPushIOCs) return;
+    if (lastPushedAt) {
+      setConfirmPushAll(true);
+    } else {
+      doPushAll();
+    }
+  };
+
+  const handlePushCategory = (type: IOCType) => {
+    if (!ociWritePARConfigured || !onPushIOCs) return;
+    if (lastPushedAt) {
+      setConfirmPushCategory(type);
+    } else {
+      doPushCategory(type);
+    }
+  };
 
   const handleCategoryExport = (type: IOCType, format: 'json' | 'csv' | 'flat-json' | 'flat-csv') => {
     setExportForType(null);
@@ -169,12 +235,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
               )}
             </div>
             <button
-              onClick={() => {
-                if (!onPushIOCs || !ociWritePARConfigured) return;
-                const entries = [{ clipTitle: item.title, sourceUrl: item.sourceUrl, iocs: analysis.iocs }];
-                const slug = slugify(item.title) || 'item';
-                onPushIOCs(entries, slug);
-              }}
+              onClick={handlePushAll}
               disabled={!ociWritePARConfigured || ociPushing}
               className="p-1 rounded text-gray-500 hover:text-gray-300 disabled:opacity-50"
               title={ociWritePARConfigured ? 'Push IOCs to OCI' : 'Configure write PAR in Settings to push IOCs'}
@@ -193,6 +254,23 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
           <X size={14} />
         </button>
       </div>
+
+      {/* Push notification */}
+      {pushMessage && (
+        <div className={cn(
+          'px-3 py-1.5 text-xs shrink-0',
+          pushMessage.type === 'success' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+        )}>
+          {pushMessage.text}
+        </div>
+      )}
+
+      {/* Last pushed indicator */}
+      {lastPushedAt && !pushMessage && (
+        <div className="px-3 py-1 text-[10px] text-gray-500 shrink-0">
+          Last pushed {formatDate(lastPushedAt)}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -286,13 +364,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
                             <button
                               onClick={() => {
                                 setExportForType(null);
-                                if (!onPushIOCs || !ociWritePARConfigured || !analysis) return;
-                                const typeIOCs = analysis.iocs.filter((ioc) => ioc.type === type && !ioc.dismissed);
-                                if (typeIOCs.length === 0) return;
-                                const entries = [{ clipTitle: item.title, sourceUrl: item.sourceUrl, iocs: typeIOCs }];
-                                const slug = slugify(item.title) || 'item';
-                                const typeSlug = type.replace(/[^a-z0-9]/g, '-');
-                                onPushIOCs(entries, slug, typeSlug);
+                                handlePushCategory(type);
                               }}
                               disabled={!ociWritePARConfigured || ociPushing}
                               className={cn('w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 rounded-b-lg disabled:opacity-50', ociWritePARConfigured ? 'text-accent' : 'text-gray-500')}
@@ -373,6 +445,24 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
           </>
         )}
       </div>
+
+      {/* Confirm dialogs for duplicate push */}
+      <ConfirmDialog
+        open={confirmPushAll}
+        onClose={() => setConfirmPushAll(false)}
+        onConfirm={() => doPushAll()}
+        title="Push IOCs Again?"
+        message={`IOCs from this report were already pushed ${lastPushedAt ? formatDate(lastPushedAt) : ''}. Push again?`}
+        confirmLabel="Push Again"
+      />
+      <ConfirmDialog
+        open={confirmPushCategory !== null}
+        onClose={() => setConfirmPushCategory(null)}
+        onConfirm={() => { if (confirmPushCategory) doPushCategory(confirmPushCategory); }}
+        title="Push IOCs Again?"
+        message={`IOCs from this report were already pushed ${lastPushedAt ? formatDate(lastPushedAt) : ''}. Push this category again?`}
+        confirmLabel="Push Again"
+      />
     </div>
   );
 }

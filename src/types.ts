@@ -127,6 +127,7 @@ export interface IOCAnalysis {
   extractedAt: number;
   iocs: IOCEntry[];
   analysisSummary?: string;
+  lastPushedAt?: number;
 }
 
 export const IOC_TYPE_LABELS: Record<IOCType, { label: string; color: string }> = {

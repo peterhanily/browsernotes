@@ -399,13 +399,18 @@ export function NoteEditor({
                 defaultReportSource: externalSettings.tiDefaultReportSource,
               } : undefined}
               onPushIOCs={(entries, slug, typeSlug) => {
-                oci.pushIOCs(entries, slug, typeSlug, externalSettings ? {
+                return oci.pushIOCs(entries, slug, typeSlug, externalSettings ? {
                   defaultClsLevel: externalSettings.tiDefaultClsLevel,
                   defaultReportSource: externalSettings.tiDefaultReportSource,
                 } : undefined);
               }}
               ociWritePARConfigured={!!externalSettings?.ociWritePAR}
               ociPushing={oci.syncing}
+              lastPushedAt={note.iocAnalysis?.lastPushedAt}
+              onPushComplete={() => {
+                const updated = { ...note.iocAnalysis!, lastPushedAt: Date.now() };
+                onUpdate(note.id, { iocAnalysis: updated });
+              }}
               style={{ width: `${(1 - editorIOC.ratio) * 100}%` }}
             />
           </>

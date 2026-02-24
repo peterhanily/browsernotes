@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
+import '@excalidraw/excalidraw/index.css';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 import type { Whiteboard, Tag, Folder } from '../../types';
 import { TagInput } from '../Common/TagInput';
@@ -152,26 +153,28 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
         />
       </div>
 
-      {/* Excalidraw canvas */}
-      <div className="flex-1 min-h-0">
-        <Excalidraw
-          key={whiteboard.id}
-          initialData={{
-            elements: initialElements as never,
-            appState: {
-              ...initialAppState,
-              theme: isDark ? 'dark' : 'light',
-            } as never,
-          }}
-          onChange={handleExcalidrawChange as never}
-          UIOptions={{
-            canvasActions: {
-              loadScene: false,
-              saveToActiveFile: false,
-              export: false,
-            },
-          }}
-        />
+      {/* Excalidraw canvas — needs a container with explicit dimensions */}
+      <div className="flex-1 min-h-0 relative">
+        <div className="absolute inset-0">
+          <Excalidraw
+            key={whiteboard.id}
+            initialData={{
+              elements: initialElements as never,
+              appState: {
+                ...initialAppState,
+                theme: isDark ? 'dark' : 'light',
+              } as never,
+            }}
+            onChange={handleExcalidrawChange as never}
+            UIOptions={{
+              canvasActions: {
+                loadScene: false,
+                saveToActiveFile: false,
+                export: false,
+              },
+            }}
+          />
+        </div>
       </div>
     </div>
   );

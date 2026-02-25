@@ -92,6 +92,28 @@ describe('buildGraphData', () => {
     expect(nodes[0].id).toBe('event:event-1');
   });
 
+  it('all nodes have shape round-rectangle', () => {
+    const ioc = makeIOC();
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];
+    const tasks = [makeTask()];
+    const events = [makeEvent()];
+    const { nodes } = buildGraphData(notes, tasks, events);
+    for (const node of nodes) {
+      expect(node.shape).toBe('round-rectangle');
+    }
+  });
+
+  it('all nodes have an icon data URI', () => {
+    const ioc = makeIOC();
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];
+    const tasks = [makeTask()];
+    const events = [makeEvent()];
+    const { nodes } = buildGraphData(notes, tasks, events);
+    for (const node of nodes) {
+      expect(node.icon).toMatch(/^data:image\/svg\+xml;utf8,/);
+    }
+  });
+
   it('creates IOC nodes from note analysis', () => {
     const ioc = makeIOC();
     const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];

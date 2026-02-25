@@ -1,13 +1,15 @@
 import type { Note, Task, TimelineEvent, Settings, IOCEntry, IOCType, TimelineEventType } from '../types';
 import { IOC_TYPE_LABELS, TIMELINE_EVENT_TYPE_LABELS, DEFAULT_RELATIONSHIP_TYPES } from '../types';
 import type { IOCRelationshipDef } from '../types';
+import { getNodeIcon } from './graph-icons';
 
 export interface GraphNode {
   id: string;
   label: string;
   type: 'ioc' | 'note' | 'task' | 'timeline-event';
   color: string;
-  shape: 'diamond' | 'round-rectangle' | 'hexagon';
+  shape: 'round-rectangle';
+  icon: string;
   /** Original entity IDs that contributed to this node (for IOCs deduplicated across entities) */
   sourceEntityIds: string[];
   iocType?: IOCType;
@@ -60,7 +62,8 @@ export function buildGraphData(
         label: ioc.value.length > 40 ? ioc.value.substring(0, 37) + '...' : ioc.value,
         type: 'ioc',
         color: typeInfo.color,
-        shape: 'diamond',
+        shape: 'round-rectangle',
+        icon: getNodeIcon('ioc', typeInfo.color, ioc.type),
         sourceEntityIds: [],
         iocType: ioc.type,
       };
@@ -81,6 +84,7 @@ export function buildGraphData(
       type: 'note',
       color: '#3b82f6',
       shape: 'round-rectangle',
+      icon: getNodeIcon('note', '#3b82f6'),
       sourceEntityIds: [note.id],
     });
 
@@ -115,6 +119,7 @@ export function buildGraphData(
       type: 'task',
       color: '#22c55e',
       shape: 'round-rectangle',
+      icon: getNodeIcon('task', '#22c55e'),
       sourceEntityIds: [task.id],
     });
 
@@ -143,12 +148,14 @@ export function buildGraphData(
   for (const event of timelineEvents) {
     const eventNodeId = `event:${event.id}`;
     const eventTypeInfo = TIMELINE_EVENT_TYPE_LABELS[event.eventType];
+    const eventColor = eventTypeInfo?.color || '#6b7280';
     nodes.push({
       id: eventNodeId,
       label: event.title || 'Untitled',
       type: 'timeline-event',
-      color: eventTypeInfo?.color || '#6b7280',
-      shape: 'hexagon',
+      color: eventColor,
+      shape: 'round-rectangle',
+      icon: getNodeIcon('timeline-event', eventColor),
       sourceEntityIds: [event.id],
       eventType: event.eventType,
     });

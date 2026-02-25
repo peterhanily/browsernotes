@@ -56,6 +56,11 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
           selector: 'node',
           style: {
             'background-color': 'data(color)',
+            'background-opacity': 0.18,
+            'background-image': 'data(icon)',
+            'background-width': 16,
+            'background-height': 16,
+            'background-fit': 'none' as cytoscape.Css.PropertyValueNode<'none'>,
             'label': 'data(label)',
             'font-size': '10px',
             'color': isDark ? '#e5e7eb' : '#374151',
@@ -66,30 +71,31 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
             'text-margin-y': 4,
             'width': 30,
             'height': 30,
-            'shape': 'ellipse' as cytoscape.Css.NodeShape,
-            'border-width': 0,
+            'shape': 'round-rectangle' as cytoscape.Css.NodeShape,
+            'border-width': 1.5,
+            'border-color': 'data(color)',
+            'border-opacity': 0.5,
           },
         },
         {
           selector: 'node[type = "ioc"]',
           style: {
-            'width': 24,
-            'height': 24,
-            'shape': 'diamond',
+            'width': 26,
+            'height': 26,
           },
         },
         {
           selector: 'node[type = "note"], node[type = "task"]',
           style: {
-            'width': 36,
-            'height': 24,
-            'shape': 'round-rectangle',
+            'width': 34,
+            'height': 26,
           },
         },
         {
           selector: 'node[type = "timeline-event"]',
           style: {
-            'shape': 'hexagon',
+            'width': 30,
+            'height': 30,
           },
         },
         {
@@ -182,8 +188,9 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
             id: node.id,
             label: node.label,
             color: node.color,
-            shape: node.shape,
             type: node.type,
+            icon: node.icon,
+            iocType: node.iocType ?? '',
           },
         });
       }

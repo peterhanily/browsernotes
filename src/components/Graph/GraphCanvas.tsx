@@ -19,7 +19,7 @@ interface GraphCanvasProps {
 
 export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, theme }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
   const isDark = theme === 'dark';
@@ -194,6 +194,17 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
 
     cyRef.current = cy;
 
+    // Create overlay layer inside the cytoscape container so wheel events
+    // still reach cytoscape's handler on the container element.
+    const overlay = document.createElement('div');
+    overlay.style.position = 'absolute';
+    overlay.style.inset = '0';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.overflow = 'hidden';
+    overlay.style.zIndex = '10';
+    containerRef.current.appendChild(overlay);
+    overlayRef.current = overlay;
+
     // Sync overlay on every render frame (covers zoom, pan, layout)
     cy.on('render', syncOverlay);
 
@@ -211,8 +222,8 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     return () => {
       cy.destroy();
       cyRef.current = null;
-      // Clear overlay
-      if (overlayRef.current) overlayRef.current.innerHTML = '';
+      overlay.remove();
+      overlayRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDark]);
@@ -222,7 +233,7 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     const cy = cyRef.current;
     if (!cy) return;
 
-    // Clear overlay before rebuilding data
+    // Clear overlay icons before rebuilding data
     if (overlayRef.current) overlayRef.current.innerHTML = '';
 
     cy.batch(() => {
@@ -266,10 +277,5 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     cy.fit(undefined, 40);
   }, [data, layout, getLayoutOptions]);
 
-  return (
-    <div className="w-full h-full relative">
-      <div ref={containerRef} className="w-full h-full" />
-      <div ref={overlayRef} className="absolute inset-0 pointer-events-none overflow-hidden" />
-    </div>
-  );
+  return <div ref={containerRef} className="w-full h-full" />;
 }

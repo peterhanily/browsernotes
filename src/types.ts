@@ -13,6 +13,9 @@ export interface Note {
   color?: string;
   iocAnalysis?: IOCAnalysis;
   iocTypes?: IOCType[];
+  linkedNoteIds?: string[];
+  linkedTaskIds?: string[];
+  linkedTimelineEventIds?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -49,6 +52,9 @@ export interface Task {
   iocAnalysis?: IOCAnalysis;
   iocTypes?: IOCType[];
   comments?: TaskComment[];
+  linkedNoteIds?: string[];
+  linkedTaskIds?: string[];
+  linkedTimelineEventIds?: string[];
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -223,6 +229,8 @@ export interface TimelineEvent {
   starred: boolean;
   folderId?: string;
   timelineId: string;
+  iocAnalysis?: IOCAnalysis;
+  iocTypes?: IOCType[];
   createdAt: number;
   updatedAt: number;
 }

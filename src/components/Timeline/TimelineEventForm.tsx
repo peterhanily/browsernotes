@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import type { TimelineEvent, TimelineEventType, ConfidenceLevel, Folder, Tag } from '../../types';
+import { ChevronDown, ChevronRight, Shield } from 'lucide-react';
+import type { TimelineEvent, TimelineEventType, ConfidenceLevel, Folder, Tag, IOCTarget, IOCAnalysis, IOCType } from '../../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { AttributionComboInput } from '../Analysis/AttributionComboInput';
+import { IOCPanel } from '../Analysis/IOCPanel';
 import { MitreComboInput } from './MitreComboInput';
+import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { useSettings } from '../../hooks/useSettings';
+import { useAutoIOCExtraction } from '../../hooks/useAutoIOCExtraction';
+import { cn } from '../../lib/utils';
 
 interface TimelineEventFormProps {
   event?: TimelineEvent;
@@ -14,6 +18,7 @@ interface TimelineEventFormProps {
   onCreateTag: (name: string) => Promise<Tag>;
   onSave: (data: Partial<TimelineEvent>) => void;
   onCancel: () => void;
+  onUpdateEvent?: (id: string, updates: Partial<TimelineEvent>) => void;
 }
 
 function toDatetimeLocal(ms: number): string {
@@ -30,7 +35,7 @@ function fromDatetimeLocal(str: string): number {
 const ALL_EVENT_TYPES = Object.keys(TIMELINE_EVENT_TYPE_LABELS) as TimelineEventType[];
 const ALL_CONFIDENCE = Object.keys(CONFIDENCE_LEVELS) as ConfidenceLevel[];
 
-export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel }: TimelineEventFormProps) {
+export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel, onUpdateEvent }: TimelineEventFormProps) {
   const { settings } = useSettings();
 
   const [initialTs] = useState(() => Date.now());
@@ -49,6 +54,19 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const [mitreAttackIds, setMitreAttackIds] = useState<string[]>(event?.mitreAttackIds || []);
   const [rawData, setRawData] = useState(event?.rawData || '');
   const [rawDataOpen, setRawDataOpen] = useState(false);
+  const [showIOCPanel, setShowIOCPanel] = useState(false);
+
+  const isEditMode = !!event;
+  const iocCount = event?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
+
+  // Auto-extract IOCs on description changes (edit mode only)
+  useAutoIOCExtraction({
+    entityId: event?.id,
+    content: description,
+    existingAnalysis: event?.iocAnalysis,
+    onUpdate: (id, updates) => onUpdateEvent?.(id, updates),
+    enabled: isEditMode && !!onUpdateEvent,
+  });
 
   useEffect(() => {
     if (event) {
@@ -100,8 +118,21 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
 
+  const iocTarget: IOCTarget | null = event ? {
+    id: event.id,
+    title,
+    content: description,
+    iocAnalysis: event.iocAnalysis,
+    iocTypes: event.iocTypes,
+  } : null;
+
+  const handleIOCUpdate = (id: string, updates: { iocAnalysis?: IOCAnalysis; iocTypes?: IOCType[] }) => {
+    if (onUpdateEvent) onUpdateEvent(id, updates);
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="flex gap-0">
+    <form onSubmit={handleSubmit} className="space-y-4 flex-1 min-w-0">
       <div>
         <label className={labelClass}>Title</label>
         <input
@@ -190,7 +221,31 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
       </div>
 
       <div>
-        <label className={labelClass}>Description (markdown)</label>
+        <div className="flex items-center gap-2 mb-1">
+          <label className="text-xs font-medium text-gray-400">Description (markdown)</label>
+          {isEditMode && onUpdateEvent && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!event.iocAnalysis && !showIOCPanel) {
+                  const fresh = extractIOCs(description);
+                  const merged = mergeIOCAnalysis(event.iocAnalysis, fresh);
+                  const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];
+                  onUpdateEvent(event.id, { iocAnalysis: merged, iocTypes });
+                }
+                setShowIOCPanel(!showIOCPanel);
+              }}
+              className={cn('p-1 rounded flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+              title="IOC Analysis"
+              aria-label="Toggle IOC analysis"
+            >
+              <Shield size={14} />
+              {iocCount > 0 && (
+                <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">{iocCount}</span>
+              )}
+            </button>
+          )}
+        </div>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -266,5 +321,26 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
         </button>
       </div>
     </form>
+
+    {/* IOC Panel side panel */}
+    {showIOCPanel && iocTarget && (
+      <IOCPanel
+        item={iocTarget}
+        onUpdate={handleIOCUpdate}
+        onClose={() => setShowIOCPanel(false)}
+        attributionActors={settings.attributionActors}
+        threatIntelConfig={{
+          clsLevels: settings.tiClsLevels,
+          iocSubtypes: settings.tiIocSubtypes,
+          relationshipTypes: settings.tiRelationshipTypes,
+          iocStatuses: settings.tiIocStatuses,
+        }}
+        tiExportConfig={{
+          defaultClsLevel: settings.tiDefaultClsLevel,
+          defaultReportSource: settings.tiDefaultReportSource,
+        }}
+      />
+    )}
+    </div>
   );
 }

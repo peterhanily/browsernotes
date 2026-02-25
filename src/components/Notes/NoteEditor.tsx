@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload, FolderOpen } from 'lucide-react';
-import type { Note, Tag, Folder, EditorMode, Settings } from '../../types';
+import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
 import { IOCPanel } from '../Analysis/IOCPanel';
 import { ResizeHandle } from '../Common/ResizeHandle';
+import { EntityLinker } from '../Common/EntityLinker';
 import { useOCISync } from '../../hooks/useOCISync';
 import { useResizable } from '../../hooks/useResizable';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
+import { useAutoIOCExtraction } from '../../hooks/useAutoIOCExtraction';
 import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
@@ -27,6 +29,9 @@ interface NoteEditorProps {
   onBack?: () => void;
   clipsFolderId?: string;
   settings?: Settings;
+  allNotes?: Note[];
+  allTasks?: Task[];
+  allTimelineEvents?: TimelineEvent[];
 }
 
 export function NoteEditor({
@@ -44,6 +49,9 @@ export function NoteEditor({
   onBack,
   clipsFolderId,
   settings: externalSettings,
+  allNotes = [],
+  allTasks = [],
+  allTimelineEvents = [],
 }: NoteEditorProps) {
   const iocCount = note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
   const [title, setTitle] = useState(note.title);
@@ -59,6 +67,14 @@ export function NoteEditor({
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const shareMsgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Auto-extract IOCs on content changes
+  useAutoIOCExtraction({
+    entityId: note.id,
+    content,
+    existingAnalysis: note.iocAnalysis,
+    onUpdate: (id, updates) => onUpdate(id, updates),
+  });
 
   // Resizable: editor ↔ preview (split mode only)
   const editorPreview = useResizable({ initialRatio: 0.5, minRatio: 0.25, maxRatio: 0.75 });
@@ -262,6 +278,17 @@ export function NoteEditor({
             ))}
           </select>
         </div>
+
+        <EntityLinker
+          currentEntityId={note.id}
+          linkedNoteIds={note.linkedNoteIds || []}
+          linkedTaskIds={note.linkedTaskIds || []}
+          linkedTimelineEventIds={note.linkedTimelineEventIds || []}
+          allNotes={allNotes}
+          allTasks={allTasks}
+          allTimelineEvents={allTimelineEvents}
+          onUpdateLinks={(links) => onUpdate(note.id, links)}
+        />
 
         <button
           onClick={() => {

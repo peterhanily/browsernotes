@@ -15,9 +15,10 @@ interface GraphCanvasProps {
   onSelectNode: (nodeId: string | null) => void;
   onDoubleClickNode: (nodeId: string) => void;
   theme: 'dark' | 'light';
+  fitTrigger?: number;
 }
 
-export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, theme }: GraphCanvasProps) {
+export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, theme, fitTrigger }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
@@ -144,6 +145,25 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
             'arrow-scale': 0.6,
           },
         },
+        {
+          selector: 'edge[type = "entity-link"]',
+          style: {
+            'line-color': '#22c55e',
+            'width': 2,
+          },
+        },
+        {
+          selector: '.faded',
+          style: {
+            'opacity': 0.15,
+          },
+        },
+        {
+          selector: '.highlighted',
+          style: {
+            'opacity': 1,
+          },
+        },
       ],
       layout: getLayoutOptions(layout),
       minZoom: 0.1,
@@ -152,12 +172,19 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
 
     cyRef.current = cy;
 
-    // Events
+    // Events — neighbor highlighting
     cy.on('tap', 'node', (evt) => {
-      onSelectNode(evt.target.id());
+      const node = evt.target;
+      const neighborhood = node.neighborhood().add(node);
+      cy.elements().addClass('faded').removeClass('highlighted');
+      neighborhood.removeClass('faded').addClass('highlighted');
+      onSelectNode(node.id());
     });
     cy.on('tap', (evt) => {
-      if (evt.target === cy) onSelectNode(null);
+      if (evt.target === cy) {
+        cy.elements().removeClass('faded').removeClass('highlighted');
+        onSelectNode(null);
+      }
     });
     cy.on('dbltap', 'node', (evt) => {
       onDoubleClickNode(evt.target.id());
@@ -215,6 +242,13 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     cy.layout(getLayoutOptions(layout)).run();
     cy.fit(undefined, 40);
   }, [data, layout, getLayoutOptions]);
+
+  // Fit-to-view on trigger change
+  useEffect(() => {
+    if (fitTrigger === undefined) return;
+    const cy = cyRef.current;
+    if (cy) cy.fit(undefined, 40);
+  }, [fitTrigger]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { Shield, X, MessageSquare, Trash2 } from 'lucide-react';
-import type { Task, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment } from '../../types';
+import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IOCPanel } from '../Analysis/IOCPanel';
+import { EntityLinker } from '../Common/EntityLinker';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { useSettings } from '../../hooks/useSettings';
+import { useAutoIOCExtraction } from '../../hooks/useAutoIOCExtraction';
 import { cn } from '../../lib/utils';
 
 interface TaskFormProps {
@@ -18,6 +20,8 @@ interface TaskFormProps {
   onCancel: () => void;
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDelete?: (id: string) => void;
+  allNotes?: Note[];
+  allTimelineEvents?: TimelineEvent[];
 }
 
 function formatRelativeTime(ts: number): string {
@@ -31,7 +35,7 @@ function formatRelativeTime(ts: number): string {
   return `${days}d ago`;
 }
 
-export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete }: TaskFormProps) {
+export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete, allNotes = [], allTimelineEvents = [] }: TaskFormProps) {
   const { settings: taskFormSettings } = useSettings();
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
@@ -47,6 +51,15 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
   const isEditMode = !!task;
   const iocCount = task?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
   const comments = task?.comments ?? [];
+
+  // Auto-extract IOCs on description changes (edit mode only)
+  useAutoIOCExtraction({
+    entityId: task?.id,
+    content: description,
+    existingAnalysis: task?.iocAnalysis,
+    onUpdate: (id, updates) => onUpdateTask?.(id, updates),
+    enabled: isEditMode && !!onUpdateTask,
+  });
 
   useEffect(() => {
     if (task) {
@@ -206,6 +219,25 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
             onCreateTag={onCreateTag}
           />
         </div>
+
+        {/* Entity linking (edit mode only) */}
+        {isEditMode && task && onUpdateTask && (
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-1">
+              Linked Entities
+            </label>
+            <EntityLinker
+              currentEntityId={task.id}
+              linkedNoteIds={task.linkedNoteIds || []}
+              linkedTaskIds={task.linkedTaskIds || []}
+              linkedTimelineEventIds={task.linkedTimelineEventIds || []}
+              allNotes={allNotes}
+              allTasks={[]}
+              allTimelineEvents={allTimelineEvents}
+              onUpdateLinks={(links) => onUpdateTask(task.id, links)}
+            />
+          </div>
+        )}
 
         {/* Comments section (edit mode only) */}
         {isEditMode && onUpdateTask && (

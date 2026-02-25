@@ -21,7 +21,7 @@ export interface GraphEdge {
   source: string;
   target: string;
   label: string;
-  type: 'contains-ioc' | 'ioc-relationship' | 'timeline-link';
+  type: 'contains-ioc' | 'ioc-relationship' | 'timeline-link' | 'entity-link';
 }
 
 export interface GraphData {
@@ -160,6 +160,27 @@ export function buildGraphData(
       eventType: event.eventType,
     });
 
+    // Timeline event → IOC edges (from iocAnalysis)
+    if (event.iocAnalysis?.iocs) {
+      for (const ioc of event.iocAnalysis.iocs) {
+        if (ioc.dismissed) continue;
+        const iocNode = getOrCreateIOCNode(ioc);
+        if (!iocNode.sourceEntityIds.includes(event.id)) {
+          iocNode.sourceEntityIds.push(event.id);
+        }
+        const edgeId = `${eventNodeId}--${iocNode.id}`;
+        if (!edges.find((e) => e.id === edgeId)) {
+          edges.push({
+            id: edgeId,
+            source: eventNodeId,
+            target: iocNode.id,
+            label: 'contains',
+            type: 'contains-ioc',
+          });
+        }
+      }
+    }
+
     // Timeline → Note links
     for (const noteId of event.linkedNoteIds) {
       const noteNodeId = `note:${noteId}`;
@@ -214,6 +235,9 @@ export function buildGraphData(
   for (const task of tasks) {
     if (task.iocAnalysis?.iocs) allIOCEntries.push(...task.iocAnalysis.iocs);
   }
+  for (const event of timelineEvents) {
+    if (event.iocAnalysis?.iocs) allIOCEntries.push(...event.iocAnalysis.iocs);
+  }
 
   const seenRelEdges = new Set<string>();
   for (const ioc of allIOCEntries) {
@@ -243,6 +267,36 @@ export function buildGraphData(
         type: 'ioc-relationship',
       });
     }
+  }
+
+  // Entity-link edges (from Note/Task linkedNoteIds, linkedTaskIds, linkedTimelineEventIds)
+  const seenEntityLinks = new Set<string>();
+  function addEntityLink(sourceNodeId: string, targetNodeId: string) {
+    // Deduplicate bidirectional: sort to create canonical key
+    const key = [sourceNodeId, targetNodeId].sort().join('--');
+    if (seenEntityLinks.has(key)) return;
+    if (!nodes.find((n) => n.id === sourceNodeId) || !nodes.find((n) => n.id === targetNodeId)) return;
+    seenEntityLinks.add(key);
+    edges.push({
+      id: `link:${key}`,
+      source: sourceNodeId,
+      target: targetNodeId,
+      label: 'linked',
+      type: 'entity-link',
+    });
+  }
+
+  for (const note of activeNotes) {
+    const noteNodeId = `note:${note.id}`;
+    for (const id of note.linkedNoteIds || []) addEntityLink(noteNodeId, `note:${id}`);
+    for (const id of note.linkedTaskIds || []) addEntityLink(noteNodeId, `task:${id}`);
+    for (const id of note.linkedTimelineEventIds || []) addEntityLink(noteNodeId, `event:${id}`);
+  }
+  for (const task of tasks) {
+    const taskNodeId = `task:${task.id}`;
+    for (const id of task.linkedNoteIds || []) addEntityLink(taskNodeId, `note:${id}`);
+    for (const id of task.linkedTaskIds || []) addEntityLink(taskNodeId, `task:${id}`);
+    for (const id of task.linkedTimelineEventIds || []) addEntityLink(taskNodeId, `event:${id}`);
   }
 
   return { nodes, edges };

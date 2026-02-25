@@ -366,6 +366,7 @@ export function TimelineView({
               onCreateTag={onCreateTag}
               onSave={handleSaveEdit}
               onCancel={() => setEditingEvent(null)}
+              onUpdateEvent={onUpdateEvent}
             />
             <div className="mt-3 pt-3 border-t border-gray-700">
               <button

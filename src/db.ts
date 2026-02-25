@@ -70,4 +70,15 @@ db.version(7).stores({
   activityLog: 'id, category, action, timestamp',
 });
 
+db.version(8).stores({
+  timelineEvents: 'id, timestamp, eventType, source, starred, folderId, timelineId, createdAt, updatedAt, *tags, *iocTypes',
+}).upgrade((tx) => {
+  return tx.table('timelineEvents').toCollection().modify((event) => {
+    if (!event.iocTypes) event.iocTypes = [];
+  });
+});
+
+// Version 9: entity linking fields (optional arrays, no index changes needed)
+db.version(9).stores({});
+
 export { db };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ListChecks, LayoutGrid, Plus, Filter } from 'lucide-react';
-import type { Task, TaskStatus, TaskViewMode, Tag, Folder } from '../../types';
+import type { Task, Note, TimelineEvent, TaskStatus, TaskViewMode, Tag, Folder } from '../../types';
 import { TaskItem } from './TaskItem';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
@@ -19,6 +19,8 @@ interface TaskListProps {
   viewMode: TaskViewMode;
   onViewModeChange: (mode: TaskViewMode) => void;
   getTasksByStatus: (status: TaskStatus) => Task[];
+  allNotes?: Note[];
+  allTimelineEvents?: TimelineEvent[];
 }
 
 export function TaskListView({
@@ -33,6 +35,8 @@ export function TaskListView({
   viewMode,
   onViewModeChange,
   getTasksByStatus,
+  allNotes,
+  allTimelineEvents,
 }: TaskListProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -160,6 +164,8 @@ export function TaskListView({
               setEditingTask((prev) => prev && prev.id === id ? { ...prev, ...updates } : prev);
             }}
             onDelete={(id) => { onDeleteTask(id); setEditingTask(null); }}
+            allNotes={allNotes}
+            allTimelineEvents={allTimelineEvents}
           />
         )}
       </Modal>

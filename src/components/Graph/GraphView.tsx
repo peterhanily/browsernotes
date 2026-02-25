@@ -1,9 +1,9 @@
 import React, { Suspense, useState, useMemo, useCallback } from 'react';
-import { Loader2, Search, Network } from 'lucide-react';
+import { Loader2, Search, Network, Maximize2 } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Settings, IOCType } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { buildGraphData } from '../../lib/graph-data';
-import type { GraphNode } from '../../lib/graph-data';
+import type { GraphNode, GraphEdge } from '../../lib/graph-data';
 import { GraphDetailPanel } from './GraphDetailPanel';
 import { GraphIOCEditDialog } from './GraphIOCEditDialog';
 import type { LayoutName } from './GraphCanvas';
@@ -25,6 +25,14 @@ interface GraphViewProps {
 }
 
 type NodeTypeFilter = 'ioc' | 'note' | 'task' | 'timeline-event';
+type EdgeTypeFilter = GraphEdge['type'];
+
+const ALL_EDGE_TYPES: { key: EdgeTypeFilter; label: string; color: string }[] = [
+  { key: 'contains-ioc', label: 'Contains IOC', color: '#4b5563' },
+  { key: 'ioc-relationship', label: 'IOC Relations', color: '#f59e0b' },
+  { key: 'timeline-link', label: 'Timeline Links', color: '#6366f1' },
+  { key: 'entity-link', label: 'Entity Links', color: '#22c55e' },
+];
 
 export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask }: GraphViewProps) {
   const [layout, setLayout] = useState<LayoutName>('cose-bilkent');
@@ -32,7 +40,9 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<Set<NodeTypeFilter>>(new Set(['ioc', 'note', 'task', 'timeline-event']));
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
+  const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link']));
   const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
+  const [fitTrigger, setFitTrigger] = useState(0);
 
   // Build full graph data
   const fullGraphData = useMemo(
@@ -54,10 +64,10 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
     });
     const nodeIds = new Set(filteredNodes.map((n) => n.id));
     const filteredEdges = fullGraphData.edges.filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target) && visibleEdgeTypes.has(e.type),
     );
     return { nodes: filteredNodes, edges: filteredEdges };
-  }, [fullGraphData, visibleNodeTypes, visibleIOCTypes, searchQuery]);
+  }, [fullGraphData, visibleNodeTypes, visibleIOCTypes, visibleEdgeTypes, searchQuery]);
 
   const selectedNode = useMemo(
     () => filteredGraphData.nodes.find((n) => n.id === selectedNodeId) || null,
@@ -75,6 +85,15 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
 
   const toggleIOCType = (type: IOCType) => {
     setVisibleIOCTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const toggleEdgeType = (type: EdgeTypeFilter) => {
+    setVisibleEdgeTypes((prev) => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
       else next.add(type);
@@ -169,18 +188,45 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
           </div>
         )}
 
+        {/* Edge type filters */}
+        <div className="p-3 pt-0 space-y-1 border-t border-gray-800 pt-3">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Edge Types</span>
+          {ALL_EDGE_TYPES.map(({ key, label, color }) => (
+            <label key={key} className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={visibleEdgeTypes.has(key)}
+                onChange={() => toggleEdgeType(key)}
+                className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
+              />
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-gray-400">{label}</span>
+            </label>
+          ))}
+        </div>
+
         {/* Layout */}
         <div className="p-3 border-t border-gray-800 space-y-2">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Layout</span>
-          <select
-            value={layout}
-            onChange={(e) => setLayout(e.target.value as LayoutName)}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-          >
-            <option value="cose-bilkent">Force-Directed</option>
-            <option value="circle">Circle</option>
-            <option value="breadthfirst">Breadth-First</option>
-          </select>
+          <div className="flex gap-1">
+            <select
+              value={layout}
+              onChange={(e) => setLayout(e.target.value as LayoutName)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+            >
+              <option value="cose-bilkent">Force-Directed</option>
+              <option value="circle">Circle</option>
+              <option value="breadthfirst">Breadth-First</option>
+            </select>
+            <button
+              onClick={() => setFitTrigger((n) => n + 1)}
+              className="p-1 rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-accent"
+              title="Fit to view"
+              aria-label="Fit to view"
+            >
+              <Maximize2 size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -210,6 +256,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
               onSelectNode={setSelectedNodeId}
               onDoubleClickNode={handleDoubleClickNode}
               theme={settings.theme}
+              fitTrigger={fitTrigger}
             />
           </Suspense>
         )}

@@ -599,6 +599,8 @@ export default function App() {
             viewMode={taskViewMode}
             onViewModeChange={setTaskViewMode}
             getTasksByStatus={(status) => tasks.getTasksByStatus(status, selectedFolderId)}
+            allNotes={notes.notes}
+            allTimelineEvents={timeline.events}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */
@@ -643,6 +645,9 @@ export default function App() {
                   onBack={() => setSelectedNoteId(undefined)}
                   clipsFolderId={clipsFolderId}
                   settings={settings}
+                  allNotes={notes.notes}
+                  allTasks={tasks.tasks}
+                  allTimelineEvents={timeline.events}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">

@@ -1,4 +1,4 @@
-import { X, ArrowRight, ExternalLink } from 'lucide-react';
+import { X, ArrowRight, ExternalLink, Pencil } from 'lucide-react';
 import type { GraphNode, GraphEdge } from '../../lib/graph-data';
 import { IOC_TYPE_LABELS, TIMELINE_EVENT_TYPE_LABELS } from '../../types';
 
@@ -8,9 +8,10 @@ interface GraphDetailPanelProps {
   allNodes: GraphNode[];
   onClose: () => void;
   onNavigate: (nodeId: string) => void;
+  onEditIOC?: (node: GraphNode) => void;
 }
 
-export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate }: GraphDetailPanelProps) {
+export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate, onEditIOC }: GraphDetailPanelProps) {
   const connectedEdges = edges.filter((e) => e.source === node.id || e.target === node.id);
 
   const getNodeLabel = (id: string) => {
@@ -93,16 +94,27 @@ export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate }:
         </div>
       </div>
 
-      {/* Navigate button */}
-      {(node.type === 'note' || node.type === 'task' || node.type === 'timeline-event') && (
-        <div className="border-t border-gray-800 p-2">
-          <button
-            onClick={() => onNavigate(node.id)}
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
-          >
-            <ExternalLink size={12} />
-            Go to {node.type === 'note' ? 'Note' : node.type === 'task' ? 'Task' : 'Event'}
-          </button>
+      {/* Footer buttons */}
+      {(node.type === 'note' || node.type === 'task' || node.type === 'timeline-event' || (node.type === 'ioc' && onEditIOC)) && (
+        <div className="border-t border-gray-800 p-2 space-y-1">
+          {(node.type === 'note' || node.type === 'task' || node.type === 'timeline-event') && (
+            <button
+              onClick={() => onNavigate(node.id)}
+              className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+            >
+              <ExternalLink size={12} />
+              Go to {node.type === 'note' ? 'Note' : node.type === 'task' ? 'Task' : 'Event'}
+            </button>
+          )}
+          {node.type === 'ioc' && onEditIOC && (
+            <button
+              onClick={() => onEditIOC(node)}
+              className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors"
+            >
+              <Pencil size={12} />
+              Edit IOC Attributes
+            </button>
+          )}
         </div>
       )}
     </div>

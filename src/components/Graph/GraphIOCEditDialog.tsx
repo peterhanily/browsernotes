@@ -1,0 +1,263 @@
+import { useState, useMemo } from 'react';
+import { Modal } from '../Common/Modal';
+import { AttributionComboInput } from '../Analysis/AttributionComboInput';
+import type { GraphNode } from '../../lib/graph-data';
+import type { Note, Task, IOCEntry, IOCType, ConfidenceLevel, Settings } from '../../types';
+import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, DEFAULT_IOC_SUBTYPES } from '../../types';
+
+interface GraphIOCEditDialogProps {
+  node: GraphNode;
+  notes: Note[];
+  tasks: Task[];
+  settings: Settings;
+  onUpdateNote: (id: string, updates: Partial<Note>) => void;
+  onUpdateTask: (id: string, updates: Partial<Task>) => void;
+  onClose: () => void;
+}
+
+interface IOCMatch {
+  entityType: 'note' | 'task';
+  entityId: string;
+  entityTitle: string;
+  ioc: IOCEntry;
+}
+
+function getSubtypes(type: IOCType, custom?: Record<string, string[]>): string[] {
+  const defaults = DEFAULT_IOC_SUBTYPES[type] || [];
+  const extra = custom?.[type] || [];
+  return [...new Set([...defaults, ...extra])];
+}
+
+/**
+ * Parse IOC type + normalized value from a deduplicated graph node ID.
+ * Node IDs follow the pattern: `ioc:{type}:{normalizedValue}`
+ */
+function parseIOCNodeId(nodeId: string): { iocType: IOCType; normalizedValue: string } | null {
+  const match = nodeId.match(/^ioc:([^:]+):(.+)$/);
+  if (!match) return null;
+  return { iocType: match[1] as IOCType, normalizedValue: match[2] };
+}
+
+export function GraphIOCEditDialog({ node, notes, tasks, settings, onUpdateNote, onUpdateTask, onClose }: GraphIOCEditDialogProps) {
+  const parsed = useMemo(() => parseIOCNodeId(node.id), [node.id]);
+
+  // Find ALL matching IOCEntry instances across notes and tasks
+  const matches = useMemo<IOCMatch[]>(() => {
+    if (!parsed) return [];
+    const results: IOCMatch[] = [];
+
+    for (const note of notes) {
+      if (note.trashed || !note.iocAnalysis?.iocs) continue;
+      for (const ioc of note.iocAnalysis.iocs) {
+        if (ioc.dismissed) continue;
+        if (ioc.type === parsed.iocType && ioc.value.toLowerCase() === parsed.normalizedValue) {
+          results.push({ entityType: 'note', entityId: note.id, entityTitle: note.title || 'Untitled', ioc });
+        }
+      }
+    }
+
+    for (const task of tasks) {
+      if (!task.iocAnalysis?.iocs) continue;
+      for (const ioc of task.iocAnalysis.iocs) {
+        if (ioc.dismissed) continue;
+        if (ioc.type === parsed.iocType && ioc.value.toLowerCase() === parsed.normalizedValue) {
+          results.push({ entityType: 'task', entityId: task.id, entityTitle: task.title || 'Untitled', ioc });
+        }
+      }
+    }
+
+    return results;
+  }, [parsed, notes, tasks]);
+
+  // Seed form state from the first match
+  const first = matches[0]?.ioc;
+
+  const [confidence, setConfidence] = useState<ConfidenceLevel>(first?.confidence ?? 'low');
+  const [analystNotes, setAnalystNotes] = useState(first?.analystNotes ?? '');
+  const [attribution, setAttribution] = useState(first?.attribution ?? '');
+  const [iocSubtype, setIocSubtype] = useState(first?.iocSubtype ?? '');
+  const [iocStatus, setIocStatus] = useState(first?.iocStatus ?? '');
+  const [clsLevel, setClsLevel] = useState(first?.clsLevel ?? '');
+
+  const subtypes = useMemo(
+    () => parsed ? getSubtypes(parsed.iocType, settings.tiIocSubtypes) : [],
+    [parsed, settings.tiIocSubtypes],
+  );
+
+  const typeInfo = parsed ? IOC_TYPE_LABELS[parsed.iocType] : null;
+
+  const handleSave = () => {
+    const updates: Partial<IOCEntry> = {
+      confidence,
+      analystNotes: analystNotes || undefined,
+      attribution: attribution || undefined,
+      iocSubtype: iocSubtype || undefined,
+      iocStatus: iocStatus || undefined,
+      clsLevel: clsLevel || undefined,
+    };
+
+    // Group matches by entity to update each entity once
+    const noteUpdates = new Map<string, IOCMatch[]>();
+    const taskUpdates = new Map<string, IOCMatch[]>();
+    for (const m of matches) {
+      const map = m.entityType === 'note' ? noteUpdates : taskUpdates;
+      if (!map.has(m.entityId)) map.set(m.entityId, []);
+      map.get(m.entityId)!.push(m);
+    }
+
+    for (const [noteId, noteMatches] of noteUpdates) {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note?.iocAnalysis) continue;
+      const updatedIOCs = note.iocAnalysis.iocs.map((ioc) => {
+        const isMatch = noteMatches.some((m) => m.ioc.id === ioc.id);
+        if (!isMatch) return ioc;
+        return { ...ioc, ...updates };
+      });
+      onUpdateNote(noteId, { iocAnalysis: { ...note.iocAnalysis, iocs: updatedIOCs } });
+    }
+
+    for (const [taskId, taskMatches] of taskUpdates) {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task?.iocAnalysis) continue;
+      const updatedIOCs = task.iocAnalysis.iocs.map((ioc) => {
+        const isMatch = taskMatches.some((m) => m.ioc.id === ioc.id);
+        if (!isMatch) return ioc;
+        return { ...ioc, ...updates };
+      });
+      onUpdateTask(taskId, { iocAnalysis: { ...task.iocAnalysis, iocs: updatedIOCs } });
+    }
+
+    onClose();
+  };
+
+  if (!parsed || matches.length === 0) {
+    return (
+      <Modal open onClose={onClose} title="Edit IOC">
+        <p className="text-sm text-gray-400">No matching IOC entries found.</p>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Edit IOC Attributes">
+      <div className="space-y-4">
+        {/* Read-only header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {typeInfo && (
+              <span
+                className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: typeInfo.color + '22', color: typeInfo.color }}
+              >
+                {typeInfo.label}
+              </span>
+            )}
+            <span className="text-xs text-gray-500">
+              {matches.length} instance{matches.length !== 1 ? 's' : ''} across {new Set(matches.map((m) => m.entityId)).size} entit{new Set(matches.map((m) => m.entityId)).size === 1 ? 'y' : 'ies'}
+            </span>
+          </div>
+          <div className="font-mono text-sm text-gray-200 break-all bg-gray-800/50 rounded p-2">
+            {parsed.normalizedValue}
+          </div>
+        </div>
+
+        {/* Confidence */}
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Confidence</label>
+          <select
+            value={confidence}
+            onChange={(e) => setConfidence(e.target.value as ConfidenceLevel)}
+            className="w-full bg-gray-800/50 text-xs text-gray-300 rounded p-1.5 mt-0.5 focus:outline-none focus:ring-1 focus:ring-gray-600"
+          >
+            {(Object.entries(CONFIDENCE_LEVELS) as [ConfidenceLevel, { label: string }][]).map(([value, { label }]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Analyst Notes */}
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Analyst Notes</label>
+          <textarea
+            value={analystNotes}
+            onChange={(e) => setAnalystNotes(e.target.value)}
+            className="w-full bg-gray-800/50 text-xs text-gray-300 rounded p-1.5 mt-0.5 focus:outline-none focus:ring-1 focus:ring-gray-600 resize-none"
+            rows={3}
+            placeholder="Add notes..."
+          />
+        </div>
+
+        {/* Attribution */}
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider">Attribution</label>
+          <AttributionComboInput
+            value={attribution}
+            onChange={setAttribution}
+            actors={settings.attributionActors ?? []}
+          />
+        </div>
+
+        {/* IOC Subtype */}
+        {subtypes.length > 0 && (
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider">IOC Subtype</label>
+            <select
+              value={iocSubtype}
+              onChange={(e) => setIocSubtype(e.target.value)}
+              className="w-full bg-gray-800/50 text-xs text-gray-300 rounded p-1.5 mt-0.5 focus:outline-none focus:ring-1 focus:ring-gray-600"
+            >
+              <option value="">—</option>
+              {subtypes.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* IOC Status */}
+        {settings.tiIocStatuses && settings.tiIocStatuses.length > 0 && (
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider">IOC Status</label>
+            <select
+              value={iocStatus}
+              onChange={(e) => setIocStatus(e.target.value)}
+              className="w-full bg-gray-800/50 text-xs text-gray-300 rounded p-1.5 mt-0.5 focus:outline-none focus:ring-1 focus:ring-gray-600"
+            >
+              <option value="">—</option>
+              {settings.tiIocStatuses.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Classification Level */}
+        {settings.tiClsLevels && settings.tiClsLevels.length > 0 && (
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider">Classification Level</label>
+            <select
+              value={clsLevel}
+              onChange={(e) => setClsLevel(e.target.value)}
+              className="w-full bg-gray-800/50 text-xs text-gray-300 rounded p-1.5 mt-0.5 focus:outline-none focus:ring-1 focus:ring-gray-600"
+            >
+              <option value="">—</option>
+              {settings.tiClsLevels.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Save / Cancel */}
+        <div className="flex justify-end gap-2 pt-2 border-t border-gray-700">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1.5 text-xs rounded-lg font-medium bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+          >
+            Save to All Instances
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

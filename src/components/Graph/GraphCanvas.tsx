@@ -19,6 +19,7 @@ interface GraphCanvasProps {
 
 export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, theme }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
 
   const isDark = theme === 'dark';
@@ -45,6 +46,49 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     }
   }, []);
 
+  /** Sync DOM overlay icons with cytoscape node positions */
+  const syncOverlay = useCallback(() => {
+    const cy = cyRef.current;
+    const overlay = overlayRef.current;
+    if (!cy || !overlay) return;
+
+    const existingEls = new Map<string, HTMLImageElement>();
+    for (const img of Array.from(overlay.querySelectorAll<HTMLImageElement>('img[data-node-id]'))) {
+      existingEls.set(img.dataset.nodeId!, img);
+    }
+
+    const seen = new Set<string>();
+    cy.nodes().forEach((node) => {
+      const id = node.id();
+      seen.add(id);
+      const pos = node.renderedPosition();
+      const icon = node.data('icon') as string | undefined;
+      if (!icon) return;
+
+      let img = existingEls.get(id);
+      if (!img) {
+        img = document.createElement('img');
+        img.dataset.nodeId = id;
+        img.style.position = 'absolute';
+        img.style.left = '0';
+        img.style.top = '0';
+        img.style.width = '22px';
+        img.style.height = '22px';
+        img.style.willChange = 'transform';
+        img.style.pointerEvents = 'none';
+        img.draggable = false;
+        overlay.appendChild(img);
+      }
+      if (img.src !== icon) img.src = icon;
+      img.style.transform = `translate(${pos.x - 11}px, ${pos.y - 11}px)`;
+    });
+
+    // Remove stale elements
+    existingEls.forEach((img, id) => {
+      if (!seen.has(id)) img.remove();
+    });
+  }, []);
+
   // Initialize cytoscape
   useEffect(() => {
     if (!containerRef.current) return;
@@ -57,10 +101,6 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
           style: {
             'background-color': 'data(color)',
             'background-opacity': 0.12,
-            'background-image': 'data(icon)',
-            'background-width': 'data(iconSize)' as unknown as number,
-            'background-height': 'data(iconSize)' as unknown as number,
-            'background-fit': 'none' as const,
             'label': 'data(label)',
             'font-size': '10px',
             'color': isDark ? '#e5e7eb' : '#374151',
@@ -154,13 +194,8 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
 
     cyRef.current = cy;
 
-    // Keep icons at a constant screen size regardless of zoom level.
-    // Updating node data triggers a reactive style recalculation via data(iconSize).
-    const ICON_SCREEN_PX = 22;
-    cy.on('zoom', () => {
-      const modelSize = ICON_SCREEN_PX / cy.zoom();
-      cy.nodes().data('iconSize', modelSize);
-    });
+    // Sync overlay on every render frame (covers zoom, pan, layout)
+    cy.on('render', syncOverlay);
 
     // Events
     cy.on('tap', 'node', (evt) => {
@@ -176,6 +211,8 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     return () => {
       cy.destroy();
       cyRef.current = null;
+      // Clear overlay
+      if (overlayRef.current) overlayRef.current.innerHTML = '';
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDark]);
@@ -185,11 +222,13 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     const cy = cyRef.current;
     if (!cy) return;
 
+    // Clear overlay before rebuilding data
+    if (overlayRef.current) overlayRef.current.innerHTML = '';
+
     cy.batch(() => {
       cy.elements().remove();
 
-      // Add nodes — include iconSize so stylesheet data(iconSize) is available
-      const iconSize = 22 / cy.zoom();
+      // Add nodes
       for (const node of data.nodes) {
         cy.add({
           group: 'nodes',
@@ -200,7 +239,6 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
             type: node.type,
             icon: node.icon,
             iocType: node.iocType ?? '',
-            iconSize,
           },
         });
       }
@@ -226,13 +264,12 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     // Run layout
     cy.layout(getLayoutOptions(layout)).run();
     cy.fit(undefined, 40);
-
-    // After fit changes zoom, update iconSize data so icons stay at constant screen size
-    const postFitSize = 22 / cy.zoom();
-    cy.nodes().data('iconSize', postFitSize);
   }, [data, layout, getLayoutOptions]);
 
   return (
-    <div ref={containerRef} className="w-full h-full" />
+    <div className="w-full h-full relative">
+      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={overlayRef} className="absolute inset-0 pointer-events-none overflow-hidden" />
+    </div>
   );
 }

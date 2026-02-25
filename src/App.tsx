@@ -555,6 +555,8 @@ export default function App() {
             onNavigateToNote={(id) => { setActiveView('notes'); setSelectedNoteId(id); setSelectedFolderId(undefined); setSelectedTag(undefined); setShowTrash(false); setShowArchive(false); }}
             onNavigateToTask={() => { setActiveView('tasks'); setSelectedFolderId(undefined); setSelectedTag(undefined); }}
             onNavigateToTimelineEvent={(id) => { setActiveView('timeline'); const ev = timeline.events.find((e) => e.id === id); if (ev) setSelectedTimelineId(ev.timelineId); }}
+            onUpdateNote={notes.updateNote}
+            onUpdateTask={tasks.updateTask}
           />
         ) : activeView === 'timeline' ? (
           <TimelineView

@@ -5,6 +5,7 @@ import { IOC_TYPE_LABELS } from '../../types';
 import { buildGraphData } from '../../lib/graph-data';
 import type { GraphNode } from '../../lib/graph-data';
 import { GraphDetailPanel } from './GraphDetailPanel';
+import { GraphIOCEditDialog } from './GraphIOCEditDialog';
 import type { LayoutName } from './GraphCanvas';
 
 const GraphCanvas = React.lazy(() => import('./GraphCanvas'));
@@ -19,16 +20,19 @@ interface GraphViewProps {
   onNavigateToNote: (id: string) => void;
   onNavigateToTask: (id: string) => void;
   onNavigateToTimelineEvent: (id: string) => void;
+  onUpdateNote?: (id: string, updates: Partial<Note>) => void;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
 }
 
 type NodeTypeFilter = 'ioc' | 'note' | 'task' | 'timeline-event';
 
-export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent }: GraphViewProps) {
+export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask }: GraphViewProps) {
   const [layout, setLayout] = useState<LayoutName>('cose-bilkent');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleNodeTypes, setVisibleNodeTypes] = useState<Set<NodeTypeFilter>>(new Set(['ioc', 'note', 'task', 'timeline-event']));
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
+  const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
 
   // Build full graph data
   const fullGraphData = useMemo(
@@ -222,6 +226,20 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
             const node = filteredGraphData.nodes.find((n) => n.id === nodeId);
             if (node) navigateToEntity(node);
           }}
+          onEditIOC={onUpdateNote && onUpdateTask ? setEditingIOCNode : undefined}
+        />
+      )}
+
+      {/* IOC edit dialog */}
+      {editingIOCNode && onUpdateNote && onUpdateTask && (
+        <GraphIOCEditDialog
+          node={editingIOCNode}
+          notes={notes}
+          tasks={tasks}
+          settings={settings}
+          onUpdateNote={onUpdateNote}
+          onUpdateTask={onUpdateTask}
+          onClose={() => setEditingIOCNode(null)}
         />
       )}
     </div>

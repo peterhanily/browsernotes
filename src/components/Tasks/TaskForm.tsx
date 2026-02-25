@@ -89,7 +89,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
 
   const handleShieldClick = () => {
     if (!isEditMode || !task || !onUpdateTask) return;
-    if (!task.iocAnalysis) {
+    if (!showIOCPanel) {
       const fresh = extractIOCs(description);
       const merged = mergeIOCAnalysis(task.iocAnalysis, fresh);
       const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];

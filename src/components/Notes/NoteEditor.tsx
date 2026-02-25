@@ -292,7 +292,7 @@ export function NoteEditor({
 
         <button
           onClick={() => {
-            if (!note.iocAnalysis && !showIOCPanel) {
+            if (!showIOCPanel) {
               const fresh = extractIOCs(content);
               const merged = mergeIOCAnalysis(note.iocAnalysis, fresh);
               const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];

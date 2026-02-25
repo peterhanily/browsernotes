@@ -21,13 +21,11 @@ export function useAutoIOCExtraction({
   onUpdate,
   enabled = true,
 }: UseAutoIOCExtractionOptions) {
-  const mountedRef = useRef(false);
   const prevContentRef = useRef(content);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Reset mount flag when entity changes
+  // Reset prev content when entity changes
   useEffect(() => {
-    mountedRef.current = false;
     prevContentRef.current = content;
     clearTimeout(timerRef.current);
   }, [entityId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -35,15 +33,9 @@ export function useAutoIOCExtraction({
   useEffect(() => {
     if (!enabled || !entityId) return;
 
-    // Skip if content hasn't actually changed (e.g. iocAnalysis update re-rendered parent)
+    // Skip if content hasn't actually changed (e.g. iocAnalysis update re-rendered parent, or initial mount)
     if (content === prevContentRef.current) return;
     prevContentRef.current = content;
-
-    // Skip initial mount
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
 
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

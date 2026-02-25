@@ -22,6 +22,7 @@ interface GraphViewProps {
   onNavigateToTimelineEvent: (id: string) => void;
   onUpdateNote?: (id: string, updates: Partial<Note>) => void;
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
+  onUpdateEvent?: (id: string, updates: Partial<TimelineEvent>) => void;
 }
 
 type NodeTypeFilter = 'ioc' | 'note' | 'task' | 'timeline-event';
@@ -34,7 +35,7 @@ const ALL_EDGE_TYPES: { key: EdgeTypeFilter; label: string; color: string }[] = 
   { key: 'entity-link', label: 'Entity Links', color: '#22c55e' },
 ];
 
-export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask }: GraphViewProps) {
+export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateToNote, onNavigateToTask, onNavigateToTimelineEvent, onUpdateNote, onUpdateTask, onUpdateEvent }: GraphViewProps) {
   const [layout, setLayout] = useState<LayoutName>('cose-bilkent');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -119,6 +120,15 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
     if (!node) return;
     navigateToEntity(node);
   }, [fullGraphData.nodes, navigateToEntity]);
+
+  const handleOpenNewTab = useCallback((node: GraphNode) => {
+    const entityId = node.sourceEntityIds[0];
+    if (!entityId) return;
+    const entityType = node.type === 'note' ? 'note' : node.type === 'task' ? 'task' : node.type === 'timeline-event' ? 'event' : null;
+    if (!entityType) return;
+    const url = `${location.origin}${location.pathname}#entity=${entityType}:${entityId}`;
+    window.open(url, '_blank');
+  }, []);
 
   const nodeTypeCounts = useMemo(() => {
     const counts = { ioc: 0, note: 0, task: 0, 'timeline-event': 0 };
@@ -273,6 +283,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
             const node = filteredGraphData.nodes.find((n) => n.id === nodeId);
             if (node) navigateToEntity(node);
           }}
+          onOpenNewTab={handleOpenNewTab}
           onEditIOC={onUpdateNote && onUpdateTask ? setEditingIOCNode : undefined}
         />
       )}
@@ -283,9 +294,11 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
           node={editingIOCNode}
           notes={notes}
           tasks={tasks}
+          timelineEvents={timelineEvents}
           settings={settings}
           onUpdateNote={onUpdateNote}
           onUpdateTask={onUpdateTask}
+          onUpdateEvent={onUpdateEvent}
           onClose={() => setEditingIOCNode(null)}
         />
       )}

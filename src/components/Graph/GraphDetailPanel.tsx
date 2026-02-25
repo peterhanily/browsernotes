@@ -8,10 +8,11 @@ interface GraphDetailPanelProps {
   allNodes: GraphNode[];
   onClose: () => void;
   onNavigate: (nodeId: string) => void;
+  onOpenNewTab?: (node: GraphNode) => void;
   onEditIOC?: (node: GraphNode) => void;
 }
 
-export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate, onEditIOC }: GraphDetailPanelProps) {
+export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate, onOpenNewTab, onEditIOC }: GraphDetailPanelProps) {
   const connectedEdges = edges.filter((e) => e.source === node.id || e.target === node.id);
 
   const getNodeLabel = (id: string) => {
@@ -98,13 +99,24 @@ export function GraphDetailPanel({ node, edges, allNodes, onClose, onNavigate, o
       {(node.type === 'note' || node.type === 'task' || node.type === 'timeline-event' || (node.type === 'ioc' && onEditIOC)) && (
         <div className="border-t border-gray-800 p-2 space-y-1">
           {(node.type === 'note' || node.type === 'task' || node.type === 'timeline-event') && (
-            <button
-              onClick={() => onNavigate(node.id)}
-              className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
-            >
-              <ExternalLink size={12} />
-              Go to {node.type === 'note' ? 'Note' : node.type === 'task' ? 'Task' : 'Event'}
-            </button>
+            <>
+              <button
+                onClick={() => onNavigate(node.id)}
+                className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+              >
+                <ArrowRight size={12} />
+                Open {node.type === 'note' ? 'Note' : node.type === 'task' ? 'Task' : 'Event'}
+              </button>
+              {onOpenNewTab && (
+                <button
+                  onClick={() => onOpenNewTab(node)}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700/50 text-gray-300 hover:bg-gray-700 transition-colors"
+                >
+                  <ExternalLink size={12} />
+                  Open in New Tab
+                </button>
+              )}
+            </>
           )}
           {node.type === 'ioc' && onEditIOC && (
             <button

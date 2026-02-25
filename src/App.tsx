@@ -35,6 +35,17 @@ import { useTour } from './hooks/useTour';
 import { TourOverlay } from './components/Tour/TourOverlay';
 import { TourTooltip } from './components/Tour/TourTooltip';
 
+// Parse hash deep-link on initial load: #entity=note:xxx, #entity=task:xxx, #entity=event:xxx
+function parseEntityHash(): { type: 'note' | 'task' | 'event'; id: string } | null {
+  const match = window.location.hash.match(/^#entity=(note|task|event):(.+)$/);
+  if (!match) return null;
+  // Clear the hash after reading
+  history.replaceState(null, '', location.pathname + location.search);
+  return { type: match[1] as 'note' | 'task' | 'event', id: match[2] };
+}
+
+const initialDeepLink = parseEntityHash();
+
 export default function App() {
   const { settings, updateSettings, toggleTheme } = useSettings();
   const notes = useNotes();
@@ -178,8 +189,13 @@ export default function App() {
 
   // UI state — guard against stale 'clips' defaultView in localStorage
   const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' ? settings.defaultView : 'notes';
-  const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
-  const [selectedNoteId, setSelectedNoteId] = useState<string>();
+  const deepLinkView: ViewMode | undefined = initialDeepLink
+    ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
+    : undefined;
+  const [activeView, setActiveView] = useState<ViewMode>(deepLinkView ?? safeDefaultView);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | undefined>(
+    initialDeepLink?.type === 'note' ? initialDeepLink.id : undefined,
+  );
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
   const [selectedTag, setSelectedTag] = useState<string>();
   const [showTrash, setShowTrash] = useState(false);
@@ -195,6 +211,15 @@ export default function App() {
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
   const [selectedTimelineId, setSelectedTimelineId] = useState<string>();
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string>();
+
+  // Resolve timeline deep-link once events are loaded
+  const deepLinkTimelineResolved = useCallback(() => {
+    if (initialDeepLink?.type !== 'event' || !timeline.events.length) return;
+    const ev = timeline.events.find((e) => e.id === initialDeepLink.id);
+    if (ev && !selectedTimelineId) setSelectedTimelineId(ev.timelineId);
+  }, [timeline.events, selectedTimelineId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run when events load for deep-link resolution
+  useEffect(deepLinkTimelineResolved, [timeline.events]);
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -557,6 +582,7 @@ export default function App() {
             onNavigateToTimelineEvent={(id) => { setActiveView('timeline'); const ev = timeline.events.find((e) => e.id === id); if (ev) setSelectedTimelineId(ev.timelineId); }}
             onUpdateNote={notes.updateNote}
             onUpdateTask={tasks.updateTask}
+            onUpdateEvent={timeline.updateEvent}
           />
         ) : activeView === 'timeline' ? (
           <TimelineView

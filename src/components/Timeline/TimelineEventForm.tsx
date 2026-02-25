@@ -227,7 +227,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
             <button
               type="button"
               onClick={() => {
-                if (!event.iocAnalysis && !showIOCPanel) {
+                if (!showIOCPanel) {
                   const fresh = extractIOCs(description);
                   const merged = mergeIOCAnalysis(event.iocAnalysis, fresh);
                   const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];

@@ -2,21 +2,23 @@ import { useState, useMemo } from 'react';
 import { Modal } from '../Common/Modal';
 import { AttributionComboInput } from '../Analysis/AttributionComboInput';
 import type { GraphNode } from '../../lib/graph-data';
-import type { Note, Task, IOCEntry, IOCType, ConfidenceLevel, Settings } from '../../types';
+import type { Note, Task, TimelineEvent, IOCEntry, IOCType, ConfidenceLevel, Settings } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, DEFAULT_IOC_SUBTYPES } from '../../types';
 
 interface GraphIOCEditDialogProps {
   node: GraphNode;
   notes: Note[];
   tasks: Task[];
+  timelineEvents: TimelineEvent[];
   settings: Settings;
   onUpdateNote: (id: string, updates: Partial<Note>) => void;
   onUpdateTask: (id: string, updates: Partial<Task>) => void;
+  onUpdateEvent?: (id: string, updates: Partial<TimelineEvent>) => void;
   onClose: () => void;
 }
 
 interface IOCMatch {
-  entityType: 'note' | 'task';
+  entityType: 'note' | 'task' | 'timeline-event';
   entityId: string;
   entityTitle: string;
   ioc: IOCEntry;
@@ -38,7 +40,7 @@ function parseIOCNodeId(nodeId: string): { iocType: IOCType; normalizedValue: st
   return { iocType: match[1] as IOCType, normalizedValue: match[2] };
 }
 
-export function GraphIOCEditDialog({ node, notes, tasks, settings, onUpdateNote, onUpdateTask, onClose }: GraphIOCEditDialogProps) {
+export function GraphIOCEditDialog({ node, notes, tasks, timelineEvents, settings, onUpdateNote, onUpdateTask, onUpdateEvent, onClose }: GraphIOCEditDialogProps) {
   const parsed = useMemo(() => parseIOCNodeId(node.id), [node.id]);
 
   // Find ALL matching IOCEntry instances across notes and tasks
@@ -66,8 +68,18 @@ export function GraphIOCEditDialog({ node, notes, tasks, settings, onUpdateNote,
       }
     }
 
+    for (const event of timelineEvents) {
+      if (!event.iocAnalysis?.iocs) continue;
+      for (const ioc of event.iocAnalysis.iocs) {
+        if (ioc.dismissed) continue;
+        if (ioc.type === parsed.iocType && ioc.value.toLowerCase() === parsed.normalizedValue) {
+          results.push({ entityType: 'timeline-event', entityId: event.id, entityTitle: event.title || 'Untitled', ioc });
+        }
+      }
+    }
+
     return results;
-  }, [parsed, notes, tasks]);
+  }, [parsed, notes, tasks, timelineEvents]);
 
   // Seed form state from the first match
   const first = matches[0]?.ioc;
@@ -99,8 +111,9 @@ export function GraphIOCEditDialog({ node, notes, tasks, settings, onUpdateNote,
     // Group matches by entity to update each entity once
     const noteUpdates = new Map<string, IOCMatch[]>();
     const taskUpdates = new Map<string, IOCMatch[]>();
+    const eventUpdates = new Map<string, IOCMatch[]>();
     for (const m of matches) {
-      const map = m.entityType === 'note' ? noteUpdates : taskUpdates;
+      const map = m.entityType === 'note' ? noteUpdates : m.entityType === 'task' ? taskUpdates : eventUpdates;
       if (!map.has(m.entityId)) map.set(m.entityId, []);
       map.get(m.entityId)!.push(m);
     }
@@ -125,6 +138,19 @@ export function GraphIOCEditDialog({ node, notes, tasks, settings, onUpdateNote,
         return { ...ioc, ...updates };
       });
       onUpdateTask(taskId, { iocAnalysis: { ...task.iocAnalysis, iocs: updatedIOCs } });
+    }
+
+    if (onUpdateEvent) {
+      for (const [eventId, eventMatches] of eventUpdates) {
+        const event = timelineEvents.find((e) => e.id === eventId);
+        if (!event?.iocAnalysis) continue;
+        const updatedIOCs = event.iocAnalysis.iocs.map((ioc) => {
+          const isMatch = eventMatches.some((m) => m.ioc.id === ioc.id);
+          if (!isMatch) return ioc;
+          return { ...ioc, ...updates };
+        });
+        onUpdateEvent(eventId, { iocAnalysis: { ...event.iocAnalysis, iocs: updatedIOCs } });
+      }
     }
 
     onClose();

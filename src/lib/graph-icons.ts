@@ -15,7 +15,7 @@ function lighten(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-const H = (c: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="${c}">`;
+const H = (c: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 22 22" fill="${c}">`;
 const E = '</svg>';
 
 // IPv4: filled globe with vertical/horizontal cross

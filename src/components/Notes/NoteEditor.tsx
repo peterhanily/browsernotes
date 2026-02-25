@@ -93,6 +93,7 @@ export function NoteEditor({
       titleRef.current.focus();
       titleRef.current.select();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id]);
 
   // Cleanup pending timeouts on unmount
@@ -463,6 +464,7 @@ export function NoteEditor({
               ociPushing={oci.syncing}
               lastPushedAt={note.iocAnalysis?.lastPushedAt}
               onPushComplete={() => {
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 const updated = { ...note.iocAnalysis!, lastPushedAt: Date.now() };
                 onUpdate(note.id, { iocAnalysis: updated });
               }}

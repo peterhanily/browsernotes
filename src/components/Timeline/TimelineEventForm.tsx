@@ -70,6 +70,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
 
   useEffect(() => {
     if (event) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(event.title);
       setTimestamp(toDatetimeLocal(event.timestamp));
       setTimestampEnd(event.timestampEnd ? toDatetimeLocal(event.timestampEnd) : '');

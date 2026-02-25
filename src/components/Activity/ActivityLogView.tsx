@@ -50,11 +50,13 @@ function groupByTimePeriod(entries: ActivityLogEntry[]): { period: string; entri
   for (const entry of entries) {
     const period = getTimePeriod(entry.timestamp);
     if (!groups.has(period)) groups.set(period, []);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     groups.get(period)!.push(entry);
   }
 
   return order
     .filter((p) => groups.has(p))
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     .map((period) => ({ period, entries: groups.get(period)! }));
 }
 

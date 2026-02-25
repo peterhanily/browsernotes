@@ -70,6 +70,7 @@ export function SearchOverlay({
       // Small delay to ensure DOM is ready
       rafRef.current = requestAnimationFrame(() => inputRef.current?.focus());
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery('');
       setDebouncedQuery('');
       setActiveIndex(0);
@@ -90,6 +91,7 @@ export function SearchOverlay({
     const groups: Partial<Record<SearchResultType, SearchResult[]>> = {};
     for (const r of results) {
       if (!groups[r.type]) groups[r.type] = [];
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       groups[r.type]!.push(r);
     }
     return groups;
@@ -100,6 +102,7 @@ export function SearchOverlay({
 
   // Reset activeIndex when results change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveIndex(0);
   }, [results]);
 
@@ -262,6 +265,7 @@ export function SearchOverlay({
                   {TYPE_LABELS[type]} ({group.length})
                 </div>
                 {group.map((result) => {
+                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                   const idx = indexMap.get(result.id)!;
                   const Icon = TYPE_ICONS[result.type];
                   return (

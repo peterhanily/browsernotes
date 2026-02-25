@@ -290,6 +290,7 @@ export default function App() {
         sort,
         iocTypes: selectedIOCTypes.length > 0 ? selectedIOCTypes : undefined,
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [notes.getFilteredNotes, selectedFolderId, selectedTag, showTrash, showArchive, sort, selectedIOCTypes]
   );
 
@@ -300,6 +301,7 @@ export default function App() {
         folderId: selectedFolderId,
         tag: selectedTag,
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tasks.getFilteredTasks, selectedFolderId, selectedTag]
   );
 
@@ -311,6 +313,7 @@ export default function App() {
         tag: selectedTag,
         timelineId: selectedTimelineId,
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId]
   );
 
@@ -357,6 +360,7 @@ export default function App() {
 
   const handleMoveNoteToFolder = useCallback((noteId: string, folderId: string) => {
     notes.updateNote(noteId, { folderId });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes.updateNote]);
 
   const handleNewNote = useCallback(async () => {
@@ -388,6 +392,7 @@ export default function App() {
     timeline.reload();
     reloadTimelines();
     reloadWhiteboards();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
 
   const handleToggleEditorMode = useCallback(() => {
@@ -418,6 +423,7 @@ export default function App() {
     timeline.reload();
     reloadTimelines();
     reloadWhiteboards();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
 
   // Keyboard shortcuts

@@ -35,6 +35,7 @@ export function useTour(options?: UseTourOptions) {
   // Update rect on step change, scroll, resize
   useEffect(() => {
     if (!isActive) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateRect();
 
     const onUpdate = () => {

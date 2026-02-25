@@ -135,6 +135,7 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
   const pxPerMs = zoomLevel ?? defaultPxPerMs;
 
   // Reset zoom when events change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setZoomLevel(null); }, [events]);
 
   // Track container width
@@ -368,6 +369,7 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
 
               // Duration bar
               const x1 = toX(ev.timestamp);
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               const x2 = toX(ev.timestampEnd!);
               const barWidth = Math.max(MIN_BAR_WIDTH, x2 - x1);
 

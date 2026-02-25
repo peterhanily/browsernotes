@@ -80,13 +80,14 @@ export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors
 
   const availableRelTypes = useMemo(() => getRelationshipTypesForSource(ioc.type, threatIntelConfig?.relationshipTypes), [ioc.type, threatIntelConfig?.relationshipTypes]);
 
+  const relationshipTypes = threatIntelConfig?.relationshipTypes;
   const allRelDefs = useMemo(() => {
     const merged: Record<string, IOCRelationshipDef> = { ...DEFAULT_RELATIONSHIP_TYPES };
-    if (threatIntelConfig?.relationshipTypes) {
-      for (const [k, v] of Object.entries(threatIntelConfig.relationshipTypes)) merged[k] = v;
+    if (relationshipTypes) {
+      for (const [k, v] of Object.entries(relationshipTypes)) merged[k] = v;
     }
     return merged;
-  }, [threatIntelConfig?.relationshipTypes]);
+  }, [relationshipTypes]);
 
   const validTargets = useMemo(() => {
     if (!newRelType) return allIOCs.filter((o) => o.id !== ioc.id && !o.dismissed);

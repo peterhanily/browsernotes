@@ -37,6 +37,7 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
   const excalidrawSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName(whiteboard.name);
   }, [whiteboard.id, whiteboard.name]);
 

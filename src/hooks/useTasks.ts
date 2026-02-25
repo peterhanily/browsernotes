@@ -14,6 +14,7 @@ export function useTasks() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTasks();
   }, [loadTasks]);
 
@@ -80,6 +81,7 @@ export function useTasks() {
       }
 
       if (opts.tag) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((t) => t.tags.includes(opts.tag!));
       }
 

@@ -24,6 +24,7 @@ export function useNotes() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotes();
   }, [loadNotes]);
 
@@ -99,10 +100,12 @@ export function useNotes() {
       if (opts.folderId) {
         filtered = filtered.filter((n) => n.folderId === opts.folderId);
       } else if (opts.excludeFolderIds && opts.excludeFolderIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((n) => !opts.excludeFolderIds!.includes(n.folderId!));
       }
 
       if (opts.tag) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((n) => n.tags.includes(opts.tag!));
       }
 
@@ -117,6 +120,7 @@ export function useNotes() {
 
       if (opts.iocTypes && opts.iocTypes.length > 0) {
         filtered = filtered.filter((n) =>
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           n.iocTypes && opts.iocTypes!.some((t) => n.iocTypes!.includes(t))
         );
       }

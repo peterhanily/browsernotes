@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
 import { extractIOCs, defang, mergeIOCAnalysis } from '../lib/ioc-extractor';
 import type { IOCAnalysis, IOCEntry } from '../types';

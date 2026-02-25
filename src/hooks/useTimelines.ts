@@ -12,6 +12,7 @@ export function useTimelines() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTimelines();
   }, [loadTimelines]);
 

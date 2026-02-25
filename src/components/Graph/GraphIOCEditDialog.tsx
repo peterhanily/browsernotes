@@ -115,6 +115,7 @@ export function GraphIOCEditDialog({ node, notes, tasks, timelineEvents, setting
     for (const m of matches) {
       const map = m.entityType === 'note' ? noteUpdates : m.entityType === 'task' ? taskUpdates : eventUpdates;
       if (!map.has(m.entityId)) map.set(m.entityId, []);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       map.get(m.entityId)!.push(m);
     }
 

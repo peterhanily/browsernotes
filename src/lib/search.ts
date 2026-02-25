@@ -448,8 +448,10 @@ export function parseAdvancedQuery(input: string): Predicate | null {
 
   function parseAnd(): Predicate {
     let left = parseAtom();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     while (peek() && peek()!.type !== 'OR' && peek()!.type !== 'RPAREN') {
       if (peek()?.type === 'AND') consume('AND');
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       if (!peek() || peek()!.type === 'OR' || peek()!.type === 'RPAREN') break;
       const right = parseAtom();
       const l = left, r = right;
@@ -472,7 +474,9 @@ export function parseAdvancedQuery(input: string): Predicate | null {
     if (t.type === 'FIELD_OP') {
       const token = consume('FIELD_OP');
       const field = token.field as keyof FieldSet;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const op = token.op!;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const arg = token.arg!.toLowerCase();
       return (fields) => {
         const val = fields[field].toLowerCase();

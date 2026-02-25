@@ -49,10 +49,13 @@ export function GraphView({ notes, tasks, timelineEvents, settings, onNavigateTo
 
   // Build full graph data
   const fullGraphData = useMemo(() => {
-    const data = buildGraphData(notes, tasks, timelineEvents, settings);
-    fullGraphDataRef.current = data;
-    return data;
+    return buildGraphData(notes, tasks, timelineEvents, settings);
   }, [notes, tasks, timelineEvents, settings]);
+
+  // Keep ref in sync for use in cytoscape callbacks (outside render)
+  React.useEffect(() => {
+    fullGraphDataRef.current = fullGraphData;
+  }, [fullGraphData]);
 
   // Filter graph data
   const filteredGraphData = useMemo(() => {

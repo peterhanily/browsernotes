@@ -63,6 +63,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
 
   useEffect(() => {
     if (task) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(task.title);
       setDescription(task.description || '');
       setPriority(task.priority);

@@ -12,6 +12,7 @@ export function useFolders() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFolders();
   }, [loadFolders]);
 

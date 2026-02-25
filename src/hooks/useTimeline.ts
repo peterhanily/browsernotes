@@ -14,6 +14,7 @@ export function useTimeline() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEvents();
   }, [loadEvents]);
 
@@ -78,6 +79,7 @@ export function useTimeline() {
       }
 
       if (opts.eventTypes && opts.eventTypes.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((e) => opts.eventTypes!.includes(e.eventType));
       }
 
@@ -91,6 +93,7 @@ export function useTimeline() {
       }
 
       if (opts.tag) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((e) => e.tags.includes(opts.tag!));
       }
 
@@ -99,10 +102,12 @@ export function useTimeline() {
       }
 
       if (opts.dateStart) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((e) => e.timestamp >= opts.dateStart!);
       }
 
       if (opts.dateEnd) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         filtered = filtered.filter((e) => e.timestamp <= opts.dateEnd!);
       }
 

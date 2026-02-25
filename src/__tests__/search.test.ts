@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
 import { unifiedSearch, generateSnippet, parseAdvancedQuery } from '../lib/search';
 import type { Note, Task, TimelineEvent, Whiteboard } from '../types';

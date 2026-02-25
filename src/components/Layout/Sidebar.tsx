@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
-  PanelLeftClose, Github, Download, Chrome, PenTool, Activity,
+  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -220,6 +220,12 @@ export function Sidebar({
             onClick={() => nav(() => { onViewChange('timeline'); clearFilters(); })}
           />
         </div>
+        <SidebarItem
+          icon={<Network size={18} />}
+          label="Graph"
+          active={activeView === 'graph'}
+          onClick={() => nav(() => { onViewChange('graph'); clearFilters(); })}
+        />
         <div data-tour="whiteboards">
           <SidebarItem
             icon={<PenTool size={18} />}

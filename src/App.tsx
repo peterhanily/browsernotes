@@ -30,6 +30,7 @@ import { SearchOverlay } from './components/Search/SearchOverlay';
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
+import { GraphView } from './components/Graph/GraphView';
 import { useTour } from './hooks/useTour';
 import { TourOverlay } from './components/Tour/TourOverlay';
 import { TourTooltip } from './components/Tour/TourTooltip';
@@ -176,7 +177,7 @@ export default function App() {
   }, [deleteTag, tags, activityLog.log]);
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' ? settings.defaultView : 'notes';
   const [activeView, setActiveView] = useState<ViewMode>(safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string>();
   const [selectedFolderId, setSelectedFolderId] = useState<string>();
@@ -544,6 +545,16 @@ export default function App() {
             entries={activityLog.entries}
             getFiltered={activityLog.getFiltered}
             onClear={activityLog.clear}
+          />
+        ) : activeView === 'graph' ? (
+          <GraphView
+            notes={notes.notes}
+            tasks={tasks.tasks}
+            timelineEvents={timeline.events}
+            settings={settings}
+            onNavigateToNote={(id) => { setActiveView('notes'); setSelectedNoteId(id); setSelectedFolderId(undefined); setSelectedTag(undefined); setShowTrash(false); setShowArchive(false); }}
+            onNavigateToTask={() => { setActiveView('tasks'); setSelectedFolderId(undefined); setSelectedTag(undefined); }}
+            onNavigateToTimelineEvent={(id) => { setActiveView('timeline'); const ev = timeline.events.find((e) => e.id === id); if (ev) setSelectedTimelineId(ev.timelineId); }}
           />
         ) : activeView === 'timeline' ? (
           <TimelineView

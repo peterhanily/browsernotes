@@ -4,11 +4,33 @@ import { DEFAULT_SETTINGS } from '../types';
 
 const SETTINGS_KEY = 'browsernotes-settings';
 
+function migrateSettings(raw: Record<string, unknown>): Record<string, unknown> {
+  // Migrate flat tiIocSubtypes array → per-type map
+  if (Array.isArray(raw.tiIocSubtypes)) {
+    const flat = raw.tiIocSubtypes as string[];
+    if (flat.length > 0) {
+      // Assign all old subtypes to every IOC type so user data isn't lost
+      const allTypes = ['ipv4','ipv6','domain','url','email','md5','sha1','sha256','cve','mitre-attack','yara-rule','file-path'];
+      const perType: Record<string, string[]> = {};
+      for (const t of allTypes) perType[t] = [...flat];
+      raw.tiIocSubtypes = perType;
+    } else {
+      raw.tiIocSubtypes = undefined;
+    }
+  }
+  // Migrate flat tiRelationshipTypes array → empty map (old format was just labels)
+  if (Array.isArray(raw.tiRelationshipTypes)) {
+    raw.tiRelationshipTypes = undefined;
+  }
+  return raw;
+}
+
 function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      const raw = migrateSettings(JSON.parse(stored));
+      return { ...DEFAULT_SETTINGS, ...raw } as Settings;
     }
   } catch {
     // ignore

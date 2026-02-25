@@ -407,6 +407,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
                             onRestore={restoreIOC}
                             attributionActors={attributionActors}
                             threatIntelConfig={threatIntelConfig}
+                            allIOCs={analysis?.iocs}
                           />
                         ))}
                       </div>

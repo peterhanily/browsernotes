@@ -69,7 +69,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity';
+export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -86,8 +86,8 @@ export interface Settings {
   tiDefaultClsLevel?: string;
   tiDefaultReportSource?: string;
   tiClsLevels?: string[];
-  tiIocSubtypes?: string[];
-  tiRelationshipTypes?: string[];
+  tiIocSubtypes?: Record<string, string[]>;
+  tiRelationshipTypes?: Record<string, IOCRelationshipDef>;
   tiIocStatuses?: string[];
 }
 
@@ -107,6 +107,11 @@ export type IOCType =
 
 export type ConfidenceLevel = 'low' | 'medium' | 'high' | 'confirmed';
 
+export interface IOCRelationship {
+  targetIOCId: string;
+  relationshipType: string;
+}
+
 export interface IOCEntry {
   id: string;
   type: IOCType;
@@ -119,8 +124,9 @@ export interface IOCEntry {
   iocSubtype?: string;
   iocStatus?: string;
   clsLevel?: string;
-  relatedId?: string;
-  relationshipType?: string;
+  relatedId?: string;          // deprecated — use relationships[]
+  relationshipType?: string;   // deprecated — use relationships[]
+  relationships?: IOCRelationship[];
 }
 
 export interface IOCAnalysis {
@@ -150,6 +156,42 @@ export const CONFIDENCE_LEVELS: Record<ConfidenceLevel, { label: string; color: 
   medium:    { label: 'Medium',    color: '#eab308' },
   high:      { label: 'High',      color: '#f97316' },
   confirmed: { label: 'Confirmed', color: '#ef4444' },
+};
+
+// IOC subtype defaults per IOC type
+export const DEFAULT_IOC_SUBTYPES: Record<IOCType, string[]> = {
+  ipv4: ['Scanning IP', 'C2 Server', 'Proxy', 'VPN Exit Node', 'Sinkhole', 'Tor Exit Node'],
+  ipv6: ['Scanning IP', 'C2 Server', 'Proxy', 'VPN Exit Node', 'Sinkhole', 'Tor Exit Node'],
+  domain: ['DGA Domain', 'Parked Domain', 'C2 Domain', 'Phishing Domain', 'Typosquat'],
+  url: ['Phishing URL', 'Payload URL', 'C2 URL', 'Watering Hole', 'Exploit Kit Landing'],
+  email: ['Phishing Sender', 'Spear-phishing Sender', 'Compromised Account', 'Distribution List'],
+  md5: ['Malware Sample', 'Dropper', 'Payload', 'Tool', 'Legitimate (FP)'],
+  sha1: ['Malware Sample', 'Dropper', 'Payload', 'Tool', 'Legitimate (FP)'],
+  sha256: ['Malware Sample', 'Dropper', 'Payload', 'Tool', 'Legitimate (FP)'],
+  cve: ['Remote Code Execution', 'Privilege Escalation', 'Information Disclosure', 'Denial of Service', 'Authentication Bypass'],
+  'mitre-attack': ['Technique', 'Sub-technique', 'Tactic'],
+  'yara-rule': ['Detection Rule', 'Hunting Rule', 'Classification Rule'],
+  'file-path': ['Persistence Location', 'Staging Directory', 'Exfil Path', 'Log File', 'Config File'],
+};
+
+// IOC relationship type definitions
+export interface IOCRelationshipDef {
+  label: string;
+  sourceTypes: IOCType[];  // empty = any
+  targetTypes: IOCType[];  // empty = any
+}
+
+export const DEFAULT_RELATIONSHIP_TYPES: Record<string, IOCRelationshipDef> = {
+  'resolves-to':       { label: 'Resolves To',       sourceTypes: ['domain'],                                    targetTypes: ['ipv4', 'ipv6'] },
+  'downloads':         { label: 'Downloads',          sourceTypes: ['url'],                                       targetTypes: ['md5', 'sha1', 'sha256'] },
+  'communicates-with': { label: 'Communicates With',  sourceTypes: ['ipv4', 'ipv6', 'domain'],                    targetTypes: ['ipv4', 'ipv6', 'domain'] },
+  'drops':             { label: 'Drops',              sourceTypes: ['md5', 'sha1', 'sha256'],                     targetTypes: ['md5', 'sha1', 'sha256', 'file-path'] },
+  'hosts':             { label: 'Hosts',              sourceTypes: ['ipv4', 'ipv6', 'domain'],                    targetTypes: ['url'] },
+  'attributed-to':     { label: 'Attributed To',      sourceTypes: [],                                            targetTypes: [] },
+  'exploits':          { label: 'Exploits',           sourceTypes: ['md5', 'sha1', 'sha256', 'url'],              targetTypes: ['cve'] },
+  'uses-technique':    { label: 'Uses Technique',     sourceTypes: [],                                            targetTypes: ['mitre-attack'] },
+  'detected-by':       { label: 'Detected By',        sourceTypes: ['md5', 'sha1', 'sha256'],                     targetTypes: ['yara-rule'] },
+  'related-to':        { label: 'Related To',         sourceTypes: [],                                            targetTypes: [] },
 };
 
 // Timeline types

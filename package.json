@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "cytoscape": "^3.33.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
     "dexie": "^4.3.0",
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",

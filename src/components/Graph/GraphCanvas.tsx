@@ -268,7 +268,7 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
 
   return (
     <div className="w-full h-full relative">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="w-full h-full" />
       <div ref={overlayRef} className="absolute inset-0 pointer-events-none overflow-hidden" />
     </div>
   );

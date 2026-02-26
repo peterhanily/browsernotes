@@ -98,6 +98,7 @@ export function GraphLinkDialog({ sourceNode, targetNode, notes, tasks, timeline
     }
 
     if (!targetIOCId) return;
+    const resolvedTargetId = targetIOCId;
 
     // Update all entities that contain the source IOC
     for (const { type, entity } of allEntities) {
@@ -108,10 +109,9 @@ export function GraphLinkDialog({ sourceNode, targetNode, notes, tasks, timeline
         if (ioc.dismissed) return ioc;
         if (ioc.type !== sourceParsed.iocType || ioc.value.toLowerCase() !== sourceParsed.normalizedValue) return ioc;
         const existing = ioc.relationships || [];
-        if (existing.some((r) => r.targetIOCId === targetIOCId && r.relationshipType === selectedRelType)) return ioc;
+        if (existing.some((r) => r.targetIOCId === resolvedTargetId && r.relationshipType === selectedRelType)) return ioc;
         changed = true;
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        return { ...ioc, relationships: [...existing, { targetIOCId: targetIOCId!, relationshipType: selectedRelType }] };
+        return { ...ioc, relationships: [...existing, { targetIOCId: resolvedTargetId, relationshipType: selectedRelType }] };
       });
       if (!changed) continue;
       const updatedAnalysis = { ...analysis, iocs: updatedIOCs };

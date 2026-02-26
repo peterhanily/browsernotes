@@ -47,13 +47,13 @@ export function ScreenshareToggle({ maxLevel, onChangeLevel, effectiveLevels }: 
       </div>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+        <div className="absolute right-0 top-full mt-1 w-60 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
           <button
             onClick={() => { onChangeLevel(null); setOpen(false); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 rounded-t-lg"
           >
             {!active && <Check size={12} />}
-            <span className={!active ? '' : 'ml-5'}>Off</span>
+            <span className={cn('whitespace-nowrap', !active ? '' : 'ml-5')}>Off</span>
           </button>
           {effectiveLevels.map((level, i) => (
             <button
@@ -65,7 +65,7 @@ export function ScreenshareToggle({ maxLevel, onChangeLevel, effectiveLevels }: 
               )}
             >
               {maxLevel === level && <Check size={12} />}
-              <span className={maxLevel === level ? '' : 'ml-5'}>Show up to {level}</span>
+              <span className={cn('whitespace-nowrap', maxLevel === level ? '' : 'ml-5')}>Show up to {level}</span>
             </button>
           ))}
         </div>

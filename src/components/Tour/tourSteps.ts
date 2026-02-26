@@ -1,10 +1,13 @@
+import type { ViewMode } from '../../types';
+
 export interface TourStep {
   id: string;
   target: string; // CSS selector
   title: string;
   description: string;
   placement: 'top' | 'bottom' | 'left' | 'right';
-  beforeShow?: () => void;
+  /** View that should be active when this step is shown. */
+  view?: ViewMode;
 }
 
 export const tourSteps: TourStep[] = [
@@ -14,13 +17,15 @@ export const tourSteps: TourStep[] = [
     title: 'Welcome to BrowserNotes',
     description: 'Your private, browser-based notebook for notes, tasks, timelines, and whiteboards. Everything stays in your browser — nothing is sent to a server.',
     placement: 'bottom',
+    view: 'notes',
   },
   {
     id: 'sidebar',
     target: '[data-tour="sidebar-nav"]',
     title: 'Sidebar Navigation',
-    description: 'Switch between Notes, Tasks, Timeline, and Whiteboards. Manage folders and tags to keep things organized.',
+    description: 'Switch between Notes, Tasks, Timeline, Graph, IOC Stats, and Whiteboards. Manage folders and tags to keep things organized.',
     placement: 'right',
+    view: 'notes',
   },
   {
     id: 'search',
@@ -58,11 +63,36 @@ export const tourSteps: TourStep[] = [
     placement: 'right',
   },
   {
+    id: 'graph',
+    target: '[data-tour="graph-canvas"]',
+    title: 'Entity Graph',
+    description: 'Visualize IOCs, notes, tasks, and timeline events as an interactive graph. Filter by node and edge types, search nodes, and choose layouts.',
+    placement: 'bottom',
+    view: 'graph',
+  },
+  {
+    id: 'graph-link',
+    target: '[data-tour="graph-link-hint"]',
+    title: 'Drag-to-Link',
+    description: 'Hold Alt and drag from one node to another to create IOC relationships or entity links directly on the graph canvas.',
+    placement: 'top',
+    view: 'graph',
+  },
+  {
+    id: 'ioc-stats',
+    target: '[data-tour="ioc-stats-header"]',
+    title: 'IOC Statistics',
+    description: 'See aggregate IOC intelligence across your entire database — type and confidence distribution, top actors, IOC timeline, frequency tables, and source breakdown.',
+    placement: 'bottom',
+    view: 'ioc-stats',
+  },
+  {
     id: 'whiteboards',
     target: '[data-tour="whiteboards"]',
     title: 'Whiteboards',
     description: 'Sketch diagrams and visualize ideas with the built-in whiteboard powered by Excalidraw. Fully offline.',
     placement: 'right',
+    view: 'notes',
   },
   {
     id: 'backup',
@@ -70,6 +100,7 @@ export const tourSteps: TourStep[] = [
     title: 'Backup & Restore',
     description: 'Save your entire workspace as a JSON backup, or load a previous backup. Your data is always under your control.',
     placement: 'bottom',
+    view: 'notes',
   },
   {
     id: 'shortcuts',

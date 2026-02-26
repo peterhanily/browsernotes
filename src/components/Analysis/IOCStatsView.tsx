@@ -165,7 +165,7 @@ export function IOCStatsView({ notes, tasks, timelineEvents }: IOCStatsViewProps
   if (uniqueIOCs.length === 0) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
+        <div data-tour="ioc-stats-header" className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
           <ShieldCheck size={18} className="text-accent" />
           <span className="text-sm font-medium text-gray-200">IOC Statistics</span>
         </div>
@@ -183,7 +183,7 @@ export function IOCStatsView({ notes, tasks, timelineEvents }: IOCStatsViewProps
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
+      <div data-tour="ioc-stats-header" className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
         <ShieldCheck size={18} className="text-accent" />
         <span className="text-sm font-medium text-gray-200">IOC Statistics</span>
         <span className="text-xs text-gray-500">({uniqueIOCs.length} unique IOCs)</span>

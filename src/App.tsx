@@ -62,6 +62,7 @@ export default function App() {
 
   const tour = useTour({
     onComplete: () => updateSettings({ tourCompleted: true }),
+    onNavigate: (view) => setActiveView(view),
   });
 
   const activityLog = useActivityLog();
@@ -566,7 +567,7 @@ export default function App() {
             onQuickSave={handleQuickSave}
             onQuickLoad={handleQuickLoad}
             activeView={activeView}
-            onStartTour={tour.start}
+            onStartTour={() => tour.start(activeView)}
           />
         }
         sidebar={

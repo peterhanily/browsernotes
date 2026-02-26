@@ -327,12 +327,12 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
         {/* Stats */}
         <div className="p-3 border-t border-gray-800 text-[10px] text-gray-600 mt-auto space-y-1">
           <div>{filteredGraphData.nodes.length} nodes, {filteredGraphData.edges.length} edges</div>
-          <div>Alt+drag to link nodes</div>
+          <div data-tour="graph-link-hint">Alt+drag to link nodes</div>
         </div>
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 relative bg-gray-950">
+      <div data-tour="graph-canvas" className="flex-1 relative bg-gray-950">
         {filteredGraphData.nodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
             <Network size={48} className="mb-3" />

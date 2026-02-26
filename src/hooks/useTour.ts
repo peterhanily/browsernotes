@@ -1,8 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { tourSteps } from '../components/Tour/tourSteps';
+import type { ViewMode } from '../types';
 
 export interface UseTourOptions {
   onComplete?: () => void;
+  /** Called when a tour step requires navigating to a different view. */
+  onNavigate?: (view: ViewMode) => void;
 }
 
 export interface TourState {
@@ -16,6 +19,10 @@ export function useTour(options?: UseTourOptions) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
+  /** The view that was active before the tour started — restored on finish/skip. */
+  const preTourViewRef = useRef<ViewMode | null>(null);
+  const optionsRef = useRef(options);
+  useEffect(() => { optionsRef.current = options; });
 
   const currentStep = tourSteps[currentStepIndex] ?? null;
 
@@ -35,7 +42,6 @@ export function useTour(options?: UseTourOptions) {
   // Update rect on step change, scroll, resize
   useEffect(() => {
     if (!isActive) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateRect();
 
     const onUpdate = () => {
@@ -52,7 +58,28 @@ export function useTour(options?: UseTourOptions) {
     };
   }, [isActive, updateRect]);
 
-  const start = useCallback(() => {
+  /** Navigate to the view required by a step, if specified. */
+  const navigateToStepView = useCallback((stepIndex: number) => {
+    const step = tourSteps[stepIndex];
+    if (step?.view && optionsRef.current?.onNavigate) {
+      optionsRef.current.onNavigate(step.view);
+    }
+  }, []);
+
+  /** Restore the view that was active before the tour started. */
+  const restorePreTourView = useCallback(() => {
+    if (preTourViewRef.current && optionsRef.current?.onNavigate) {
+      optionsRef.current.onNavigate(preTourViewRef.current);
+    }
+    preTourViewRef.current = null;
+  }, []);
+
+  const start = useCallback((currentView?: ViewMode) => {
+    preTourViewRef.current = currentView ?? null;
+    const firstStep = tourSteps[0];
+    if (firstStep?.view && optionsRef.current?.onNavigate) {
+      optionsRef.current.onNavigate(firstStep.view);
+    }
     setCurrentStepIndex(0);
     setIsActive(true);
   }, []);
@@ -61,37 +88,39 @@ export function useTour(options?: UseTourOptions) {
     setIsActive(false);
     setCurrentStepIndex(0);
     setTargetRect(null);
-  }, []);
+    restorePreTourView();
+  }, [restorePreTourView]);
 
   const next = useCallback(() => {
     if (currentStepIndex < tourSteps.length - 1) {
       const nextIndex = currentStepIndex + 1;
-      const nextStep = tourSteps[nextIndex];
-      nextStep?.beforeShow?.();
-      setCurrentStepIndex(nextIndex);
+      navigateToStepView(nextIndex);
+      // Small delay to allow view to render before measuring target
+      setTimeout(() => setCurrentStepIndex(nextIndex), 50);
     } else {
       setIsActive(false);
       setCurrentStepIndex(0);
       setTargetRect(null);
-      options?.onComplete?.();
+      restorePreTourView();
+      optionsRef.current?.onComplete?.();
     }
-  }, [currentStepIndex, options]);
+  }, [currentStepIndex, navigateToStepView, restorePreTourView]);
 
   const prev = useCallback(() => {
     if (currentStepIndex > 0) {
       const prevIndex = currentStepIndex - 1;
-      const prevStep = tourSteps[prevIndex];
-      prevStep?.beforeShow?.();
-      setCurrentStepIndex(prevIndex);
+      navigateToStepView(prevIndex);
+      setTimeout(() => setCurrentStepIndex(prevIndex), 50);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, navigateToStepView]);
 
   const skip = useCallback(() => {
     setIsActive(false);
     setCurrentStepIndex(0);
     setTargetRect(null);
-    options?.onComplete?.();
-  }, [options]);
+    restorePreTourView();
+    optionsRef.current?.onComplete?.();
+  }, [restorePreTourView]);
 
   // Keyboard navigation
   useEffect(() => {

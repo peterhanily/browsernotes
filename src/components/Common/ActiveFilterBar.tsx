@@ -77,7 +77,7 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
         </span>
       )}
       {entityCounts && onViewChange && (
-        <div className="flex items-center gap-1 ml-1">
+        <div className="flex items-center gap-1 ml-1 flex-wrap">
           <EntityChip
             icon={<FileText size={11} />}
             count={entityCounts.notes}

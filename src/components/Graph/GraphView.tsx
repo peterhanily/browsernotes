@@ -329,7 +329,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
             <div className="mt-2 space-y-1.5">
               {legendEntries.map((entry) => (
                 <div key={entry.type + (entry.iocType ?? '')} className="flex items-center gap-2">
-                  <img src={entry.icon} alt="" className="w-4 h-4" />
+                  <img src={entry.icon} alt={entry.label} className="w-4 h-4" />
                   <span className="text-[11px] text-gray-400">{entry.label}</span>
                 </div>
               ))}

@@ -27,7 +27,9 @@ interface NoteListProps {
 export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash }: NoteListProps) {
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
 
   const notesWithIOCs = notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed));
 
@@ -49,6 +51,17 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showExportMenu]);
+
+  useEffect(() => {
+    if (!showSortMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSortMenu]);
 
   const handleBulkExport = (format: 'json' | 'csv' | 'flat-json' | 'flat-csv') => {
     setShowExportMenu(false);
@@ -107,21 +120,28 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
               )}
             </div>
           )}
-          <div className="relative group">
-            <button className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300" aria-label="Sort notes" title="Sort notes">
+          <div className="relative" ref={sortMenuRef}>
+            <button
+              onClick={() => setShowSortMenu(!showSortMenu)}
+              className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300"
+              aria-label="Sort notes"
+              title="Sort notes"
+            >
               <ArrowUpDown size={14} />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 hidden group-hover:block">
-              {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title'], ['iocCount', 'IOC Count']] as [SortOption, string][]).map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => onSortChange(value)}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 ${sort === value ? 'text-accent' : 'text-gray-300'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {showSortMenu && (
+              <div className="absolute right-0 top-full mt-1 w-36 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                {([['updatedAt', 'Last Modified'], ['createdAt', 'Created'], ['title', 'Title'], ['iocCount', 'IOC Count']] as [SortOption, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    onClick={() => { onSortChange(value); setShowSortMenu(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 ${sort === value ? 'text-accent' : 'text-gray-300'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

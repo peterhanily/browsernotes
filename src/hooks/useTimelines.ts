@@ -44,9 +44,11 @@ export function useTimelines() {
   const deleteTimeline = useCallback(async (id: string) => {
     const all = await db.timelines.toArray();
     if (all.length <= 1) return;
-    await db.transaction('rw', [db.timelines, db.timelineEvents], async () => {
+    await db.transaction('rw', [db.timelines, db.timelineEvents, db.folders], async () => {
       await db.timelines.delete(id);
       await db.timelineEvents.where('timelineId').equals(id).delete();
+      // Clear orphaned folder.timelineId references
+      await db.folders.filter(f => f.timelineId === id).modify({ timelineId: undefined });
     });
     setTimelines((prev) => prev.filter((t) => t.id !== id));
   }, []);

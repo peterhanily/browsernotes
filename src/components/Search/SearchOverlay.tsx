@@ -305,6 +305,7 @@ export function SearchOverlay({
                       data-index={idx}
                       onClick={() => handleSelect(result)}
                       onMouseEnter={() => setActiveIndex(idx)}
+                      aria-label={`${TYPE_LABELS[result.type].replace(/s$/, '')}: ${result.title}`}
                       className={cn(
                         'w-full text-left px-3 py-2 flex items-start gap-3 transition-colors cursor-pointer',
                         idx === activeIndex ? 'bg-accent/10' : 'hover:bg-gray-800/50'

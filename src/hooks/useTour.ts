@@ -19,6 +19,7 @@ export function useTour(options?: UseTourOptions) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
+  const stepRef = useRef(0);
   /** The view that was active before the tour started — restored on finish/skip. */
   const preTourViewRef = useRef<ViewMode | null>(null);
   const optionsRef = useRef(options);
@@ -80,42 +81,50 @@ export function useTour(options?: UseTourOptions) {
     if (firstStep?.view && optionsRef.current?.onNavigate) {
       optionsRef.current.onNavigate(firstStep.view);
     }
+    stepRef.current = 0;
     setCurrentStepIndex(0);
     setIsActive(true);
   }, []);
 
   const stop = useCallback(() => {
     setIsActive(false);
+    stepRef.current = 0;
     setCurrentStepIndex(0);
     setTargetRect(null);
     restorePreTourView();
   }, [restorePreTourView]);
 
   const next = useCallback(() => {
-    if (currentStepIndex < tourSteps.length - 1) {
-      const nextIndex = currentStepIndex + 1;
+    const current = stepRef.current;
+    if (current < tourSteps.length - 1) {
+      const nextIndex = current + 1;
+      stepRef.current = nextIndex;
       navigateToStepView(nextIndex);
       // Small delay to allow view to render before measuring target
       setTimeout(() => setCurrentStepIndex(nextIndex), 50);
     } else {
       setIsActive(false);
+      stepRef.current = 0;
       setCurrentStepIndex(0);
       setTargetRect(null);
       restorePreTourView();
       optionsRef.current?.onComplete?.();
     }
-  }, [currentStepIndex, navigateToStepView, restorePreTourView]);
+  }, [navigateToStepView, restorePreTourView]);
 
   const prev = useCallback(() => {
-    if (currentStepIndex > 0) {
-      const prevIndex = currentStepIndex - 1;
+    const current = stepRef.current;
+    if (current > 0) {
+      const prevIndex = current - 1;
+      stepRef.current = prevIndex;
       navigateToStepView(prevIndex);
       setTimeout(() => setCurrentStepIndex(prevIndex), 50);
     }
-  }, [currentStepIndex, navigateToStepView]);
+  }, [navigateToStepView]);
 
   const skip = useCallback(() => {
     setIsActive(false);
+    stepRef.current = 0;
     setCurrentStepIndex(0);
     setTargetRect(null);
     restorePreTourView();

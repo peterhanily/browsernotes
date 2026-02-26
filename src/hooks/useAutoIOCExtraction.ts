@@ -23,6 +23,14 @@ export function useAutoIOCExtraction({
 }: UseAutoIOCExtractionOptions) {
   const prevContentRef = useRef(content);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const entityIdRef = useRef(entityId);
+  const onUpdateRef = useRef(onUpdate);
+  const existingAnalysisRef = useRef(existingAnalysis);
+
+  // Keep refs in sync
+  entityIdRef.current = entityId;
+  onUpdateRef.current = onUpdate;
+  existingAnalysisRef.current = existingAnalysis;
 
   // Reset prev content when entity changes
   useEffect(() => {
@@ -39,15 +47,17 @@ export function useAutoIOCExtraction({
 
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
+      const currentId = entityIdRef.current;
+      if (!currentId) return;
       const fresh = extractIOCs(content);
-      if (fresh.length === 0 && !existingAnalysis) return;
-      const merged = mergeIOCAnalysis(existingAnalysis, fresh);
+      if (fresh.length === 0 && !existingAnalysisRef.current) return;
+      const merged = mergeIOCAnalysis(existingAnalysisRef.current, fresh);
       const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];
-      onUpdate(entityId, { iocAnalysis: merged, iocTypes });
+      onUpdateRef.current(currentId, { iocAnalysis: merged, iocTypes });
     }, 2000);
 
     return () => clearTimeout(timerRef.current);
-  }, [content, entityId, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [content, entityId, enabled]);
 
   useEffect(() => {
     return () => clearTimeout(timerRef.current);

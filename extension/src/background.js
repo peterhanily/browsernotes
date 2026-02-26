@@ -199,6 +199,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 // Handle messages from popup and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return;
   if (message.type === 'PING') {
     sendResponse({ loaded: true });
   } else if (message.type === 'SAVE_NOTE') {

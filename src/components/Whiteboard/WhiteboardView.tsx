@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import type { Whiteboard, Folder, Tag } from '../../types';
 import { WhiteboardList } from './WhiteboardList';
 import { Loader2 } from 'lucide-react';
@@ -31,10 +31,11 @@ export function WhiteboardView({
   const selectedWhiteboard = selectedWhiteboardId ? whiteboards.find((w) => w.id === selectedWhiteboardId) : null;
 
   // Auto-deselect if whiteboard was deleted
-  if (selectedWhiteboardId && !selectedWhiteboard) {
-    // Use setTimeout to avoid setState during render
-    setTimeout(() => onWhiteboardSelect?.(null), 0);
-  }
+  useEffect(() => {
+    if (selectedWhiteboardId && !whiteboards.find((w) => w.id === selectedWhiteboardId)) {
+      onWhiteboardSelect?.(null);
+    }
+  }, [selectedWhiteboardId, whiteboards, onWhiteboardSelect]);
 
   const handleCreate = async () => {
     const wb = await onCreateWhiteboard();

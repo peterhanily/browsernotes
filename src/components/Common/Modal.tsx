@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
     const el = overlayRef.current;
     if (!el) return;
     const focusable = el.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [contenteditable], [tabindex]:not([tabindex="-1"])'
     );
     if (focusable.length === 0) return;
     const first = focusable[0];
@@ -49,7 +49,7 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
     // Focus first focusable element
     const el = overlayRef.current;
     if (el) {
-      const first = el.querySelector<HTMLElement>('button, [href], input, select, textarea');
+      const first = el.querySelector<HTMLElement>('button, [href], input, select, textarea, [contenteditable]');
       first?.focus();
     }
     return () => document.removeEventListener('keydown', handleKeyDown);

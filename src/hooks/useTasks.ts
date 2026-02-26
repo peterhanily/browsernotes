@@ -53,6 +53,16 @@ export function useTasks() {
 
   const deleteTask = useCallback(async (id: string) => {
     await db.tasks.delete(id);
+    // Clean orphaned links from other entities
+    await db.notes.filter(n => n.linkedTaskIds?.includes(id) ?? false).modify(n => {
+      n.linkedTaskIds = n.linkedTaskIds!.filter(tid => tid !== id);
+    });
+    await db.tasks.filter(t => t.linkedTaskIds?.includes(id) ?? false).modify(t => {
+      t.linkedTaskIds = t.linkedTaskIds!.filter(tid => tid !== id);
+    });
+    await db.timelineEvents.filter(e => e.linkedTaskIds.includes(id)).modify(e => {
+      e.linkedTaskIds = e.linkedTaskIds.filter(tid => tid !== id);
+    });
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 

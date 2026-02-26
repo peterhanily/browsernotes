@@ -18,6 +18,8 @@ A privacy-first, browser-based note-taking and threat intelligence analysis app.
 - **Type-Constrained Subtypes** — IOC subtypes scoped per IOC type (e.g. "C2 Server" for IPs, "Phishing Domain" for domains) with built-in defaults and custom overrides
 - **Many-to-Many Relationships** — Link IOCs with typed, directional relationships (e.g. domain "resolves-to" IP, hash "exploits" CVE) with source/target type constraints
 - **Entity Graph View** — Visualize IOCs, notes, tasks, and timeline events as an interactive graph with force-directed, circle, and breadth-first layouts, node/edge filtering, and detail panel
+- **Graph Drag-to-Link** — Alt+drag between graph nodes to create IOC relationships or entity links directly on the canvas
+- **IOC Statistics Dashboard** — Aggregate view of all IOCs across the database: type/confidence distribution, top actors, timeline, frequency tables, and source breakdown
 - **Attribution & Classification** — Tag IOCs with threat actors, classification levels, and statuses
 - **IOC Export** — Download IOCs as JSON or CSV (grouped or flat), push to OCI object storage
 

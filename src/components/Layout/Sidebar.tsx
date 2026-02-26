@@ -536,20 +536,20 @@ export function Sidebar({
                           {onEditFolder && (
                             <button
                               onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
+                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
                               aria-label={`Edit investigation ${folder.name}`}
                               title="Edit investigation"
                             >
-                              <Info size={10} />
+                              <Info size={12} />
                             </button>
                           )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
                             aria-label={`Delete investigation ${folder.name}`}
                             title="Delete investigation"
                           >
-                            <X size={10} />
+                            <X size={12} />
                           </button>
                         </span>
                       }

@@ -208,7 +208,7 @@ export function InvestigationDetailPanel({
             <label className="block text-xs font-medium text-gray-400 mb-1">Investigation Timeline</label>
             {folder.timelineId ? (
               <button
-                onClick={() => onNavigateToTimeline?.(folder.timelineId!)}
+                onClick={() => { if (folder.timelineId) onNavigateToTimeline?.(folder.timelineId); }}
                 className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-accent hover:text-accent-hover transition-colors"
               >
                 View Timeline

@@ -28,9 +28,11 @@ export function useAutoIOCExtraction({
   const existingAnalysisRef = useRef(existingAnalysis);
 
   // Keep refs in sync
-  entityIdRef.current = entityId;
-  onUpdateRef.current = onUpdate;
-  existingAnalysisRef.current = existingAnalysis;
+  useEffect(() => {
+    entityIdRef.current = entityId;
+    onUpdateRef.current = onUpdate;
+    existingAnalysisRef.current = existingAnalysis;
+  });
 
   // Reset prev content when entity changes
   useEffect(() => {

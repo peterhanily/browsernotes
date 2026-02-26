@@ -679,7 +679,7 @@ export function Sidebar({
         onConfirm={() => { if (deletingFolderId) onDeleteFolder(deletingFolderId); }}
         title="Delete Investigation"
         message="This investigation will be deleted. Notes, tasks, and other items inside it will be moved to &quot;All Items&quot;."
-        confirmLabel="Delete Investigation"
+        confirmLabel="Delete"
         danger
       />
 

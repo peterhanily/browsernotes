@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, TaskComment } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 
@@ -47,6 +47,13 @@ function strArr(v: unknown): string[] {
 
 const VALID_IOC_TYPES = Object.keys(IOC_TYPE_LABELS) as string[];
 
+function sanitizeIOCRelationship(raw: unknown): IOCRelationship | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.targetIOCId !== 'string' || typeof r.relationshipType !== 'string') return null;
+  return { targetIOCId: str(r.targetIOCId), relationshipType: str(r.relationshipType) };
+}
+
 function sanitizeIOCEntry(raw: unknown): IOCEntry | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -61,6 +68,14 @@ function sanitizeIOCEntry(raw: unknown): IOCEntry | null {
     attribution: r.attribution != null ? str(r.attribution) : undefined,
     firstSeen: num(r.firstSeen, Date.now()),
     dismissed: bool(r.dismissed),
+    iocSubtype: r.iocSubtype != null ? str(r.iocSubtype) : undefined,
+    iocStatus: r.iocStatus != null ? str(r.iocStatus) : undefined,
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    relatedId: r.relatedId != null ? str(r.relatedId) : undefined,
+    relationshipType: r.relationshipType != null ? str(r.relationshipType) : undefined,
+    relationships: Array.isArray(r.relationships)
+      ? (r.relationships as unknown[]).map(sanitizeIOCRelationship).filter((rel): rel is IOCRelationship => rel !== null)
+      : undefined,
   };
 }
 
@@ -74,6 +89,7 @@ function sanitizeIOCAnalysis(raw: unknown): IOCAnalysis | undefined {
     extractedAt: num(r.extractedAt, Date.now()),
     iocs,
     analysisSummary: r.analysisSummary != null ? str(r.analysisSummary) : undefined,
+    lastPushedAt: r.lastPushedAt != null ? num(r.lastPushedAt) : undefined,
   };
 }
 
@@ -106,6 +122,10 @@ export function sanitizeNote(raw: unknown): Note | null {
     color: r.color != null ? str(r.color) : undefined,
     iocAnalysis: sanitizeIOCAnalysis(r.iocAnalysis),
     iocTypes: Array.isArray(r.iocTypes) ? strArr(r.iocTypes).filter((t) => VALID_IOC_TYPES.includes(t)) as Note['iocTypes'] : undefined,
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    linkedNoteIds: Array.isArray(r.linkedNoteIds) ? strArr(r.linkedNoteIds) : undefined,
+    linkedTaskIds: Array.isArray(r.linkedTaskIds) ? strArr(r.linkedTaskIds) : undefined,
+    linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
@@ -130,6 +150,10 @@ function sanitizeTask(raw: unknown): Task | null {
     comments: Array.isArray(r.comments)
       ? (r.comments as unknown[]).map(sanitizeComment).filter((c): c is TaskComment => c !== null)
       : undefined,
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    linkedNoteIds: Array.isArray(r.linkedNoteIds) ? strArr(r.linkedNoteIds) : undefined,
+    linkedTaskIds: Array.isArray(r.linkedTaskIds) ? strArr(r.linkedTaskIds) : undefined,
+    linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
     completedAt: r.completedAt != null ? num(r.completedAt) : undefined,
@@ -196,6 +220,9 @@ function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
     starred: bool(r.starred),
     folderId: r.folderId != null ? str(r.folderId) : undefined,
     timelineId: str(r.timelineId),
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    iocAnalysis: sanitizeIOCAnalysis(r.iocAnalysis),
+    iocTypes: Array.isArray(r.iocTypes) ? strArr(r.iocTypes).filter((t) => VALID_IOC_TYPES.includes(t)) as TimelineEvent['iocTypes'] : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };

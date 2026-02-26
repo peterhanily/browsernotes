@@ -24,7 +24,7 @@ export function ScreenshareToggle({ maxLevel, onChangeLevel, effectiveLevels }: 
   const active = maxLevel !== null;
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} data-tour="screenshare">
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => setOpen(!open)}

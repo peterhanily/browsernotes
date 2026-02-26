@@ -247,12 +247,14 @@ export function Sidebar({
             onClick={() => nav(() => { onViewChange('whiteboard'); clearFilters(); })}
           />
         </div>
-        <SidebarItem
-          icon={<Activity size={18} />}
-          label="Activity"
-          active={activeView === 'activity'}
-          onClick={() => nav(() => { onViewChange('activity'); clearFilters(); })}
-        />
+        <div data-tour="activity">
+          <SidebarItem
+            icon={<Activity size={18} />}
+            label="Activity"
+            active={activeView === 'activity'}
+            onClick={() => nav(() => { onViewChange('activity'); clearFilters(); })}
+          />
+        </div>
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
           <div className="pt-2">

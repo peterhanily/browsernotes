@@ -45,7 +45,7 @@ export const tourSteps: TourStep[] = [
     id: 'tags-folders',
     target: '[data-tour="tags-folders"]',
     title: 'Tags & Investigations',
-    description: 'Organize your work with investigations and color-coded tags. Double-click to rename, hover for delete. Tags apply across notes, tasks, and more.',
+    description: 'Organize your work with investigations and color-coded tags. Investigations support status tracking (active/closed/archived) and TLP/PAP classification. Double-click to rename, hover for actions.',
     placement: 'right',
   },
   {
@@ -93,6 +93,29 @@ export const tourSteps: TourStep[] = [
     description: 'Sketch diagrams and visualize ideas with the built-in whiteboard powered by Excalidraw. Fully offline.',
     placement: 'right',
     view: 'notes',
+  },
+  {
+    id: 'activity',
+    target: '[data-tour="activity"]',
+    title: 'Activity Log',
+    description: 'Track every action in your workspace — note edits, task updates, IOC pushes, and more. Filter by category and search the audit trail.',
+    placement: 'right',
+    view: 'notes',
+  },
+  {
+    id: 'investigation-detail',
+    target: '[data-tour="tags-folders"]',
+    title: 'Investigation Details',
+    description: 'Click the info icon on any investigation to edit its description, set status (active/closed/archived), assign TLP/PAP classification, manage tags, and link a dedicated timeline. Export an entire investigation as JSON.',
+    placement: 'right',
+    view: 'notes',
+  },
+  {
+    id: 'screenshare-cls',
+    target: '[data-tour="screenshare"]',
+    title: 'Screenshare & Classification',
+    description: 'Assign TLP/PAP classification levels to investigations, notes, tasks, and events. Enable screenshare mode to hide items above a chosen classification level during presentations.',
+    placement: 'bottom',
   },
   {
     id: 'backup',

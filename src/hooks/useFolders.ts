@@ -65,12 +65,71 @@ export function useFolders() {
     setFolders((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
+  const deleteFolderWithContents = useCallback(async (id: string) => {
+    // Collect all entity IDs in this folder
+    const noteIds = await db.notes.where('folderId').equals(id).primaryKeys();
+    const taskIds = await db.tasks.where('folderId').equals(id).primaryKeys();
+    const eventIds = await db.timelineEvents.where('folderId').equals(id).primaryKeys();
+    const whiteboardIds = await db.whiteboards.where('folderId').equals(id).primaryKeys();
+
+    // Bulk-delete all entities
+    await Promise.all([
+      db.notes.bulkDelete(noteIds as string[]),
+      db.tasks.bulkDelete(taskIds as string[]),
+      db.timelineEvents.bulkDelete(eventIds as string[]),
+      db.whiteboards.bulkDelete(whiteboardIds as string[]),
+    ]);
+
+    // Clean orphaned cross-entity links
+    const noteIdSet = new Set(noteIds as string[]);
+    const taskIdSet = new Set(taskIds as string[]);
+    const eventIdSet = new Set(eventIds as string[]);
+
+    if (noteIdSet.size > 0) {
+      await db.notes.filter(n => n.linkedNoteIds?.some(nid => noteIdSet.has(nid)) ?? false).modify(n => {
+        n.linkedNoteIds = (n.linkedNoteIds ?? []).filter(nid => !noteIdSet.has(nid));
+      });
+      await db.tasks.filter(t => t.linkedNoteIds?.some(nid => noteIdSet.has(nid)) ?? false).modify(t => {
+        t.linkedNoteIds = (t.linkedNoteIds ?? []).filter(nid => !noteIdSet.has(nid));
+      });
+      await db.timelineEvents.filter(e => e.linkedNoteIds.some(nid => noteIdSet.has(nid))).modify(e => {
+        e.linkedNoteIds = e.linkedNoteIds.filter(nid => !noteIdSet.has(nid));
+      });
+    }
+
+    if (taskIdSet.size > 0) {
+      await db.notes.filter(n => n.linkedTaskIds?.some(tid => taskIdSet.has(tid)) ?? false).modify(n => {
+        n.linkedTaskIds = (n.linkedTaskIds ?? []).filter(tid => !taskIdSet.has(tid));
+      });
+      await db.tasks.filter(t => t.linkedTaskIds?.some(tid => taskIdSet.has(tid)) ?? false).modify(t => {
+        t.linkedTaskIds = (t.linkedTaskIds ?? []).filter(tid => !taskIdSet.has(tid));
+      });
+      await db.timelineEvents.filter(e => e.linkedTaskIds.some(tid => taskIdSet.has(tid))).modify(e => {
+        e.linkedTaskIds = e.linkedTaskIds.filter(tid => !taskIdSet.has(tid));
+      });
+    }
+
+    if (eventIdSet.size > 0) {
+      await db.notes.filter(n => n.linkedTimelineEventIds?.some(eid => eventIdSet.has(eid)) ?? false).modify(n => {
+        n.linkedTimelineEventIds = (n.linkedTimelineEventIds ?? []).filter(eid => !eventIdSet.has(eid));
+      });
+      await db.tasks.filter(t => t.linkedTimelineEventIds?.some(eid => eventIdSet.has(eid)) ?? false).modify(t => {
+        t.linkedTimelineEventIds = (t.linkedTimelineEventIds ?? []).filter(eid => !eventIdSet.has(eid));
+      });
+    }
+
+    // Delete the folder itself
+    await db.folders.delete(id);
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
   return {
     folders,
     createFolder,
     findOrCreateFolder,
     updateFolder,
     deleteFolder,
+    deleteFolderWithContents,
     reload: loadFolders,
   };
 }

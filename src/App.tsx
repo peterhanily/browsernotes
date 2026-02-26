@@ -61,7 +61,7 @@ export default function App() {
   const timeline = useTimeline();
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, reload: reloadWhiteboards } = useWhiteboards();
-  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder } = useFolders();
+  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents } = useFolders();
   const { tags, createTag, updateTag, deleteTag } = useTags();
 
   const tour = useTour({
@@ -183,6 +183,16 @@ export default function App() {
     await deleteFolder(id);
     activityLog.log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}"`, id, folder?.name);
   }, [deleteFolder, folders, activityLog]);
+
+  const loggedDeleteFolderWithContents = useCallback(async (id: string) => {
+    const folder = folders.find((f) => f.id === id);
+    await deleteFolderWithContents(id);
+    activityLog.log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}" and all its contents`, id, folder?.name);
+    notes.reload();
+    tasks.reload();
+    timeline.reload();
+    reloadWhiteboards();
+  }, [deleteFolderWithContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards]);
 
   const loggedCreateTag = useCallback(async (name: string) => {
     const tag = await createTag(name);
@@ -611,6 +621,7 @@ export default function App() {
     onShowArchive: setShowArchive,
     onCreateFolder: (name: string) => loggedCreateFolder(name),
     onDeleteFolder: (id: string) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
+    onDeleteFolderWithContents: (id: string) => { loggedDeleteFolderWithContents(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
     onRenameFolder: (id: string, name: string) => updateFolder(id, { name }),
     onOpenSettings: () => { setShowSettings(true); },
     noteCounts,
@@ -637,7 +648,7 @@ export default function App() {
     folderStatusFilter,
     onFolderStatusFilterChange: setFolderStatusFilter,
     investigationScopedCounts,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedDeleteFolderWithContents, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);

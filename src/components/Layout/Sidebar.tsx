@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
+import { Modal } from '../Common/Modal';
 import { cn } from '../../lib/utils';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ interface SidebarProps {
   onShowArchive: (show: boolean) => void;
   onCreateFolder: (name: string) => void;
   onDeleteFolder: (id: string) => void;
+  onDeleteFolderWithContents: (id: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onOpenSettings: () => void;
   collapsed: boolean;
@@ -69,6 +71,7 @@ export function Sidebar({
   onShowArchive,
   onCreateFolder,
   onDeleteFolder,
+  onDeleteFolderWithContents,
   onRenameFolder,
   onOpenSettings,
   collapsed,
@@ -734,15 +737,37 @@ export function Sidebar({
         </div>
       </div>
 
-      <ConfirmDialog
+      <Modal
         open={deletingFolderId !== null}
         onClose={() => setDeletingFolderId(null)}
-        onConfirm={() => { if (deletingFolderId) onDeleteFolder(deletingFolderId); }}
         title="Delete Investigation"
-        message="This investigation will be deleted. Notes, tasks, and other items inside it will be moved to &quot;All Items&quot;."
-        confirmLabel="Delete"
-        danger
-      />
+      >
+        <p className="text-sm text-gray-400 mb-4">What should happen to the items inside this investigation?</p>
+        <div className="space-y-2">
+          <button
+            className="w-full text-left px-4 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+            onClick={() => { if (deletingFolderId) { onDeleteFolder(deletingFolderId); setDeletingFolderId(null); } }}
+          >
+            <div className="text-sm font-medium text-gray-200">Keep items</div>
+            <div className="text-xs text-gray-400 mt-0.5">Move them back to All Items</div>
+          </button>
+          <button
+            className="w-full text-left px-4 py-3 rounded-lg bg-red-600/15 hover:bg-red-600/25 transition-colors"
+            onClick={() => { if (deletingFolderId) { onDeleteFolderWithContents(deletingFolderId); setDeletingFolderId(null); } }}
+          >
+            <div className="text-sm font-medium text-red-400">Delete everything</div>
+            <div className="text-xs text-red-400/70 mt-0.5">Permanently delete all items in this investigation</div>
+          </button>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            onClick={() => setDeletingFolderId(null)}
+          >
+            Cancel
+          </button>
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={deletingTimelineId !== null}

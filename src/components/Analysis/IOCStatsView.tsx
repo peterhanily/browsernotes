@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Settings, IOCEntry, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
@@ -30,10 +30,9 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
   const [scopeMode, setScopeMode] = useState<'investigation' | 'global'>('investigation');
 
   // Reset scope when investigation changes
-  const prevFolderIdRef = useMemo(() => ({ current: selectedFolderId }), [selectedFolderId]);
-  if (prevFolderIdRef.current !== selectedFolderId) {
+  useEffect(() => {
     setScopeMode('investigation');
-  }
+  }, [selectedFolderId]);
 
   const effectiveNotes = selectedFolderId && scopeMode === 'investigation' && scopedNotes ? scopedNotes : notes;
   const effectiveTasks = selectedFolderId && scopeMode === 'investigation' && scopedTasks ? scopedTasks : tasks;

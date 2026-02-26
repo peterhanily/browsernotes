@@ -66,24 +66,29 @@ export function useFolders() {
   }, []);
 
   const deleteFolderWithContents = useCallback(async (id: string) => {
-    // Collect all entity IDs in this folder
-    const noteIds = await db.notes.where('folderId').equals(id).primaryKeys();
-    const taskIds = await db.tasks.where('folderId').equals(id).primaryKeys();
-    const eventIds = await db.timelineEvents.where('folderId').equals(id).primaryKeys();
-    const whiteboardIds = await db.whiteboards.where('folderId').equals(id).primaryKeys();
+    // Collect all entities in this folder (same query pattern as deleteFolder)
+    const notesInFolder = await db.notes.where('folderId').equals(id).toArray();
+    const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
+    const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
+    const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+
+    const noteIds = notesInFolder.map(n => n.id);
+    const taskIds = tasksInFolder.map(t => t.id);
+    const eventIds = eventsInFolder.map(e => e.id);
+    const whiteboardIds = whiteboardsInFolder.map(w => w.id);
 
     // Bulk-delete all entities
     await Promise.all([
-      db.notes.bulkDelete(noteIds as string[]),
-      db.tasks.bulkDelete(taskIds as string[]),
-      db.timelineEvents.bulkDelete(eventIds as string[]),
-      db.whiteboards.bulkDelete(whiteboardIds as string[]),
+      db.notes.bulkDelete(noteIds),
+      db.tasks.bulkDelete(taskIds),
+      db.timelineEvents.bulkDelete(eventIds),
+      db.whiteboards.bulkDelete(whiteboardIds),
     ]);
 
     // Clean orphaned cross-entity links
-    const noteIdSet = new Set(noteIds as string[]);
-    const taskIdSet = new Set(taskIds as string[]);
-    const eventIdSet = new Set(eventIds as string[]);
+    const noteIdSet = new Set(noteIds);
+    const taskIdSet = new Set(taskIds);
+    const eventIdSet = new Set(eventIds);
 
     if (noteIdSet.size > 0) {
       await db.notes.filter(n => n.linkedNoteIds?.some(nid => noteIdSet.has(nid)) ?? false).modify(n => {

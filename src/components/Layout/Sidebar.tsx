@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
-  Archive, ChevronDown, ChevronRight, Plus, X, Settings as SettingsIcon,
+  Archive, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, ShieldCheck, Info,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
@@ -51,6 +51,7 @@ interface SidebarProps {
   onEditFolder?: (id: string) => void;
   folderStatusFilter?: InvestigationStatus[];
   onFolderStatusFilterChange?: (filter: InvestigationStatus[]) => void;
+  investigationScopedCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
 }
 
 export function Sidebar({
@@ -96,6 +97,7 @@ export function Sidebar({
   onEditFolder,
   folderStatusFilter = ['active'],
   onFolderStatusFilterChange,
+  investigationScopedCounts,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
@@ -185,6 +187,11 @@ export function Sidebar({
     onShowArchive(false);
   };
 
+  const navToView = (view: ViewMode) => {
+    onViewChange(view);
+    if (!selectedFolderId) clearFilters();
+  };
+
   const nav = (fn: () => void) => {
     fn();
     onNavigate?.();
@@ -204,47 +211,48 @@ export function Sidebar({
         <SidebarItem
           icon={<FileText size={18} />}
           label="Notes"
-          count={noteCounts.total}
+          count={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
           active={activeView === 'notes' && !showTrash && !showArchive}
-          onClick={() => nav(() => { onViewChange('notes'); clearFilters(); })}
+          onClick={() => nav(() => navToView('notes'))}
         />
         <div data-tour="tasks">
           <SidebarItem
             icon={<ListChecks size={18} />}
             label="Tasks"
-            count={taskCounts.total}
+            count={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
             active={activeView === 'tasks'}
-            onClick={() => nav(() => { onViewChange('tasks'); clearFilters(); })}
+            onClick={() => nav(() => navToView('tasks'))}
           />
         </div>
         <div data-tour="timeline">
           <SidebarItem
             icon={<Clock size={18} />}
             label="Timeline"
-            count={timelineCounts?.total}
+            count={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
             active={activeView === 'timeline'}
-            onClick={() => nav(() => { onViewChange('timeline'); clearFilters(); })}
+            onClick={() => nav(() => navToView('timeline'))}
           />
         </div>
         <SidebarItem
           icon={<Network size={18} />}
           label="Graph"
           active={activeView === 'graph'}
-          onClick={() => nav(() => { onViewChange('graph'); clearFilters(); })}
+          onClick={() => nav(() => navToView('graph'))}
         />
         <SidebarItem
           icon={<ShieldCheck size={18} />}
           label="IOC Stats"
+          count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
           active={activeView === 'ioc-stats'}
-          onClick={() => nav(() => { onViewChange('ioc-stats'); clearFilters(); })}
+          onClick={() => nav(() => navToView('ioc-stats'))}
         />
         <div data-tour="whiteboards">
           <SidebarItem
             icon={<PenTool size={18} />}
             label="Whiteboards"
-            count={whiteboardCount}
+            count={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
             active={activeView === 'whiteboard'}
-            onClick={() => nav(() => { onViewChange('whiteboard'); clearFilters(); })}
+            onClick={() => nav(() => navToView('whiteboard'))}
           />
         </div>
         <div data-tour="activity">
@@ -252,7 +260,7 @@ export function Sidebar({
             icon={<Activity size={18} />}
             label="Activity"
             active={activeView === 'activity'}
-            onClick={() => nav(() => { onViewChange('activity'); clearFilters(); })}
+            onClick={() => nav(() => navToView('activity'))}
           />
         </div>
         {/* Whiteboards — only in whiteboard view */}
@@ -429,6 +437,57 @@ export function Sidebar({
 
         {/* Folders */}
         <div data-tour="tags-folders" className="pt-2">
+          {selectedFolderId ? (() => {
+            const folder = folders.find((f) => f.id === selectedFolderId);
+            if (!folder) return null;
+            return (
+              <div className="space-y-0.5">
+                <button
+                  onClick={() => onFolderSelect(undefined)}
+                  className="flex items-center gap-1 w-full px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                  All Investigations
+                </button>
+                <div className="group relative">
+                  {editingFolder === folder.id ? (
+                    <div className="flex items-center gap-1 px-2">
+                      <input
+                        autoFocus
+                        value={editFolderName}
+                        onChange={(e) => setEditFolderName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
+                        aria-label="Rename investigation"
+                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  ) : (
+                    <SidebarItem
+                      compact
+                      icon={<Briefcase size={14} style={{ color: folder.color }} />}
+                      label={folder.name}
+                      active
+                      onClick={() => {}}
+                      onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
+                      actions={
+                        onEditFolder ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
+                            aria-label={`Edit investigation ${folder.name}`}
+                            title="Edit investigation"
+                          >
+                            <Info size={10} />
+                          </button>
+                        ) : undefined
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })() : (
+          <>
           <button
             onClick={() => setFoldersOpen(!foldersOpen)}
             className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300"
@@ -558,6 +617,8 @@ export function Sidebar({
                 </div>
               ))}
             </div>
+          )}
+          </>
           )}
         </div>
 

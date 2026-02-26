@@ -417,6 +417,25 @@ export default function App() {
     [whiteboards, selectedFolderId]
   );
 
+  const investigationScopedCounts = useMemo(() => {
+    if (!selectedFolderId) return null;
+    const iocKeys = new Set<string>();
+    const collect = (a?: { iocs: Array<{ type: string; value: string; dismissed: boolean }> }) => {
+      if (!a?.iocs) return;
+      for (const i of a.iocs) if (!i.dismissed) iocKeys.add(`${i.type}:${i.value.toLowerCase()}`);
+    };
+    for (const n of investigationNotes) if (!n.trashed && !n.archived) collect(n.iocAnalysis);
+    for (const t of investigationTasks) collect(t.iocAnalysis);
+    for (const e of investigationTimelineEvents) collect(e.iocAnalysis);
+    return {
+      notes: investigationNotes.filter(n => !n.trashed && !n.archived).length,
+      tasks: investigationTasks.length,
+      events: investigationTimelineEvents.length,
+      whiteboards: investigationWhiteboards.length,
+      iocs: iocKeys.size,
+    };
+  }, [selectedFolderId, investigationNotes, investigationTasks, investigationTimelineEvents, investigationWhiteboards]);
+
   // Screenshare context value
   const screenshareCtx = useMemo(
     () => ({ maxLevel: screenshareMaxLevel, effectiveLevels: effectiveClsLevels }),
@@ -614,7 +633,8 @@ export default function App() {
     onEditFolder: setEditingFolderId,
     folderStatusFilter,
     onFolderStatusFilterChange: setFolderStatusFilter,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter]);
+    investigationScopedCounts,
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -637,6 +657,9 @@ export default function App() {
       tagName={selectedTag}
       tagColor={selectedTagObj?.color}
       onClear={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); }}
+      activeView={activeView}
+      onViewChange={(v: ViewMode) => navigateTo(v)}
+      entityCounts={investigationScopedCounts}
     />
   ) : null;
 

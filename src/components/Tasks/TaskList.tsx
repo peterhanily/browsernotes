@@ -22,6 +22,7 @@ interface TaskListProps {
   allNotes?: Note[];
   allTimelineEvents?: TimelineEvent[];
   scopeLabel?: string;
+  selectedFolderId?: string;
 }
 
 export function TaskListView({
@@ -39,6 +40,7 @@ export function TaskListView({
   allNotes,
   allTimelineEvents,
   scopeLabel,
+  selectedFolderId,
 }: TaskListProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -182,6 +184,7 @@ export function TaskListView({
           onCreateTag={onCreateTag}
           onSave={handleSaveNew}
           onCancel={() => setShowNewTask(false)}
+          defaultFolderId={selectedFolderId}
         />
       </Modal>
     </div>

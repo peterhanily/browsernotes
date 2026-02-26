@@ -38,6 +38,7 @@ interface TimelineViewProps {
   onTimelineReload?: () => void;
   onEventsReload?: () => void;
   scopeLabel?: string;
+  selectedFolderId?: string;
 }
 
 function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; timelines: Timeline[]; onImportClick: () => void }) {
@@ -146,6 +147,7 @@ export function TimelineView({
   onTimelineReload,
   onEventsReload,
   scopeLabel,
+  selectedFolderId,
 }: TimelineViewProps) {
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showNewEvent, setShowNewEvent] = useState(false);
@@ -395,6 +397,7 @@ export function TimelineView({
           onCreateTag={onCreateTag}
           onSave={handleSaveNew}
           onCancel={() => setShowNewEvent(false)}
+          defaultFolderId={selectedFolderId}
         />
       </Modal>
 

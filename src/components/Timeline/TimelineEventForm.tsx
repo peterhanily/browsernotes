@@ -20,6 +20,7 @@ interface TimelineEventFormProps {
   onSave: (data: Partial<TimelineEvent>) => void;
   onCancel: () => void;
   onUpdateEvent?: (id: string, updates: Partial<TimelineEvent>) => void;
+  defaultFolderId?: string;
 }
 
 function toDatetimeLocal(ms: number): string {
@@ -36,7 +37,7 @@ function fromDatetimeLocal(str: string): number {
 const ALL_EVENT_TYPES = Object.keys(TIMELINE_EVENT_TYPE_LABELS) as TimelineEventType[];
 const ALL_CONFIDENCE = Object.keys(CONFIDENCE_LEVELS) as ConfidenceLevel[];
 
-export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel, onUpdateEvent }: TimelineEventFormProps) {
+export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel, onUpdateEvent, defaultFolderId }: TimelineEventFormProps) {
   const { settings } = useSettings();
 
   const [initialTs] = useState(() => Date.now());
@@ -46,7 +47,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const [eventType, setEventType] = useState<TimelineEventType>(event?.eventType || 'other');
   const [confidence, setConfidence] = useState<ConfidenceLevel>(event?.confidence || 'low');
   const [source, setSource] = useState(event?.source || '');
-  const [folderId, setFolderId] = useState(event?.folderId || '');
+  const [folderId, setFolderId] = useState(event?.folderId || defaultFolderId || '');
   const [actor, setActor] = useState(event?.actor || '');
   const [description, setDescription] = useState(event?.description || '');
   const [assets, setAssets] = useState(event?.assets.join(', ') || '');

@@ -161,13 +161,10 @@ export default function App() {
   }, [deleteTimeline, timelines, activityLog]);
 
   const loggedCreateWhiteboard = useCallback(async (name?: string, folderId?: string) => {
-    const wb = await createWhiteboard(name);
-    if (folderId) {
-      await updateWhiteboard(wb.id, { folderId });
-    }
+    const wb = await createWhiteboard(name, folderId);
     activityLog.log('whiteboard', 'create', `Created whiteboard "${wb.name}"`, wb.id, wb.name);
     return wb;
-  }, [createWhiteboard, updateWhiteboard, activityLog]);
+  }, [createWhiteboard, activityLog]);
 
   const loggedDeleteWhiteboard = useCallback(async (id: string) => {
     const wb = whiteboards.find((w) => w.id === id);
@@ -494,10 +491,15 @@ export default function App() {
   }, [navigateTo]);
 
   const handleQuickCapture = useCallback(async (data: Partial<Note>) => {
-    const note = await loggedCreateNote(data);
+    const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
+    const note = await loggedCreateNote({
+      ...data,
+      folderId: data.folderId ?? selectedFolderId,
+      clsLevel: data.clsLevel ?? folder?.clsLevel,
+    });
     setSelectedNoteId(note.id);
     navigateTo('notes', { selectedNoteId: note.id });
-  }, [loggedCreateNote, navigateTo]);
+  }, [loggedCreateNote, navigateTo, selectedFolderId, folders]);
 
   const handleImportComplete = useCallback(() => {
     notes.reload();
@@ -742,6 +744,7 @@ export default function App() {
             onTimelineReload={reloadTimelines}
             onEventsReload={timeline.reload}
             scopeLabel={selectedFolder?.name}
+            selectedFolderId={selectedFolderId}
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
@@ -771,6 +774,7 @@ export default function App() {
             allNotes={screensafeNotes}
             allTimelineEvents={screensafeTimelineEvents}
             scopeLabel={selectedFolder?.name}
+            selectedFolderId={selectedFolderId}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */

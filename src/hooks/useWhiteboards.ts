@@ -18,7 +18,7 @@ export function useWhiteboards() {
     loadWhiteboards();
   }, [loadWhiteboards]);
 
-  const createWhiteboard = useCallback(async (name?: string): Promise<Whiteboard> => {
+  const createWhiteboard = useCallback(async (name?: string, folderId?: string): Promise<Whiteboard> => {
     const maxOrder = whiteboards.reduce((max, w) => Math.max(max, w.order), 0);
     const now = Date.now();
     const whiteboard: Whiteboard = {
@@ -29,6 +29,7 @@ export function useWhiteboards() {
       order: maxOrder + 1,
       createdAt: now,
       updatedAt: now,
+      ...(folderId ? { folderId } : {}),
     };
     await db.whiteboards.add(whiteboard);
     setWhiteboards((prev) => [...prev, whiteboard].sort((a, b) => a.order - b.order));

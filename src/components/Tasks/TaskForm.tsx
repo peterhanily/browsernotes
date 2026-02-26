@@ -23,6 +23,7 @@ interface TaskFormProps {
   onDelete?: (id: string) => void;
   allNotes?: Note[];
   allTimelineEvents?: TimelineEvent[];
+  defaultFolderId?: string;
 }
 
 function formatRelativeTime(ts: number): string {
@@ -36,14 +37,14 @@ function formatRelativeTime(ts: number): string {
   return `${days}d ago`;
 }
 
-export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete, allNotes = [], allTimelineEvents = [] }: TaskFormProps) {
+export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete, allNotes = [], allTimelineEvents = [], defaultFolderId }: TaskFormProps) {
   const { settings: taskFormSettings } = useSettings();
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
   const [priority, setPriority] = useState<Priority>(task?.priority || 'none');
   const [status, setStatus] = useState<TaskStatus>(task?.status || 'todo');
   const [dueDate, setDueDate] = useState(task?.dueDate || '');
-  const [folderId, setFolderId] = useState(task?.folderId || '');
+  const [folderId, setFolderId] = useState(task?.folderId || defaultFolderId || '');
   const [tags, setTags] = useState<string[]>(task?.tags || []);
   const [clsLevel, setClsLevel] = useState(task?.clsLevel || '');
   const [showIOCPanel, setShowIOCPanel] = useState(false);

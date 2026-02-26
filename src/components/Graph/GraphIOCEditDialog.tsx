@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Modal } from '../Common/Modal';
 import { AttributionComboInput } from '../Analysis/AttributionComboInput';
+import { parseIOCNodeId } from '../../lib/graph-data';
 import type { GraphNode } from '../../lib/graph-data';
 import type { Note, Task, TimelineEvent, IOCEntry, IOCType, ConfidenceLevel, Settings } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, DEFAULT_IOC_SUBTYPES } from '../../types';
@@ -28,16 +29,6 @@ function getSubtypes(type: IOCType, custom?: Record<string, string[]>): string[]
   const defaults = DEFAULT_IOC_SUBTYPES[type] || [];
   const extra = custom?.[type] || [];
   return [...new Set([...defaults, ...extra])];
-}
-
-/**
- * Parse IOC type + normalized value from a deduplicated graph node ID.
- * Node IDs follow the pattern: `ioc:{type}:{normalizedValue}`
- */
-function parseIOCNodeId(nodeId: string): { iocType: IOCType; normalizedValue: string } | null {
-  const match = nodeId.match(/^ioc:([^:]+):(.+)$/);
-  if (!match) return null;
-  return { iocType: match[1] as IOCType, normalizedValue: match[2] };
 }
 
 export function GraphIOCEditDialog({ node, notes, tasks, timelineEvents, settings, onUpdateNote, onUpdateTask, onUpdateEvent, onClose }: GraphIOCEditDialogProps) {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, FolderOpen, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, Plus, X, Settings,
-  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network,
+  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, ShieldCheck,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -225,6 +225,12 @@ export function Sidebar({
           label="Graph"
           active={activeView === 'graph'}
           onClick={() => nav(() => { onViewChange('graph'); clearFilters(); })}
+        />
+        <SidebarItem
+          icon={<ShieldCheck size={18} />}
+          label="IOC Stats"
+          active={activeView === 'ioc-stats'}
+          onClick={() => nav(() => { onViewChange('ioc-stats'); clearFilters(); })}
         />
         <div data-tour="whiteboards">
           <SidebarItem

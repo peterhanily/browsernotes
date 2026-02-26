@@ -15,11 +15,12 @@ interface GraphCanvasProps {
   onSelectNode: (nodeId: string | null) => void;
   onDoubleClickNode: (nodeId: string) => void;
   onSelectMulti?: (nodeIds: string[]) => void;
+  onLinkNodes?: (sourceId: string, targetId: string) => void;
   theme: 'dark' | 'light';
   fitTrigger?: number;
 }
 
-export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, onSelectMulti, theme, fitTrigger }: GraphCanvasProps) {
+export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickNode, onSelectMulti, onLinkNodes, theme, fitTrigger }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   // Stable refs for callbacks so cytoscape event handlers always use latest versions
@@ -29,6 +30,11 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
   onDoubleClickNodeRef.current = onDoubleClickNode;
   const onSelectMultiRef = useRef(onSelectMulti);
   onSelectMultiRef.current = onSelectMulti;
+  const onLinkNodesRef = useRef(onLinkNodes);
+  onLinkNodesRef.current = onLinkNodes;
+  // Drag-to-link state
+  const linkDragSourceRef = useRef<string | null>(null);
+  const linkDragActiveRef = useRef(false);
 
   const isDark = theme === 'dark';
 
@@ -163,6 +169,24 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
           },
         },
         {
+          selector: '.link-source',
+          style: {
+            'border-width': 3,
+            'border-color': '#f59e0b',
+            'border-opacity': 1,
+            'background-opacity': 0.3,
+          },
+        },
+        {
+          selector: '.link-target',
+          style: {
+            'border-width': 2,
+            'border-color': '#f59e0b',
+            'border-opacity': 0.7,
+            'border-style': 'dashed' as cytoscape.Css.LineStyle,
+          },
+        },
+        {
           selector: '.faded',
           style: {
             'opacity': 0.15,
@@ -210,6 +234,65 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
       neighborhood.removeClass('faded').addClass('highlighted');
       const ids = selected.map((n) => n.id());
       onSelectMultiRef.current?.(ids);
+    });
+
+    // Alt+drag-to-link: grab
+    cy.on('grab', 'node', (evt) => {
+      if (!evt.originalEvent || !(evt.originalEvent as MouseEvent).altKey) return;
+      const node = evt.target;
+      linkDragSourceRef.current = node.id();
+      linkDragActiveRef.current = true;
+      node.addClass('link-source');
+    });
+
+    // Alt+drag-to-link: drag — highlight nearest node
+    cy.on('drag', 'node', (evt) => {
+      if (!linkDragActiveRef.current) return;
+      const sourceId = linkDragSourceRef.current;
+      const draggedNode = evt.target;
+      const pos = draggedNode.position();
+      // Remove previous link-target highlights
+      cy.nodes('.link-target').removeClass('link-target');
+      // Find closest other node within threshold
+      let closest: cytoscape.NodeSingular | null = null;
+      let minDist = Infinity;
+      cy.nodes().forEach((n) => {
+        if (n.id() === sourceId || n.id() === draggedNode.id()) return;
+        const np = n.position();
+        const dx = np.x - pos.x;
+        const dy = np.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 60 && dist < minDist) { minDist = dist; closest = n; }
+      });
+      if (closest) (closest as cytoscape.NodeSingular).addClass('link-target');
+    });
+
+    // Alt+drag-to-link: free (drop)
+    cy.on('free', 'node', (evt) => {
+      if (!linkDragActiveRef.current) return;
+      linkDragActiveRef.current = false;
+      const sourceId = linkDragSourceRef.current;
+      linkDragSourceRef.current = null;
+      // Clean up classes
+      cy.nodes('.link-source').removeClass('link-source');
+      const targetNode = cy.nodes('.link-target');
+      targetNode.removeClass('link-target');
+      if (!sourceId) return;
+      // Find target: the node under the drop position
+      const pos = evt.target.position();
+      let bestTarget: string | null = null;
+      let bestDist = Infinity;
+      cy.nodes().forEach((n) => {
+        if (n.id() === sourceId || n.id() === evt.target.id()) return;
+        const np = n.position();
+        const dx = np.x - pos.x;
+        const dy = np.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 60 && dist < bestDist) { bestDist = dist; bestTarget = n.id(); }
+      });
+      if (bestTarget && onLinkNodesRef.current) {
+        onLinkNodesRef.current(sourceId, bestTarget);
+      }
     });
 
     return () => {

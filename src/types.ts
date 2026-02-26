@@ -75,7 +75,7 @@ export interface Tag {
   color: string;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph';
+export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 

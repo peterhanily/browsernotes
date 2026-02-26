@@ -6,6 +6,7 @@ import { buildGraphData } from '../../lib/graph-data';
 import type { GraphNode, GraphEdge } from '../../lib/graph-data';
 import { GraphDetailPanel } from './GraphDetailPanel';
 import { GraphIOCEditDialog } from './GraphIOCEditDialog';
+import { GraphLinkDialog } from './GraphLinkDialog';
 import type { LayoutName } from './GraphCanvas';
 import { getLegendEntries } from '../../lib/graph-icons';
 
@@ -49,6 +50,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link']));
   const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
+  const [linkDialogState, setLinkDialogState] = useState<{ sourceNodeId: string; targetNodeId: string } | null>(null);
   const [fitTrigger, setFitTrigger] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
   // Stable ref to full graph data for use in cytoscape callbacks
@@ -161,6 +163,11 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
       navigateToEntity(node);
     }
   }, [fullGraphData.nodes, navigateToEntity, onUpdateNote, onUpdateTask]);
+
+  const handleLinkNodes = useCallback((sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setLinkDialogState({ sourceNodeId: sourceId, targetNodeId: targetId });
+  }, []);
 
   const handleOpenNewTab = useCallback((node: GraphNode) => {
     const entityId = node.sourceEntityIds[0];
@@ -318,8 +325,9 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
         </div>
 
         {/* Stats */}
-        <div className="p-3 border-t border-gray-800 text-[10px] text-gray-600 mt-auto">
-          {filteredGraphData.nodes.length} nodes, {filteredGraphData.edges.length} edges
+        <div className="p-3 border-t border-gray-800 text-[10px] text-gray-600 mt-auto space-y-1">
+          <div>{filteredGraphData.nodes.length} nodes, {filteredGraphData.edges.length} edges</div>
+          <div>Alt+drag to link nodes</div>
         </div>
       </div>
 
@@ -344,6 +352,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
               onSelectNode={handleSelectNode}
               onDoubleClickNode={handleDoubleClickNode}
               onSelectMulti={handleSelectMulti}
+              onLinkNodes={handleLinkNodes}
               theme={settings.theme}
               fitTrigger={fitTrigger}
             />
@@ -406,6 +415,27 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
           onClose={() => setEditingIOCNode(null)}
         />
       )}
+
+      {/* Link dialog */}
+      {linkDialogState && (() => {
+        const sourceNode = fullGraphData.nodes.find((n) => n.id === linkDialogState.sourceNodeId);
+        const targetNode = fullGraphData.nodes.find((n) => n.id === linkDialogState.targetNodeId);
+        if (!sourceNode || !targetNode) return null;
+        return (
+          <GraphLinkDialog
+            sourceNode={sourceNode}
+            targetNode={targetNode}
+            notes={notes}
+            tasks={tasks}
+            timelineEvents={timelineEvents}
+            settings={settings}
+            onUpdateNote={onUpdateNote}
+            onUpdateTask={onUpdateTask}
+            onUpdateEvent={onUpdateEvent}
+            onClose={() => setLinkDialogState(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

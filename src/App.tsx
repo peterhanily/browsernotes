@@ -31,6 +31,7 @@ import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
 import { GraphView } from './components/Graph/GraphView';
+import { IOCStatsView } from './components/Analysis/IOCStatsView';
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -191,7 +192,7 @@ export default function App() {
   }, [deleteTag, tags, activityLog]);
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' ? settings.defaultView : 'notes';
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
@@ -586,6 +587,13 @@ export default function App() {
             onUpdateSettings={updateSettings}
             notes={notes.notes}
             onImportComplete={handleImportComplete}
+          />
+        ) : activeView === 'ioc-stats' ? (
+          <IOCStatsView
+            notes={notes.notes}
+            tasks={tasks.tasks}
+            timelineEvents={timeline.events}
+            settings={settings}
           />
         ) : activeView === 'activity' ? (
           <ActivityLogView

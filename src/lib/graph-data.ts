@@ -3,6 +3,16 @@ import { IOC_TYPE_LABELS, TIMELINE_EVENT_TYPE_LABELS, DEFAULT_RELATIONSHIP_TYPES
 import type { IOCRelationshipDef } from '../types';
 import { getNodeIcon } from './graph-icons';
 
+/**
+ * Parse IOC type + normalized value from a deduplicated graph node ID.
+ * Node IDs follow the pattern: `ioc:{type}:{normalizedValue}`
+ */
+export function parseIOCNodeId(nodeId: string): { iocType: IOCType; normalizedValue: string } | null {
+  const match = nodeId.match(/^ioc:([^:]+):(.+)$/);
+  if (!match) return null;
+  return { iocType: match[1] as IOCType, normalizedValue: match[2] };
+}
+
 export interface GraphNode {
   id: string;
   label: string;

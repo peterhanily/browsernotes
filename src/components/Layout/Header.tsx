@@ -1,6 +1,7 @@
 import { Plus, Menu, ListChecks, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle } from 'lucide-react';
 import { useRef } from 'react';
 import { ThemeToggle } from '../Common/ThemeToggle';
+import { ScreenshareToggle } from '../Common/ScreenshareToggle';
 import { cn } from '../../lib/utils';
 import type { ViewMode } from '../../types';
 import logoSvgRaw from '/logo.svg?raw';
@@ -19,6 +20,9 @@ interface HeaderProps {
   onQuickLoad: (file: File) => void;
   activeView: ViewMode;
   onStartTour?: () => void;
+  screenshareMaxLevel: string | null;
+  onScreenshareChange: (level: string | null) => void;
+  effectiveClsLevels: string[];
 }
 
 export function Header({
@@ -34,10 +38,14 @@ export function Header({
   onQuickLoad,
   activeView,
   onStartTour,
+  screenshareMaxLevel,
+  onScreenshareChange,
+  effectiveClsLevels,
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
-    <header data-tour="header" className="h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0">
+    <header data-tour="header" className={cn("h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative", screenshareMaxLevel && "pt-0.5")}>
+      {screenshareMaxLevel && <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500" />}
       {/* Mobile menu button - always visible on mobile */}
       <button
         onClick={onMobileMenuToggle}
@@ -183,6 +191,11 @@ export function Header({
               e.target.value = '';
             }
           }}
+        />
+        <ScreenshareToggle
+          maxLevel={screenshareMaxLevel}
+          onChangeLevel={onScreenshareChange}
+          effectiveLevels={effectiveClsLevels}
         />
         <span data-tour="theme-toggle">
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />

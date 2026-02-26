@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { X, RefreshCw, ChevronDown, ChevronRight, Shield, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
 import type { IOCTarget, IOCEntry, IOCType, IOCAnalysis } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { useIOCAnalysis } from '../../hooks/useIOCAnalysis';
+import { useScreenshare } from '../../hooks/ScreenshareContext';
+import { isAboveClsThreshold } from '../../lib/classification';
 import { IOCItem } from './IOCItem';
 import type { ThreatIntelConfigProps } from './IOCItem';
 import { AttributionComboInput } from './AttributionComboInput';
@@ -43,6 +45,14 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
     activeIOCs,
     dismissedIOCs,
   } = useIOCAnalysis({ item, onUpdate });
+
+  const { maxLevel: ssMaxLevel, effectiveLevels: ssLevels } = useScreenshare();
+  const visibleActiveIOCs = useMemo(
+    () => ssMaxLevel
+      ? activeIOCs.filter((ioc) => !isAboveClsThreshold(ioc.clsLevel || item.clsLevel, ssMaxLevel, ssLevels))
+      : activeIOCs,
+    [activeIOCs, ssMaxLevel, ssLevels, item.clsLevel]
+  );
 
   const [collapsedTypes, setCollapsedTypes] = useState<Set<IOCType>>(new Set());
   const [showDismissed, setShowDismissed] = useState(false);
@@ -193,9 +203,9 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
     });
   };
 
-  // Group active IOCs by type
+  // Group visible active IOCs by type (screenshare-aware)
   const grouped = new Map<IOCType, IOCEntry[]>();
-  for (const ioc of activeIOCs) {
+  for (const ioc of visibleActiveIOCs) {
     const list = grouped.get(ioc.type) || [];
     list.push(ioc);
     grouped.set(ioc.type, list);
@@ -306,7 +316,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
             </div>
 
             {/* Grouped IOCs */}
-            {activeIOCs.length === 0 ? (
+            {visibleActiveIOCs.length === 0 ? (
               <p className="text-xs text-gray-600 text-center py-4">No IOCs found</p>
             ) : (
               [...grouped.entries()].map(([type, iocs]) => {

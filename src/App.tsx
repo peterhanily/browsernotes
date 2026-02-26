@@ -21,6 +21,8 @@ import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
+import { ScreenshareContext } from './hooks/ScreenshareContext';
+import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType } from './types';
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
@@ -217,6 +219,9 @@ export default function App() {
   const [selectedTimelineId, setSelectedTimelineId] = useState<string>();
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string>();
   const [graphLayout, setGraphLayout] = useState<LayoutName>('cose-bilkent');
+  const [screenshareMaxLevel, setScreenshareMaxLevel] = useState<string | null>(null);
+
+  const effectiveClsLevels = useMemo(() => getEffectiveClsLevels(settings.tiClsLevels), [settings.tiClsLevels]);
 
   // Browser back/forward navigation
   const handleNavRestore = useCallback((state: NavState) => {
@@ -347,6 +352,40 @@ export default function App() {
       return wbs;
     },
     [whiteboards, selectedFolderId, selectedTag]
+  );
+
+  // Screenshare-filtered: folder-filtered arrays (for NoteList, TaskList, TimelineView)
+  const ssFilteredNotes = useMemo(
+    () => screenshareMaxLevel ? filteredNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredNotes,
+    [filteredNotes, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredTasks = useMemo(
+    () => screenshareMaxLevel ? filteredTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTasks,
+    [filteredTasks, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredTimelineEvents = useMemo(
+    () => screenshareMaxLevel ? filteredTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTimelineEvents,
+    [filteredTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
+  );
+
+  // Screenshare-filtered: unfiltered-by-folder arrays (for GraphView, IOCStatsView, SearchOverlay, NoteEditor, TaskListView)
+  const screensafeNotes = useMemo(
+    () => screenshareMaxLevel ? notes.notes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : notes.notes,
+    [notes.notes, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const screensafeTasks = useMemo(
+    () => screenshareMaxLevel ? tasks.tasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : tasks.tasks,
+    [tasks.tasks, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const screensafeTimelineEvents = useMemo(
+    () => screenshareMaxLevel ? timeline.events.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : timeline.events,
+    [timeline.events, screenshareMaxLevel, effectiveClsLevels]
+  );
+
+  // Screenshare context value
+  const screenshareCtx = useMemo(
+    () => ({ maxLevel: screenshareMaxLevel, effectiveLevels: effectiveClsLevels }),
+    [screenshareMaxLevel, effectiveClsLevels]
   );
 
   // Timeline event counts per timeline
@@ -552,6 +591,7 @@ export default function App() {
   ) : null;
 
   return (
+    <ScreenshareContext.Provider value={screenshareCtx}>
     <ActivityLogContext.Provider value={activityLog.log}>
       <AppLayout
         header={
@@ -568,6 +608,9 @@ export default function App() {
             onQuickLoad={handleQuickLoad}
             activeView={activeView}
             onStartTour={() => tour.start(activeView)}
+            screenshareMaxLevel={screenshareMaxLevel}
+            onScreenshareChange={setScreenshareMaxLevel}
+            effectiveClsLevels={effectiveClsLevels}
           />
         }
         sidebar={
@@ -591,9 +634,9 @@ export default function App() {
           />
         ) : activeView === 'ioc-stats' ? (
           <IOCStatsView
-            notes={notes.notes}
-            tasks={tasks.tasks}
-            timelineEvents={timeline.events}
+            notes={screensafeNotes}
+            tasks={screensafeTasks}
+            timelineEvents={screensafeTimelineEvents}
             settings={settings}
           />
         ) : activeView === 'activity' ? (
@@ -606,7 +649,7 @@ export default function App() {
           null /* GraphView is always-mounted below for layout persistence */
         ) : activeView === 'timeline' ? (
           <TimelineView
-            events={filteredTimelineEvents}
+            events={ssFilteredTimelineEvents}
             allTags={tags}
             folders={folders}
             onCreateTag={loggedCreateTag}
@@ -634,7 +677,7 @@ export default function App() {
           />
         ) : activeView === 'tasks' ? (
           <TaskListView
-            tasks={filteredTasks}
+            tasks={ssFilteredTasks}
             allTags={tags}
             folders={folders}
             onCreateTag={loggedCreateTag}
@@ -645,8 +688,8 @@ export default function App() {
             viewMode={taskViewMode}
             onViewModeChange={setTaskViewMode}
             getTasksByStatus={(status) => tasks.getTasksByStatus(status, selectedFolderId)}
-            allNotes={notes.notes}
-            allTimelineEvents={timeline.events}
+            allNotes={screensafeNotes}
+            allTimelineEvents={screensafeTimelineEvents}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */
@@ -656,7 +699,7 @@ export default function App() {
               selectedNote ? 'hidden md:block md:w-72' : 'w-full md:w-72'
             )}>
               <NoteList
-                notes={filteredNotes}
+                notes={ssFilteredNotes}
                 selectedId={selectedNoteId}
                 onSelect={setSelectedNoteId}
                 sort={sort}
@@ -691,9 +734,9 @@ export default function App() {
                   onBack={() => setSelectedNoteId(undefined)}
                   clipsFolderId={clipsFolderId}
                   settings={settings}
-                  allNotes={notes.notes}
-                  allTasks={tasks.tasks}
-                  allTimelineEvents={timeline.events}
+                  allNotes={screensafeNotes}
+                  allTasks={screensafeTasks}
+                  allTimelineEvents={screensafeTimelineEvents}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">
@@ -709,9 +752,9 @@ export default function App() {
         {/* Always-mounted GraphView — hidden via CSS when not active to preserve layout/positions */}
         <div className={activeView === 'graph' && !showSettings ? 'flex flex-1 overflow-hidden' : 'hidden'}>
           <GraphView
-            notes={notes.notes}
-            tasks={tasks.tasks}
-            timelineEvents={timeline.events}
+            notes={screensafeNotes}
+            tasks={screensafeTasks}
+            timelineEvents={screensafeTimelineEvents}
             settings={settings}
             layout={graphLayout}
             onLayoutChange={setGraphLayout}
@@ -760,12 +803,12 @@ export default function App() {
       <SearchOverlay
         open={searchOverlayOpen}
         onClose={() => setSearchOverlayOpen(false)}
-        notes={notes.notes}
-        tasks={tasks.tasks}
+        notes={screensafeNotes}
+        tasks={screensafeTasks}
         clipsFolderId={clipsFolderId}
         onNavigateToNote={handleSearchNavigateToNote}
         onNavigateToTask={handleSearchNavigateToTask}
-        timelineEvents={timeline.events}
+        timelineEvents={screensafeTimelineEvents}
         whiteboards={whiteboards}
         onNavigateToTimeline={handleSearchNavigateToTimeline}
         onNavigateToWhiteboard={handleSearchNavigateToWhiteboard}
@@ -786,5 +829,6 @@ export default function App() {
         </>
       )}
     </ActivityLogContext.Provider>
+    </ScreenshareContext.Provider>
   );
 }

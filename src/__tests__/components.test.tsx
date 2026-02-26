@@ -184,6 +184,9 @@ describe('Header', () => {
     sidebarCollapsed: false,
     onQuickSave: () => {},
     onQuickLoad: () => {},
+    screenshareMaxLevel: null,
+    onScreenshareChange: () => {},
+    effectiveClsLevels: ['TLP:CLEAR', 'TLP:GREEN', 'TLP:AMBER', 'TLP:AMBER+STRICT', 'TLP:RED'],
   };
 
   it('highlights Note button when activeView is notes', () => {

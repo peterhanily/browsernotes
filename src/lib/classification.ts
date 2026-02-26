@@ -31,6 +31,21 @@ export function getEffectiveClsLevels(userLevels?: string[]): string[] {
   return userLevels && userLevels.length > 0 ? userLevels : DEFAULT_CLS_LEVELS;
 }
 
+/**
+ * Returns true if the item should be hidden during screenshare mode.
+ * - No level → visible (not sensitive)
+ * - Unknown level (not in hierarchy) → hidden (conservative)
+ * - Otherwise compare indices: hidden if item index > max index
+ */
+export function isAboveClsThreshold(itemLevel: string | undefined, maxLevel: string, effectiveLevels: string[]): boolean {
+  if (!itemLevel) return false;
+  const itemIdx = effectiveLevels.indexOf(itemLevel);
+  const maxIdx = effectiveLevels.indexOf(maxLevel);
+  if (itemIdx === -1) return true; // unknown level → hide conservatively
+  if (maxIdx === -1) return true;  // unknown max → hide conservatively
+  return itemIdx > maxIdx;
+}
+
 /** Cascade: IOC-level > entity-level > global default > empty string. */
 export function resolveIOCClsLevel(iocLevel?: string, entityLevel?: string, defaultLevel?: string): string {
   return iocLevel || entityLevel || defaultLevel || '';

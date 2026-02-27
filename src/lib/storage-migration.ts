@@ -8,6 +8,7 @@ const KEY_MAP: Array<{ old: string; new: string; storage: 'local' | 'session' }>
   { old: 'browsernotes-session-cache', new: 'threatcaddy-session-cache', storage: 'session' },
   { old: 'browsernotes-settings', new: 'threatcaddy-settings', storage: 'local' },
   { old: 'browsernotes-saved-searches', new: 'threatcaddy-saved-searches', storage: 'local' },
+  { old: 'browsernotes-nav-state', new: 'threatcaddy-nav-state', storage: 'session' },
 ];
 
 export function migrateStorageKeys(): void {

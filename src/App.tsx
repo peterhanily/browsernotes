@@ -54,6 +54,17 @@ function parseEntityHash(): { type: 'note' | 'task' | 'event'; id: string } | nu
 
 const initialDeepLink = parseEntityHash();
 
+const NAV_STORAGE_KEY = 'threatcaddy-nav-state';
+
+function loadNavState(): NavState | null {
+  try {
+    const raw = sessionStorage.getItem(NAV_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+const savedNavState = loadNavState();
+
 export default function App() {
   const { settings, updateSettings, toggleTheme } = useSettings();
   const notes = useNotes();
@@ -211,11 +222,11 @@ export default function App() {
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
-  const [activeView, setActiveView] = useState<ViewMode>(deepLinkView ?? safeDefaultView);
+  const [activeView, setActiveView] = useState<ViewMode>(deepLinkView ?? savedNavState?.view ?? safeDefaultView);
   const [selectedNoteId, setSelectedNoteId] = useState<string | undefined>(
-    initialDeepLink?.type === 'note' ? initialDeepLink.id : undefined,
+    initialDeepLink?.type === 'note' ? initialDeepLink.id : savedNavState?.selectedNoteId,
   );
-  const [selectedFolderId, setSelectedFolderId] = useState<string>();
+  const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>(savedNavState?.selectedFolderId);
   const [selectedTag, setSelectedTag] = useState<string>();
   const [showTrash, setShowTrash] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -228,8 +239,8 @@ export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
-  const [selectedTimelineId, setSelectedTimelineId] = useState<string>();
-  const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string>();
+  const [selectedTimelineId, setSelectedTimelineId] = useState<string | undefined>(savedNavState?.selectedTimelineId);
+  const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string | undefined>(savedNavState?.selectedWhiteboardId);
   const [graphLayout, setGraphLayout] = useState<LayoutName>('cose-bilkent');
   const [screenshareMaxLevel, setScreenshareMaxLevel] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | undefined>();
@@ -247,6 +258,17 @@ export default function App() {
     setShowSettings(false);
   }, []);
   const { navigate: navPush } = useNavigationHistory({ onViewChange: handleNavRestore });
+
+  // Persist navigation state to sessionStorage for refresh restoration
+  useEffect(() => {
+    sessionStorage.setItem(NAV_STORAGE_KEY, JSON.stringify({
+      view: activeView,
+      selectedNoteId,
+      selectedFolderId,
+      selectedTimelineId,
+      selectedWhiteboardId,
+    }));
+  }, [activeView, selectedNoteId, selectedFolderId, selectedTimelineId, selectedWhiteboardId]);
 
   const navigateTo = useCallback((view: ViewMode, opts?: { selectedNoteId?: string; selectedTimelineId?: string; selectedWhiteboardId?: string }) => {
     setActiveView(view);

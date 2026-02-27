@@ -8,7 +8,7 @@ interface DateRangeSliderProps {
   onChange: (start: number | undefined, end: number | undefined) => void;
 }
 
-function formatDate(ts: number, shortSpan: boolean): string {
+function formatLabel(ts: number, shortSpan: boolean): string {
   const d = new Date(ts);
   const month = d.toLocaleString('en-US', { month: 'short' });
   const day = d.getDate();
@@ -18,6 +18,106 @@ function formatDate(ts: number, shortSpan: boolean): string {
     return `${month} ${day} ${hours}:${mins}`;
   }
   return `${month} ${day}`;
+}
+
+interface Tick {
+  frac: number;
+  label: string;
+  major: boolean;
+}
+
+function computeTicks(minTs: number, maxTs: number): Tick[] {
+  const range = maxTs - minTs;
+  const ticks: Tick[] = [];
+
+  const DAY = 86_400_000;
+  const HOUR = 3_600_000;
+
+  if (range <= 0) return ticks;
+
+  // Choose interval based on span
+  let stepMs: number;
+  let majorEvery: number;
+  let labelFn: (d: Date) => string;
+  let majorLabelFn: (d: Date) => string;
+
+  if (range > 365 * DAY) {
+    // > 1 year: tick every month, major every 3 months
+    return computeMonthTicks(minTs, maxTs, 1, 3);
+  } else if (range > 90 * DAY) {
+    // 3-12 months: tick every month, major every month
+    return computeMonthTicks(minTs, maxTs, 1, 1);
+  } else if (range > 14 * DAY) {
+    // 2 weeks – 3 months: tick every week, labels on weeks
+    stepMs = 7 * DAY;
+    majorEvery = 1;
+    labelFn = (d) => `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
+    majorLabelFn = labelFn;
+  } else if (range > 2 * DAY) {
+    // 2–14 days: tick every day
+    stepMs = DAY;
+    majorEvery = 1;
+    labelFn = (d) => `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
+    majorLabelFn = labelFn;
+  } else if (range > 12 * HOUR) {
+    // 12h–2d: tick every 4 hours
+    stepMs = 4 * HOUR;
+    majorEvery = 1;
+    labelFn = (d) => `${d.getHours().toString().padStart(2, '0')}:00`;
+    majorLabelFn = labelFn;
+  } else {
+    // < 12h: tick every hour
+    stepMs = HOUR;
+    majorEvery = 1;
+    labelFn = (d) => `${d.getHours().toString().padStart(2, '0')}:00`;
+    majorLabelFn = labelFn;
+  }
+
+  // Align first tick to step boundary
+  const firstAligned = Math.ceil(minTs / stepMs) * stepMs;
+  let count = 0;
+  for (let ts = firstAligned; ts <= maxTs; ts += stepMs) {
+    const frac = (ts - minTs) / range;
+    if (frac < 0.02 || frac > 0.98) continue; // skip ticks too close to edges
+    const major = count % majorEvery === 0;
+    const d = new Date(ts);
+    ticks.push({
+      frac,
+      label: major ? majorLabelFn(d) : labelFn(d),
+      major,
+    });
+    count++;
+  }
+  return ticks;
+}
+
+function computeMonthTicks(minTs: number, maxTs: number, stepMonths: number, majorEvery: number): Tick[] {
+  const range = maxTs - minTs;
+  const ticks: Tick[] = [];
+  const startDate = new Date(minTs);
+  // Start at the first of the next month after minTs
+  let year = startDate.getFullYear();
+  let month = startDate.getMonth() + 1;
+  if (month > 11) { month = 0; year++; }
+
+  let count = 0;
+  for (let i = 0; i < 200; i++) {
+    const ts = new Date(year, month, 1).getTime();
+    if (ts > maxTs) break;
+    const frac = (ts - minTs) / range;
+    if (frac >= 0.02 && frac <= 0.98) {
+      const major = count % majorEvery === 0;
+      const d = new Date(ts);
+      const label = d.getMonth() === 0
+        ? `${d.toLocaleString('en-US', { month: 'short' })} '${String(d.getFullYear()).slice(2)}`
+        : d.toLocaleString('en-US', { month: 'short' });
+      ticks.push({ frac, label, major });
+    }
+    month += stepMonths;
+    if (month > 11) { month -= 12; year++; }
+    count++;
+  }
+  return ticks;
 }
 
 export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRangeSliderProps) {
@@ -38,10 +138,15 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
   const range = maxTs - minTs;
   const hidden = events.length < 2 || range === 0;
 
-  const shortSpan = range < 2 * 24 * 60 * 60 * 1000; // < 2 days
+  const shortSpan = range < 2 * 24 * 60 * 60 * 1000;
   const startFrac = dateStart !== undefined && range > 0 ? (dateStart - minTs) / range : 0;
   const endFrac = dateEnd !== undefined && range > 0 ? (dateEnd - minTs) / range : 1;
   const isNarrowed = dateStart !== undefined || dateEnd !== undefined;
+
+  const ticks = useMemo(() => {
+    if (hidden) return [];
+    return computeTicks(minTs, maxTs);
+  }, [minTs, maxTs, hidden]);
 
   const getTrackFraction = useCallback((clientX: number) => {
     if (!trackRef.current) return 0;
@@ -78,51 +183,99 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
   if (hidden) return null;
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800">
-      <span className="text-[10px] text-gray-500 whitespace-nowrap shrink-0 select-none tabular-nums">
-        {formatDate(dateStart ?? minTs, shortSpan)}
-      </span>
-      <div
-        ref={trackRef}
-        className="relative flex-1 h-4 select-none touch-none cursor-pointer"
-        onPointerDown={(e) => {
-          const frac = getTrackFraction(e.clientX);
-          // Pick the closer handle
-          const pick = Math.abs(frac - startFrac) <= Math.abs(frac - endFrac) ? 'start' : 'end';
-          e.preventDefault();
-          setDragging(pick);
-        }}
-      >
-        {/* Track */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-gray-700" />
-        {/* Selected fill */}
+    <div className="px-3 py-1.5 border-b border-gray-800">
+      {/* Slider row */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0 select-none tabular-nums w-[70px] text-right">
+          {formatLabel(dateStart ?? minTs, shortSpan)}
+        </span>
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-accent/40"
-          style={{ left: `${startFrac * 100}%`, right: `${(1 - endFrac) * 100}%` }}
-        />
-        {/* Start handle */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing z-10 hover:scale-125 transition-transform"
-          style={{ left: `${startFrac * 100}%`, transform: `translateX(-50%) translateY(-50%)` }}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging('start'); }}
-        />
-        {/* End handle */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing z-10 hover:scale-125 transition-transform"
-          style={{ left: `${endFrac * 100}%`, transform: `translateX(-50%) translateY(-50%)` }}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging('end'); }}
-        />
-      </div>
-      <span className="text-[10px] text-gray-500 whitespace-nowrap shrink-0 select-none tabular-nums">
-        {formatDate(dateEnd ?? maxTs, shortSpan)}
-      </span>
-      {isNarrowed && (
-        <button
-          onClick={() => onChange(undefined, undefined)}
-          className="text-[10px] text-accent hover:text-accent-hover shrink-0 ml-0.5"
+          ref={trackRef}
+          className="relative flex-1 h-5 select-none touch-none cursor-pointer"
+          onPointerDown={(e) => {
+            const frac = getTrackFraction(e.clientX);
+            const pick = Math.abs(frac - startFrac) <= Math.abs(frac - endFrac) ? 'start' : 'end';
+            e.preventDefault();
+            setDragging(pick);
+          }}
         >
-          Reset
-        </button>
+          {/* Track */}
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-gray-700" />
+          {/* Selected fill */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-accent/40"
+            style={{ left: `${startFrac * 100}%`, right: `${(1 - endFrac) * 100}%` }}
+          />
+          {/* Tick marks */}
+          {ticks.map((tick) => (
+            <div
+              key={tick.frac}
+              className="absolute top-1/2 w-px bg-gray-600"
+              style={{
+                left: `${tick.frac * 100}%`,
+                height: tick.major ? 8 : 6,
+                transform: 'translateX(-50%) translateY(-50%)',
+              }}
+            />
+          ))}
+          {/* Start handle + tooltip */}
+          <div
+            className="absolute top-1/2 z-10 group"
+            style={{ left: `${startFrac * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+          >
+            <div
+              className="w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging('start'); }}
+            />
+            {/* Tooltip */}
+            {dragging === 'start' && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-1.5 py-0.5 rounded bg-gray-700 text-[10px] text-gray-200 whitespace-nowrap tabular-nums shadow-lg pointer-events-none">
+                {formatLabel(dateStart ?? minTs, true)}
+              </div>
+            )}
+          </div>
+          {/* End handle + tooltip */}
+          <div
+            className="absolute top-1/2 z-10 group"
+            style={{ left: `${endFrac * 100}%`, transform: 'translateX(-50%) translateY(-50%)' }}
+          >
+            <div
+              className="w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging('end'); }}
+            />
+            {/* Tooltip */}
+            {dragging === 'end' && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-1.5 py-0.5 rounded bg-gray-700 text-[10px] text-gray-200 whitespace-nowrap tabular-nums shadow-lg pointer-events-none">
+                {formatLabel(dateEnd ?? maxTs, true)}
+              </div>
+            )}
+          </div>
+        </div>
+        <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0 select-none tabular-nums w-[70px]">
+          {formatLabel(dateEnd ?? maxTs, shortSpan)}
+        </span>
+        {isNarrowed && (
+          <button
+            onClick={() => onChange(undefined, undefined)}
+            className="text-[10px] text-accent hover:text-accent-hover shrink-0"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      {/* Tick labels row */}
+      {ticks.length > 0 && (
+        <div className="relative ml-[78px] mr-[78px] h-3.5 select-none pointer-events-none">
+          {ticks.map((tick) => (
+            <span
+              key={tick.frac}
+              className="absolute text-[9px] text-gray-600 whitespace-nowrap tabular-nums"
+              style={{ left: `${tick.frac * 100}%`, transform: 'translateX(-50%)' }}
+            >
+              {tick.label}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

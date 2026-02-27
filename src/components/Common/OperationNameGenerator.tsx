@@ -177,7 +177,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
       <div className="relative w-full max-w-2xl mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-100">Operation Name Generator</h2>
+          <h2 className="text-lg font-semibold text-gray-100">Investigation Name Generator</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={cycleLevel}
@@ -263,7 +263,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
 
           {/* Result display */}
           <div className="text-center py-3">
-            <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1">Operation</div>
+            <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1">Investigation</div>
             <div className={`text-xl font-black tracking-wider transition-opacity duration-300 ${
               currentName && !spinning ? 'opacity-100 text-gray-100' : 'opacity-30 text-gray-500'
             }`}>

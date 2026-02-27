@@ -504,8 +504,8 @@ export function Sidebar({
               <button
                 onClick={(e) => { e.stopPropagation(); setShowNameGenerator(true); }}
                 className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                aria-label="Generate operation name"
-                title="Generate operation name"
+                aria-label="Generate investigation name"
+                title="Generate investigation name"
               >
                 <Dices size={14} />
               </button>

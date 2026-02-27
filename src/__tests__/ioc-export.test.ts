@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { formatIOCsJSON, formatIOCsCSV, formatIOCsFlatJSON, formatIOCsFlatCSV, slugify } from '../lib/ioc-export';
 import type { IOCExportEntry, ThreatIntelExportConfig } from '../lib/ioc-export';
 import type { IOCEntry } from '../types';
+
+// ── Helpers ─────────────────────────────────────────────────────────
 
 function makeIOC(overrides: Partial<IOCEntry> = {}): IOCEntry {
   return {
@@ -23,6 +25,19 @@ function makeEntry(overrides: Partial<IOCExportEntry> & { iocs?: IOCEntry[] } = 
     ...overrides,
   };
 }
+
+const FROZEN_NOW = '2024-03-01T00:00:00.000Z';
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(FROZEN_NOW));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+// ── formatIOCsJSON ──────────────────────────────────────────────────
 
 describe('formatIOCsJSON', () => {
   it('produces correct structure with metadata', () => {
@@ -74,7 +89,52 @@ describe('formatIOCsJSON', () => {
     expect(result.totalIOCs).toBe(0);
     expect(result.clips).toEqual([]);
   });
+
+  it('exportedAt is a valid ISO timestamp', () => {
+    const result = JSON.parse(formatIOCsJSON([makeEntry()]));
+    expect(result.exportedAt).toBe(FROZEN_NOW);
+  });
+
+  it('output is valid JSON', () => {
+    expect(() => JSON.parse(formatIOCsJSON([makeEntry()]))).not.toThrow();
+  });
+
+  it('resolves clsLevel from entityClsLevel when IOC has none', () => {
+    const entries = [makeEntry({ entityClsLevel: 'TLP:GREEN', iocs: [makeIOC()] })];
+    const result = JSON.parse(formatIOCsJSON(entries));
+    expect(result.clips[0].iocs[0].clsLevel).toBe('TLP:GREEN');
+  });
+
+  it('IOC clsLevel takes priority over entityClsLevel', () => {
+    const entries = [makeEntry({ entityClsLevel: 'TLP:GREEN', iocs: [makeIOC({ clsLevel: 'TLP:RED' })] })];
+    const result = JSON.parse(formatIOCsJSON(entries));
+    expect(result.clips[0].iocs[0].clsLevel).toBe('TLP:RED');
+  });
+
+  it('preserves all exported IOC fields', () => {
+    const entries = [makeEntry({
+      iocs: [makeIOC({
+        type: 'domain',
+        value: 'evil.com',
+        confidence: 'confirmed',
+        analystNotes: 'C2 server',
+        attribution: 'APT29',
+        firstSeen: 1709251200000,
+      })],
+    })];
+    const result = JSON.parse(formatIOCsJSON(entries));
+    const ioc = result.clips[0].iocs[0];
+    expect(ioc.type).toBe('domain');
+    expect(ioc.value).toBe('evil.com');
+    expect(ioc.confidence).toBe('confirmed');
+    expect(ioc.analystNotes).toBe('C2 server');
+    expect(ioc.attribution).toBe('APT29');
+    expect(ioc.firstSeen).toBe(1709251200000);
+    expect(ioc.dismissed).toBe(false);
+  });
 });
+
+// ── formatIOCsCSV ───────────────────────────────────────────────────
 
 describe('formatIOCsCSV', () => {
   it('has correct header row', () => {
@@ -112,6 +172,13 @@ describe('formatIOCsCSV', () => {
     expect(csv).toContain('"line1\nline2"');
   });
 
+  it('escapes carriage returns in field values', () => {
+    const csv = formatIOCsCSV([
+      makeEntry({ iocs: [makeIOC({ analystNotes: 'line1\rline2' })] }),
+    ]);
+    expect(csv).toContain('"line1\rline2"');
+  });
+
   it('skips dismissed IOCs', () => {
     const csv = formatIOCsCSV([
       makeEntry({
@@ -141,7 +208,75 @@ describe('formatIOCsCSV', () => {
     const lines = csv.split('\n');
     expect(lines).toHaveLength(1); // header only
   });
+
+  it('handles empty entries array', () => {
+    const csv = formatIOCsCSV([]);
+    const lines = csv.split('\n');
+    expect(lines).toHaveLength(1); // header only
+  });
+
+  it('formats firstSeen as ISO string', () => {
+    const csv = formatIOCsCSV([makeEntry({ iocs: [makeIOC({ firstSeen: 1709251200000 })] })]);
+    expect(csv).toContain('2024-03-01T00:00:00.000Z');
+  });
+
+  it('uses entityClsLevel when IOC has no clsLevel', () => {
+    const csv = formatIOCsCSV([makeEntry({ entityClsLevel: 'TLP:AMBER', iocs: [makeIOC()] })]);
+    expect(csv).toContain('TLP:AMBER');
+  });
+
+  it('IOC clsLevel takes priority over entityClsLevel', () => {
+    const csv = formatIOCsCSV([makeEntry({
+      entityClsLevel: 'TLP:GREEN',
+      iocs: [makeIOC({ clsLevel: 'TLP:RED' })],
+    })]);
+    const lines = csv.split('\n');
+    expect(lines[1]).toContain('TLP:RED');
+    expect(lines[1]).not.toContain('TLP:GREEN');
+  });
+
+  it('uses empty string for missing optional fields', () => {
+    const csv = formatIOCsCSV([makeEntry({
+      sourceUrl: undefined,
+      iocs: [makeIOC({ analystNotes: undefined, attribution: undefined })],
+    })]);
+    const lines = csv.split('\n');
+    // Data row should have empty fields (consecutive commas) for missing values
+    const fields = lines[1].split(',');
+    // analystNotes at index 3, attribution at index 4 should be empty
+    expect(fields[3]).toBe('');
+    expect(fields[4]).toBe('');
+  });
+
+  it('includes all fields in correct order', () => {
+    const csv = formatIOCsCSV([makeEntry({
+      clipTitle: 'MyClip',
+      sourceUrl: 'https://test.com',
+      entityClsLevel: 'TLP:GREEN',
+      iocs: [makeIOC({
+        type: 'domain',
+        value: 'evil.com',
+        confidence: 'confirmed',
+        analystNotes: 'note',
+        attribution: 'APT29',
+      })],
+    })]);
+    const lines = csv.split('\n');
+    const fields = lines[1].split(',');
+    expect(fields[0]).toBe('domain');       // type
+    expect(fields[1]).toBe('evil.com');     // value
+    expect(fields[2]).toBe('confirmed');    // confidence
+    expect(fields[3]).toBe('note');         // analystNotes
+    expect(fields[4]).toBe('APT29');        // attribution
+    // fields[5] = firstSeen (ISO)
+    expect(fields[6]).toBe('false');        // dismissed
+    expect(fields[7]).toBe('TLP:GREEN');    // clsLevel
+    expect(fields[8]).toBe('MyClip');       // clipTitle
+    expect(fields[9]).toBe('https://test.com'); // sourceUrl
+  });
 });
+
+// ── formatIOCsFlatJSON ──────────────────────────────────────────────
 
 describe('formatIOCsFlatJSON', () => {
   it('produces correct { iocs: [...] } structure', () => {
@@ -191,10 +326,29 @@ describe('formatIOCsFlatJSON', () => {
     expect(result.iocs[0].cls_level).toBe('TLP:RED');
   });
 
+  it('entityClsLevel takes precedence over config default', () => {
+    const config: ThreatIntelExportConfig = { defaultClsLevel: 'TLP:CLEAR' };
+    const entries = [makeEntry({ entityClsLevel: 'TLP:AMBER', iocs: [makeIOC()] })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries, config));
+    expect(result.iocs[0].cls_level).toBe('TLP:AMBER');
+  });
+
   it('formats tags as colon-delimited string', () => {
     const entries = [makeEntry({ tags: ['malware', 'apt', 'phishing'] })];
     const result = JSON.parse(formatIOCsFlatJSON(entries));
     expect(result.iocs[0].tags).toBe('malware:apt:phishing');
+  });
+
+  it('uses empty string for no tags', () => {
+    const entries = [makeEntry({ tags: undefined })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries));
+    expect(result.iocs[0].tags).toBe('');
+  });
+
+  it('uses empty string for empty tags array', () => {
+    const entries = [makeEntry({ tags: [] })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries));
+    expect(result.iocs[0].tags).toBe('');
   });
 
   it('filters dismissed IOCs', () => {
@@ -241,14 +395,51 @@ describe('formatIOCsFlatJSON', () => {
     const result = JSON.parse(formatIOCsFlatJSON([]));
     expect(result.iocs).toEqual([]);
   });
+
+  it('report_date uses current timestamp', () => {
+    const result = JSON.parse(formatIOCsFlatJSON([makeEntry()]));
+    expect(result.iocs[0].report_date).toBe(FROZEN_NOW);
+  });
+
+  it('uses empty strings for missing optional IOC fields', () => {
+    const entries = [makeEntry({ iocs: [makeIOC()] })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries));
+    const ioc = result.iocs[0];
+    expect(ioc.actor_name).toBe('');
+    expect(ioc.ioc_subtype).toBe('');
+    expect(ioc.notes).toBe('');
+    expect(ioc.related_id).toBe('');
+    expect(ioc.relationship_type).toBe('');
+    expect(ioc.ioc_status).toBe('');
+  });
+
+  it('sourceUrl falls back to config defaultReportSource', () => {
+    const config: ThreatIntelExportConfig = { defaultReportSource: 'https://internal.soc' };
+    const entries = [makeEntry({ sourceUrl: undefined, iocs: [makeIOC()] })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries, config));
+    expect(result.iocs[0].report_source).toBe('https://internal.soc');
+  });
+
+  it('sourceUrl from entry takes priority over config', () => {
+    const config: ThreatIntelExportConfig = { defaultReportSource: 'https://fallback.com' };
+    const entries = [makeEntry({ sourceUrl: 'https://original.com', iocs: [makeIOC()] })];
+    const result = JSON.parse(formatIOCsFlatJSON(entries, config));
+    expect(result.iocs[0].report_source).toBe('https://original.com');
+  });
+
+  it('output is valid JSON', () => {
+    expect(() => JSON.parse(formatIOCsFlatJSON([makeEntry()]))).not.toThrow();
+  });
 });
+
+// ── formatIOCsFlatCSV ───────────────────────────────────────────────
 
 describe('formatIOCsFlatCSV', () => {
   it('has correct header row', () => {
     const csv = formatIOCsFlatCSV([makeEntry()]);
     const header = csv.split('\n')[0];
     expect(header).toBe(
-      'id,actor_name,ioc_value,report_date,report_title,report_source,cls_level,confidence,first_seen,ioc_type,ioc_subtype,notes,related_id,relationship_type,ioc_status,tags'
+      'id,actor_name,ioc_value,report_date,report_title,report_source,cls_level,confidence,first_seen,ioc_type,ioc_subtype,notes,related_id,relationship_type,ioc_status,tags',
     );
   });
 
@@ -270,6 +461,13 @@ describe('formatIOCsFlatCSV', () => {
     expect(csv).toContain('"note, with comma"');
   });
 
+  it('escapes CSV fields with quotes', () => {
+    const csv = formatIOCsFlatCSV([
+      makeEntry({ iocs: [makeIOC({ analystNotes: 'has "quotes" inside' })] }),
+    ]);
+    expect(csv).toContain('"has ""quotes"" inside"');
+  });
+
   it('filters dismissed IOCs', () => {
     const csv = formatIOCsFlatCSV([
       makeEntry({
@@ -288,7 +486,35 @@ describe('formatIOCsFlatCSV', () => {
     const lines = csv.split('\n');
     expect(lines).toHaveLength(1); // header only
   });
+
+  it('applies config defaults', () => {
+    const config: ThreatIntelExportConfig = {
+      defaultClsLevel: 'TLP:AMBER',
+      defaultReportSource: 'Internal',
+    };
+    const csv = formatIOCsFlatCSV([makeEntry({ sourceUrl: undefined, iocs: [makeIOC()] })], config);
+    expect(csv).toContain('TLP:AMBER');
+    expect(csv).toContain('Internal');
+  });
+
+  it('includes tags in output', () => {
+    const csv = formatIOCsFlatCSV([makeEntry({ tags: ['malware', 'apt'] })]);
+    expect(csv).toContain('malware:apt');
+  });
+
+  it('sequential IDs across multiple entries', () => {
+    const csv = formatIOCsFlatCSV([
+      makeEntry({ clipTitle: 'A', iocs: [makeIOC(), makeIOC({ id: 'ioc-2', value: '10.0.0.1' })] }),
+      makeEntry({ clipTitle: 'B', iocs: [makeIOC({ id: 'ioc-3', value: '10.0.0.2' })] }),
+    ]);
+    const lines = csv.split('\n');
+    expect(lines[1]).toMatch(/^1,/);
+    expect(lines[2]).toMatch(/^2,/);
+    expect(lines[3]).toMatch(/^3,/);
+  });
 });
+
+// ── slugify ─────────────────────────────────────────────────────────
 
 describe('slugify', () => {
   it('converts to lowercase kebab-case', () => {
@@ -299,8 +525,28 @@ describe('slugify', () => {
     expect(slugify('Report: APT29 (2024)')).toBe('report-apt29-2024');
   });
 
-  it('truncates long strings', () => {
+  it('truncates long strings to 50 chars', () => {
     const long = 'a'.repeat(100);
     expect(slugify(long).length).toBeLessThanOrEqual(50);
+  });
+
+  it('strips leading and trailing hyphens', () => {
+    expect(slugify('---hello---')).toBe('hello');
+  });
+
+  it('handles empty string', () => {
+    expect(slugify('')).toBe('');
+  });
+
+  it('collapses consecutive special chars to single hyphen', () => {
+    expect(slugify('foo!!!bar')).toBe('foo-bar');
+  });
+
+  it('handles already-valid slug', () => {
+    expect(slugify('already-valid')).toBe('already-valid');
+  });
+
+  it('handles numbers', () => {
+    expect(slugify('APT 29 Report 2024')).toBe('apt-29-report-2024');
   });
 });

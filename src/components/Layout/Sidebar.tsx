@@ -420,16 +420,14 @@ export function Sidebar({
                         onClick={() => nav(() => { onTimelineSelect?.(tl.id); })}
                         onDoubleClick={() => { setEditingTimeline(tl.id); setEditTimelineName(tl.name); }}
                         actions={
-                          timelines.length > 1 ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setDeletingTimelineId(tl.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
-                              aria-label={`Delete timeline ${tl.name}`}
-                              title="Delete timeline"
-                            >
-                              <X size={12} />
-                            </button>
-                          ) : undefined
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingTimelineId(tl.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            aria-label={`Delete timeline ${tl.name}`}
+                            title="Delete timeline"
+                          >
+                            <X size={12} />
+                          </button>
                         }
                       />
                     )}

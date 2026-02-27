@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import type { TimelineEvent } from '../../types';
 
 interface DateRangeSliderProps {
@@ -122,6 +122,7 @@ function computeMonthTicks(minTs: number, maxTs: number, stepMonths: number, maj
 
 export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRangeSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef<'start' | 'end' | null>(null);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
   // Local fractions used during drag for smooth visuals (no parent re-render until pointerup)
   const [dragStartFrac, setDragStartFrac] = useState<number | null>(null);
@@ -149,7 +150,6 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
   const startFrac = dragStartFrac ?? propsStartFrac;
   const endFrac = dragEndFrac ?? propsEndFrac;
 
-  const fracToTs = useCallback((frac: number) => minTs + frac * range, [minTs, range]);
   const isNarrowed = dateStart !== undefined || dateEnd !== undefined || dragStartFrac !== null || dragEndFrac !== null;
 
   const ticks = useMemo(() => {
@@ -164,48 +164,47 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
     return Math.max(0, Math.min(1, frac));
   }, []);
 
-  useEffect(() => {
-    if (!dragging) return;
-
-    const handleMove = (e: PointerEvent) => {
-      const frac = getTrackFraction(e.clientX);
-      if (dragging === 'start') {
-        setDragStartFrac(Math.min(frac, endFrac));
-      } else {
-        setDragEndFrac(Math.max(frac, startFrac));
-      }
-    };
-
-    const handleUp = () => {
-      // Commit final values to parent
-      const newStart = startFrac <= 0 ? undefined : fracToTs(startFrac);
-      const newEnd = endFrac >= 1 ? undefined : fracToTs(endFrac);
-      onChange(newStart, newEnd);
-      setDragStartFrac(null);
-      setDragEndFrac(null);
-      setDragging(null);
-    };
-
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
-    return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    };
-  }, [dragging, getTrackFraction, fracToTs, onChange, startFrac, endFrac]);
-
-  const beginDrag = useCallback((handle: 'start' | 'end') => {
-    // Seed local drag state from current positions
+  // Pointer capture approach: all drag handled via React events on track, no useEffect
+  const handleTrackPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>, handle?: 'start' | 'end') => {
+    e.preventDefault();
+    const frac = getTrackFraction(e.clientX);
+    const pick = handle ?? (Math.abs(frac - propsStartFrac) <= Math.abs(frac - propsEndFrac) ? 'start' : 'end');
+    draggingRef.current = pick;
+    setDragging(pick);
     setDragStartFrac(propsStartFrac);
     setDragEndFrac(propsEndFrac);
-    setDragging(handle);
-  }, [propsStartFrac, propsEndFrac]);
+    trackRef.current?.setPointerCapture(e.pointerId);
+  }, [getTrackFraction, propsStartFrac, propsEndFrac]);
+
+  const handleTrackPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const frac = getTrackFraction(e.clientX);
+    if (draggingRef.current === 'start') {
+      setDragStartFrac(Math.min(frac, dragEndFrac ?? propsEndFrac));
+    } else {
+      setDragEndFrac(Math.max(frac, dragStartFrac ?? propsStartFrac));
+    }
+  }, [getTrackFraction, dragStartFrac, dragEndFrac, propsStartFrac, propsEndFrac]);
+
+  const handleTrackPointerUp = useCallback(() => {
+    if (!draggingRef.current) return;
+    const toTs = (f: number) => minTs + f * range;
+    const sf = dragStartFrac ?? propsStartFrac;
+    const ef = dragEndFrac ?? propsEndFrac;
+    const newStart = sf <= 0.001 ? undefined : toTs(sf);
+    const newEnd = ef >= 0.999 ? undefined : toTs(ef);
+    onChange(newStart, newEnd);
+    draggingRef.current = null;
+    setDragging(null);
+    setDragStartFrac(null);
+    setDragEndFrac(null);
+  }, [minTs, range, onChange, dragStartFrac, dragEndFrac, propsStartFrac, propsEndFrac]);
 
   if (hidden) return null;
 
   // Compute display timestamps from fractions
-  const displayStartTs = fracToTs(startFrac);
-  const displayEndTs = fracToTs(endFrac);
+  const displayStartTs = minTs + startFrac * range;
+  const displayEndTs = minTs + endFrac * range;
 
   return (
     <div className="px-3 py-1.5 border-b border-gray-800">
@@ -217,12 +216,9 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
         <div
           ref={trackRef}
           className="relative flex-1 h-5 select-none touch-none cursor-pointer"
-          onPointerDown={(e) => {
-            const frac = getTrackFraction(e.clientX);
-            const pick = Math.abs(frac - startFrac) <= Math.abs(frac - endFrac) ? 'start' : 'end';
-            e.preventDefault();
-            beginDrag(pick);
-          }}
+          onPointerDown={handleTrackPointerDown}
+          onPointerMove={handleTrackPointerMove}
+          onPointerUp={handleTrackPointerUp}
         >
           {/* Track */}
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-gray-700" />
@@ -250,7 +246,7 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
           >
             <div
               className="w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
-              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); beginDrag('start'); }}
+              onPointerDown={(e) => { e.stopPropagation(); handleTrackPointerDown(e, 'start'); }}
             />
             {dragging === 'start' && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-1.5 py-0.5 rounded bg-gray-700 text-[10px] text-gray-200 whitespace-nowrap tabular-nums shadow-lg pointer-events-none">
@@ -265,7 +261,7 @@ export function DateRangeSlider({ events, dateStart, dateEnd, onChange }: DateRa
           >
             <div
               className="w-3.5 h-3.5 rounded-full bg-accent border-2 border-gray-900 cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
-              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); beginDrag('end'); }}
+              onPointerDown={(e) => { e.stopPropagation(); handleTrackPointerDown(e, 'end'); }}
             />
             {dragging === 'end' && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-1.5 py-0.5 rounded bg-gray-700 text-[10px] text-gray-200 whitespace-nowrap tabular-nums shadow-lg pointer-events-none">

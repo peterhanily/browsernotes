@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Lock } from 'lucide-react';
-import { deriveWrappingKey, unwrapMasterKey, base64ToArrayBuffer } from '../../lib/crypto';
-import { getEncryptionMeta } from '../../lib/encryptionStore';
+import { deriveWrappingKey, unwrapMasterKey, base64ToArrayBuffer, arrayBufferToBase64, exportKeyRaw } from '../../lib/crypto';
+import { getEncryptionMeta, getSessionDuration, cacheSessionKey } from '../../lib/encryptionStore';
 import { setSessionKey } from '../../lib/encryptionMiddleware';
 
 interface PassphraseDialogProps {
@@ -26,8 +26,21 @@ export function PassphraseDialog({ onUnlocked }: PassphraseDialogProps) {
       const salt = base64ToArrayBuffer(saltB64);
       const wrappedKey = base64ToArrayBuffer(wrappedB64);
       const wrappingKey = await deriveWrappingKey(passphrase.trim(), salt);
-      const masterKey = await unwrapMasterKey(wrappedKey, wrappingKey);
-      setSessionKey(masterKey);
+
+      // Unwrap as extractable so we can cache the raw bytes
+      const extractableKey = await crypto.subtle.unwrapKey(
+        'raw', wrappedKey, wrappingKey, 'AES-KW',
+        { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'],
+      );
+      const rawBytes = await exportKeyRaw(extractableKey);
+
+      // Cache for session persistence
+      const duration = getSessionDuration();
+      cacheSessionKey(arrayBufferToBase64(rawBytes), duration);
+
+      // Import as non-extractable for actual use
+      const sessionKey = await unwrapMasterKey(wrappedKey, wrappingKey);
+      setSessionKey(sessionKey);
       onUnlocked();
     } catch {
       setError(useRecovery ? 'Invalid recovery key.' : 'Wrong passphrase.');

@@ -94,6 +94,22 @@ export async function unwrapMasterKey(
   );
 }
 
+// ── Session key export / import (for caching) ───────────────────────
+
+export async function exportKeyRaw(key: CryptoKey): Promise<ArrayBuffer> {
+  return crypto.subtle.exportKey('raw', key);
+}
+
+export async function importSessionKey(raw: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    raw,
+    { name: 'AES-GCM', length: 256 },
+    false, // non-extractable in session
+    ['encrypt', 'decrypt'],
+  );
+}
+
 // ── Field-level encrypt / decrypt ────────────────────────────────────
 
 export async function encryptField(

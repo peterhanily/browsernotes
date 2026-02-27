@@ -6,12 +6,13 @@ import {
   deriveWrappingKey,
   wrapMasterKey,
   unwrapMasterKey,
+  exportKeyRaw,
   generateRecoveryPhrase,
   generateSalt,
   arrayBufferToBase64,
   base64ToArrayBuffer,
 } from '../../lib/crypto';
-import { setEncryptionMeta, type EncryptionMetadata } from '../../lib/encryptionStore';
+import { setEncryptionMeta, getSessionDuration, cacheSessionKey, type EncryptionMetadata } from '../../lib/encryptionStore';
 import { setSessionKey, encryptAllExistingData } from '../../lib/encryptionMiddleware';
 import { db } from '../../db';
 
@@ -106,6 +107,10 @@ export function EncryptionSetup({ open, onClose, onEnabled }: EncryptionSetupPro
         wrappingKey,
       );
       setSessionKey(sessionMasterKey);
+
+      // Cache raw key bytes for session persistence
+      const rawBytes = await exportKeyRaw(masterKey);
+      cacheSessionKey(arrayBufferToBase64(rawBytes), getSessionDuration());
 
       // Encrypt all existing records
       await encryptAllExistingData(db, setProgress);

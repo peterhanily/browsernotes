@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
-import { buildGraphData } from '../lib/graph-data';
+import { buildGraphData, parseIOCNodeId } from '../lib/graph-data';
 import type { Note, Task, TimelineEvent, IOCEntry, IOCAnalysis } from '../types';
 
 function makeIOC(overrides: Partial<IOCEntry> = {}): IOCEntry {
@@ -69,6 +70,28 @@ function makeEvent(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
     ...overrides,
   };
 }
+
+describe('parseIOCNodeId', () => {
+  it('parses a valid ioc node id into type and value', () => {
+    const result = parseIOCNodeId('ioc:ipv4:1.2.3.4');
+    expect(result).toEqual({ iocType: 'ipv4', normalizedValue: '1.2.3.4' });
+  });
+
+  it('handles colons in the value portion', () => {
+    const result = parseIOCNodeId('ioc:url:https://evil.com:8080');
+    expect(result).toEqual({ iocType: 'url', normalizedValue: 'https://evil.com:8080' });
+  });
+
+  it('returns null for non-ioc prefix', () => {
+    expect(parseIOCNodeId('note:note-1')).toBeNull();
+    expect(parseIOCNodeId('task:task-1')).toBeNull();
+    expect(parseIOCNodeId('event:event-1')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(parseIOCNodeId('')).toBeNull();
+  });
+});
 
 describe('buildGraphData', () => {
   it('creates note nodes for non-trashed notes', () => {
@@ -196,5 +219,171 @@ describe('buildGraphData', () => {
     const events = [makeEvent({ linkedNoteIds: ['does-not-exist'], linkedTaskIds: ['also-missing'] })];
     const { edges } = buildGraphData([], [], events);
     expect(edges.filter((e) => e.type === 'timeline-link')).toHaveLength(0);
+  });
+
+  // --- Entity-link edge tests ---
+
+  it('creates entity-link edges for Note→Note via linkedNoteIds', () => {
+    const notes = [
+      makeNote({ id: 'note-1', linkedNoteIds: ['note-2'] }),
+      makeNote({ id: 'note-2' }),
+    ];
+    const { edges } = buildGraphData(notes, [], []);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(1);
+    expect(entityLinks[0].label).toBe('linked');
+    // Verify both ends are note nodes
+    expect(entityLinks[0].source).toContain('note:');
+    expect(entityLinks[0].target).toContain('note:');
+  });
+
+  it('creates entity-link edges for Note→Task via linkedTaskIds', () => {
+    const notes = [makeNote({ id: 'note-1', linkedTaskIds: ['task-1'] })];
+    const tasks = [makeTask({ id: 'task-1' })];
+    const { edges } = buildGraphData(notes, tasks, []);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(1);
+    expect(entityLinks[0].source).toBe('note:note-1');
+    expect(entityLinks[0].target).toBe('task:task-1');
+  });
+
+  it('creates entity-link edges for Note→Event via linkedTimelineEventIds', () => {
+    const notes = [makeNote({ id: 'note-1', linkedTimelineEventIds: ['event-1'] })];
+    const events = [makeEvent({ id: 'event-1' })];
+    const { edges } = buildGraphData(notes, [], events);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(1);
+    expect(entityLinks[0].source).toBe('note:note-1');
+    expect(entityLinks[0].target).toBe('event:event-1');
+  });
+
+  it('creates entity-link edges for Task→Note and Task→Task', () => {
+    const notes = [makeNote({ id: 'note-1' })];
+    const tasks = [
+      makeTask({ id: 'task-1', linkedNoteIds: ['note-1'], linkedTaskIds: ['task-2'] }),
+      makeTask({ id: 'task-2' }),
+    ];
+    const { edges } = buildGraphData(notes, tasks, []);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(2);
+    const targets = entityLinks.map((e) => e.target).sort();
+    expect(targets).toContain('note:note-1');
+    expect(targets).toContain('task:task-2');
+  });
+
+  it('deduplicates bidirectional entity links (A→B and B→A produce one edge)', () => {
+    const notes = [
+      makeNote({ id: 'note-1', linkedNoteIds: ['note-2'] }),
+      makeNote({ id: 'note-2', linkedNoteIds: ['note-1'] }),
+    ];
+    const { edges } = buildGraphData(notes, [], []);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(1);
+  });
+
+  it('skips entity links to non-existent targets', () => {
+    const notes = [makeNote({
+      id: 'note-1',
+      linkedNoteIds: ['note-ghost'],
+      linkedTaskIds: ['task-ghost'],
+      linkedTimelineEventIds: ['event-ghost'],
+    })];
+    const { edges } = buildGraphData(notes, [], []);
+    const entityLinks = edges.filter((e) => e.type === 'entity-link');
+    expect(entityLinks).toHaveLength(0);
+  });
+
+  // --- IOC from timeline events ---
+
+  it('creates IOC nodes from timeline event iocAnalysis', () => {
+    const ioc = makeIOC({ id: 'ioc-ev-1', type: 'domain', value: 'malware.example.com' });
+    const events = [makeEvent({ id: 'event-1', iocAnalysis: makeAnalysis([ioc]) })];
+    const { nodes, edges } = buildGraphData([], [], events);
+    const iocNodes = nodes.filter((n) => n.type === 'ioc');
+    expect(iocNodes).toHaveLength(1);
+    expect(iocNodes[0].iocType).toBe('domain');
+    expect(iocNodes[0].sourceEntityIds).toContain('event-1');
+    // Should have a contains-ioc edge from event to IOC
+    const containsEdges = edges.filter((e) => e.type === 'contains-ioc');
+    expect(containsEdges).toHaveLength(1);
+    expect(containsEdges[0].source).toBe('event:event-1');
+  });
+
+  // --- IOC label truncation ---
+
+  it('truncates IOC labels longer than 40 characters with "..."', () => {
+    const longValue = 'a'.repeat(50); // 50 chars
+    const ioc = makeIOC({ value: longValue });
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];
+    const { nodes } = buildGraphData(notes, [], []);
+    const iocNode = nodes.find((n) => n.type === 'ioc');
+    expect(iocNode).toBeDefined();
+    expect(iocNode!.label).toBe('a'.repeat(37) + '...');
+    expect(iocNode!.label.length).toBe(40);
+  });
+
+  it('does not truncate IOC labels of 40 characters or fewer', () => {
+    const exact40 = 'b'.repeat(40);
+    const ioc = makeIOC({ value: exact40 });
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];
+    const { nodes } = buildGraphData(notes, [], []);
+    const iocNode = nodes.find((n) => n.type === 'ioc');
+    expect(iocNode).toBeDefined();
+    expect(iocNode!.label).toBe(exact40);
+  });
+
+  it('does not truncate short IOC values', () => {
+    const shortValue = '1.2.3.4';
+    const ioc = makeIOC({ value: shortValue });
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc]) })];
+    const { nodes } = buildGraphData(notes, [], []);
+    const iocNode = nodes.find((n) => n.type === 'ioc');
+    expect(iocNode).toBeDefined();
+    expect(iocNode!.label).toBe(shortValue);
+  });
+
+  // --- sourceEntityIds across entity types ---
+
+  it('IOC shared across note, task, and event has all three in sourceEntityIds', () => {
+    const iocInNote = makeIOC({ id: 'ioc-n1', type: 'ipv4', value: '192.168.1.1' });
+    const iocInTask = makeIOC({ id: 'ioc-t1', type: 'ipv4', value: '192.168.1.1' });
+    const iocInEvent = makeIOC({ id: 'ioc-e1', type: 'ipv4', value: '192.168.1.1' });
+    const notes = [makeNote({ id: 'note-1', iocAnalysis: makeAnalysis([iocInNote]) })];
+    const tasks = [makeTask({ id: 'task-1', iocAnalysis: makeAnalysis([iocInTask]) })];
+    const events = [makeEvent({ id: 'event-1', iocAnalysis: makeAnalysis([iocInEvent]) })];
+    const { nodes } = buildGraphData(notes, tasks, events);
+    const iocNodes = nodes.filter((n) => n.type === 'ioc');
+    expect(iocNodes).toHaveLength(1);
+    expect(iocNodes[0].sourceEntityIds).toContain('note-1');
+    expect(iocNodes[0].sourceEntityIds).toContain('task-1');
+    expect(iocNodes[0].sourceEntityIds).toContain('event-1');
+    expect(iocNodes[0].sourceEntityIds).toHaveLength(3);
+  });
+
+  // --- Edge deduplication ---
+
+  it('does not duplicate the same note→IOC contains-ioc edge', () => {
+    // Same IOC appearing twice in the same note's analysis (different IOCEntry ids, same type+value)
+    const ioc1 = makeIOC({ id: 'ioc-1', type: 'ipv4', value: '10.0.0.1' });
+    const ioc2 = makeIOC({ id: 'ioc-2', type: 'ipv4', value: '10.0.0.1' });
+    const notes = [makeNote({ iocAnalysis: makeAnalysis([ioc1, ioc2]) })];
+    const { edges } = buildGraphData(notes, [], []);
+    const containsEdges = edges.filter((e) => e.type === 'contains-ioc');
+    // Both IOCs deduplicate to the same node, so only one edge from note to that IOC node
+    expect(containsEdges).toHaveLength(1);
+  });
+
+  it('does not duplicate contains-ioc edge when same IOC appears in note and task', () => {
+    const iocInNote = makeIOC({ id: 'ioc-1', type: 'domain', value: 'shared.com' });
+    const iocInTask = makeIOC({ id: 'ioc-2', type: 'domain', value: 'shared.com' });
+    const notes = [makeNote({ id: 'note-1', iocAnalysis: makeAnalysis([iocInNote]) })];
+    const tasks = [makeTask({ id: 'task-1', iocAnalysis: makeAnalysis([iocInTask]) })];
+    const { edges } = buildGraphData(notes, tasks, []);
+    const containsEdges = edges.filter((e) => e.type === 'contains-ioc');
+    // One edge from note→IOC and one from task→IOC (different sources, same IOC target)
+    expect(containsEdges).toHaveLength(2);
+    // But no duplicates -- both edges have different source nodes
+    const sources = containsEdges.map((e) => e.source);
+    expect(new Set(sources).size).toBe(2);
   });
 });

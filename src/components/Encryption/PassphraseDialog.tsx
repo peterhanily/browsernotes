@@ -34,13 +34,15 @@ export function PassphraseDialog({ onUnlocked }: PassphraseDialogProps) {
       );
       const rawBytes = await exportKeyRaw(extractableKey);
 
+      const rawB64 = arrayBufferToBase64(rawBytes);
+
       // Cache for session persistence
       const duration = getSessionDuration();
-      cacheSessionKey(arrayBufferToBase64(rawBytes), duration);
+      cacheSessionKey(rawB64, duration);
 
       // Import as non-extractable for actual use
       const sessionKey = await unwrapMasterKey(wrappedKey, wrappingKey);
-      setSessionKey(sessionKey);
+      setSessionKey(sessionKey, rawB64);
       onUnlocked();
     } catch {
       setError(useRecovery ? 'Invalid recovery key.' : 'Wrong passphrase.');

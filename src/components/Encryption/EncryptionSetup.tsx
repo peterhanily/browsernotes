@@ -106,11 +106,11 @@ export function EncryptionSetup({ open, onClose, onEnabled }: EncryptionSetupPro
         base64ToArrayBuffer(meta.wrappedKey),
         wrappingKey,
       );
-      setSessionKey(sessionMasterKey);
-
       // Cache raw key bytes for session persistence
       const rawBytes = await exportKeyRaw(masterKey);
-      cacheSessionKey(arrayBufferToBase64(rawBytes), getSessionDuration());
+      const rawB64 = arrayBufferToBase64(rawBytes);
+      setSessionKey(sessionMasterKey, rawB64);
+      cacheSessionKey(rawB64, getSessionDuration());
 
       // Encrypt all existing records
       await encryptAllExistingData(db, setProgress);

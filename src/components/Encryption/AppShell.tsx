@@ -21,7 +21,7 @@ export function AppShell() {
 
     importSessionKey(base64ToArrayBuffer(cachedKey))
       .then((key) => {
-        setSessionKey(key);
+        setSessionKey(key, cachedKey);
         setIsUnlocked(true);
       })
       .catch(() => {

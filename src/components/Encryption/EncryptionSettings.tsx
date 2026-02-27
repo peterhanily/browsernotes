@@ -22,7 +22,7 @@ import {
   SESSION_DURATION_LABELS,
   type SessionDuration,
 } from '../../lib/encryptionStore';
-import { decryptAllExistingData, setSessionKey, getSessionKey } from '../../lib/encryptionMiddleware';
+import { decryptAllExistingData, setSessionKey, getSessionKeyRaw } from '../../lib/encryptionMiddleware';
 import { db } from '../../db';
 
 export function EncryptionSettings() {
@@ -43,32 +43,27 @@ export function EncryptionSettings() {
   const [changeError, setChangeError] = useState('');
 
   // Session duration state
-  const [sessionDuration, setSessionDurationState] = useState<SessionDuration>(getSessionDuration);
+  const savedDuration = getSessionDuration();
+  const [sessionDuration, setSessionDurationLocal] = useState<SessionDuration>(savedDuration);
+  const [durationSaved, setDurationSaved] = useState(false);
+  const durationChanged = sessionDuration !== savedDuration;
 
-  const handleSessionDurationChange = async (duration: SessionDuration) => {
-    setSessionDurationState(duration);
+  const handleSaveSessionDuration = () => {
     const meta = getEncryptionMeta();
     if (meta) {
-      setEncryptionMeta({ ...meta, sessionDuration: duration });
+      setEncryptionMeta({ ...meta, sessionDuration });
     }
-    // Update the cache with new duration (re-cache current session key if active)
-    if (duration === 'every-load') {
+    // Update the cache with new duration
+    if (sessionDuration === 'every-load') {
       clearSessionCache();
     } else {
-      const currentKey = getSessionKey();
-      if (currentKey) {
-        try {
-          // Export current session key — need extractable version
-          // Re-derive from the stored wrapped key isn't possible without passphrase,
-          // but we can check if there's already a cached key and update its TTL
-          // If no cached key exists, the new duration takes effect on next unlock
-          const rawBytes = await exportKeyRaw(currentKey);
-          cacheSessionKey(arrayBufferToBase64(rawBytes), duration);
-        } catch {
-          // Non-extractable key — new duration takes effect on next unlock
-        }
+      const rawB64 = getSessionKeyRaw();
+      if (rawB64) {
+        cacheSessionKey(rawB64, sessionDuration);
       }
     }
+    setDurationSaved(true);
+    setTimeout(() => setDurationSaved(false), 2000);
   };
 
   const handleDisable = async () => {
@@ -139,11 +134,12 @@ export function EncryptionSettings() {
         base64ToArrayBuffer(arrayBufferToBase64(newWrappedKey)),
         newWrappingKey,
       );
-      setSessionKey(sessionKey);
+      const rawBytes = await exportKeyRaw(masterKey);
+      const rawB64 = arrayBufferToBase64(rawBytes);
+      setSessionKey(sessionKey, rawB64);
 
       // Re-cache with new key bytes
-      const rawBytes = await exportKeyRaw(masterKey);
-      cacheSessionKey(arrayBufferToBase64(rawBytes), getSessionDuration());
+      cacheSessionKey(rawB64, getSessionDuration());
 
       setShowChangePass(false);
       setCurrentPass('');
@@ -173,20 +169,29 @@ export function EncryptionSettings() {
               Enabled {new Date(meta.enabledAt).toLocaleDateString()}
             </p>
           )}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <label className="flex items-center gap-1.5 text-sm text-gray-400">
               <Clock size={14} />
               Session duration
             </label>
-            <select
-              value={sessionDuration}
-              onChange={(e) => handleSessionDurationChange(e.target.value as SessionDuration)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-accent"
-            >
-              {(Object.entries(SESSION_DURATION_LABELS) as [SessionDuration, string][]).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={sessionDuration}
+                onChange={(e) => { setSessionDurationLocal(e.target.value as SessionDuration); setDurationSaved(false); }}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-accent"
+              >
+                {(Object.entries(SESSION_DURATION_LABELS) as [SessionDuration, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleSaveSessionDuration}
+                disabled={!durationChanged && !durationSaved}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors bg-accent hover:bg-accent-hover disabled:opacity-50 text-white"
+              >
+                {durationSaved ? 'Saved' : 'Save'}
+              </button>
+            </div>
             <p className="text-xs text-gray-500">
               {sessionDuration === 'every-load'
                 ? 'You\'ll enter your passphrase every time you open BrowserNotes.'

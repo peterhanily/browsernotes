@@ -27,13 +27,20 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
 // ── Session key (in-memory only, lost on tab close) ──────────────────
 
 let sessionKey: CryptoKey | null = null;
+let sessionKeyRawB64: string | null = null; // raw key bytes for re-caching
 
-export function setSessionKey(key: CryptoKey | null): void {
+export function setSessionKey(key: CryptoKey | null, rawBase64?: string): void {
   sessionKey = key;
+  if (rawBase64 !== undefined) sessionKeyRawB64 = rawBase64;
+  if (key === null) sessionKeyRawB64 = null;
 }
 
 export function getSessionKey(): CryptoKey | null {
   return sessionKey;
+}
+
+export function getSessionKeyRaw(): string | null {
+  return sessionKeyRawB64;
 }
 
 // ── Row-level encrypt / decrypt ──────────────────────────────────────

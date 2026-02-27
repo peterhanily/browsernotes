@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry } from './types';
+import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
 const db = new Dexie('BrowserNotesDB') as Dexie & {
   notes: EntityTable<Note, 'id'>;
@@ -86,5 +87,8 @@ db.version(10).stores({});
 
 // Version 11: Investigation metadata fields on folders (all optional, no index changes)
 db.version(11).stores({});
+
+// Encryption-at-rest middleware (transparent to all CRUD hooks)
+installEncryptionMiddleware(db);
 
 export { db };

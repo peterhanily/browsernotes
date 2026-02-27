@@ -4,6 +4,7 @@ import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
 import { OCISync } from './OCISync';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
+import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -65,6 +66,10 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       <hr className="border-gray-800" />
 
       <ExportImport notes={notes} onImportComplete={onImportComplete} />
+
+      <hr className="border-gray-800" />
+
+      <EncryptionSettings />
 
       <hr className="border-gray-800" />
 

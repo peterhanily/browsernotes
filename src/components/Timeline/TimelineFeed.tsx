@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Clock } from 'lucide-react';
 import type { TimelineEvent } from '../../types';
 import { TimelineEventCard } from './TimelineEventCard';
@@ -40,6 +41,8 @@ function groupByDate(events: TimelineEvent[]): Map<string, TimelineEvent[]> {
 }
 
 export function TimelineFeed({ events, selectedId, onSelect, onToggleStar, onDelete }: TimelineFeedProps) {
+  const groups = useMemo(() => groupByDate(events), [events]);
+
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-gray-600">
@@ -49,8 +52,6 @@ export function TimelineFeed({ events, selectedId, onSelect, onToggleStar, onDel
       </div>
     );
   }
-
-  const groups = groupByDate(events);
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
@@ -70,8 +71,8 @@ export function TimelineFeed({ events, selectedId, onSelect, onToggleStar, onDel
                 key={event.id}
                 event={event}
                 active={event.id === selectedId}
-                onClick={() => onSelect(event.id)}
-                onToggleStar={() => onToggleStar(event.id)}
+                onSelect={onSelect}
+                onToggleStar={onToggleStar}
                 onDelete={onDelete}
               />
             ))}

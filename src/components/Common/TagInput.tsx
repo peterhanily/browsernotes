@@ -53,7 +53,7 @@ export function TagInput({ selectedTags, allTags, onChange, onCreateTag }: TagIn
               style={{ backgroundColor: (tagObj?.color || '#6366f1') + '20', color: tagObj?.color || '#6366f1' }}
             >
               {tag}
-              <button onClick={() => removeTag(tag)} className="hover:opacity-70">
+              <button onClick={() => removeTag(tag)} className="hover:opacity-70" aria-label={`Remove tag ${tag}`}>
                 <X size={12} />
               </button>
             </span>

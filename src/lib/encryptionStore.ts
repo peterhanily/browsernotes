@@ -78,15 +78,12 @@ export function cacheSessionKey(rawKeyBase64: string, duration: SessionDuration)
   };
   const payload = JSON.stringify(cache);
 
-  if (duration === 'tab-close') {
-    sessionStorage.setItem(SESSION_CACHE_KEY, payload);
-  } else {
-    localStorage.setItem(SESSION_CACHE_KEY, payload);
-  }
+  // Always use sessionStorage so raw key bytes never persist beyond the browser session
+  sessionStorage.setItem(SESSION_CACHE_KEY, payload);
 }
 
 export function getCachedSessionKey(): string | null {
-  const raw = sessionStorage.getItem(SESSION_CACHE_KEY) ?? localStorage.getItem(SESSION_CACHE_KEY);
+  const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
   if (!raw) return null;
 
   try {
@@ -105,5 +102,6 @@ export function getCachedSessionKey(): string | null {
 
 export function clearSessionCache(): void {
   sessionStorage.removeItem(SESSION_CACHE_KEY);
+  // Clean up any legacy localStorage cache from older versions
   localStorage.removeItem(SESSION_CACHE_KEY);
 }

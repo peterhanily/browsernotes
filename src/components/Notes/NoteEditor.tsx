@@ -62,7 +62,7 @@ export function NoteEditor({
   const [showIOCPanel, setShowIOCPanel] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareMessage, setShareMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const cloud = useCloudSync();
+  const cloud = useCloudSync(externalSettings?.backupDestinations);
   const logActivity = useLogActivity();
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);

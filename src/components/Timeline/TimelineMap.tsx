@@ -71,10 +71,6 @@ function FitBounds({ bounds }: { bounds: L.LatLngBounds }) {
   return null;
 }
 
-function isLightTheme(): boolean {
-  return document.documentElement.classList.contains('light');
-}
-
 // Default: world view centered at 20N, 0E
 const DEFAULT_CENTER: [number, number] = [20, 0];
 const DEFAULT_ZOOM = 2;
@@ -82,6 +78,17 @@ const DEFAULT_ZOOM = 2;
 export function TimelineMap({ events, onSelect, onToggleStar, onDelete, onCreateEventAtLocation }: TimelineMapProps) {
   const hasAnyMapped = events.some((e) => e.latitude != null && e.longitude != null);
   const [placeMode, setPlaceMode] = useState(!hasAnyMapped);
+
+  // Track theme reactively via MutationObserver so tile URL updates on toggle
+  const [isLight, setIsLight] = useState(() => document.documentElement.classList.contains('light'));
+  useEffect(() => {
+    const el = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setIsLight(el.classList.contains('light'));
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const mappedEvents = useMemo(
     () => events.filter((e) => e.latitude != null && e.longitude != null),
@@ -107,7 +114,7 @@ export function TimelineMap({ events, onSelect, onToggleStar, onDelete, onCreate
     [onCreateEventAtLocation]
   );
 
-  const tileUrl = isLightTheme()
+  const tileUrl = isLight
     ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
     : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 

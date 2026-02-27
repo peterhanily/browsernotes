@@ -109,24 +109,29 @@ export function EntityLinker({
   const query = search.toLowerCase();
   const searchResults: EntityItem[] = [];
   if (query) {
+    const PER_TYPE = 7;
+    const noteResults: EntityItem[] = [];
+    const taskResults: EntityItem[] = [];
+    const eventResults: EntityItem[] = [];
     for (const n of allNotes) {
       if (n.id !== currentEntityId && !n.trashed && n.title.toLowerCase().includes(query)) {
-        searchResults.push({ id: n.id, title: n.title || 'Untitled', type: 'note' });
+        noteResults.push({ id: n.id, title: n.title || 'Untitled', type: 'note' });
       }
-      if (searchResults.length >= 20) break;
+      if (noteResults.length >= PER_TYPE) break;
     }
     for (const t of allTasks) {
       if (t.id !== currentEntityId && t.title.toLowerCase().includes(query)) {
-        searchResults.push({ id: t.id, title: t.title || 'Untitled', type: 'task' });
+        taskResults.push({ id: t.id, title: t.title || 'Untitled', type: 'task' });
       }
-      if (searchResults.length >= 20) break;
+      if (taskResults.length >= PER_TYPE) break;
     }
     for (const e of allTimelineEvents) {
       if (e.id !== currentEntityId && e.title.toLowerCase().includes(query)) {
-        searchResults.push({ id: e.id, title: e.title || 'Untitled', type: 'timeline-event' });
+        eventResults.push({ id: e.id, title: e.title || 'Untitled', type: 'timeline-event' });
       }
-      if (searchResults.length >= 20) break;
+      if (eventResults.length >= PER_TYPE) break;
     }
+    searchResults.push(...noteResults, ...taskResults, ...eventResults);
   }
 
   // Resolve linked entities for display

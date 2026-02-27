@@ -31,7 +31,10 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
-  const notesWithIOCs = notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed));
+  const notesWithIOCs = useMemo(
+    () => notes.filter((n) => n.iocAnalysis && n.iocAnalysis.iocs.some((ioc) => !ioc.dismissed)),
+    [notes]
+  );
 
   const folderMap = useMemo(() => {
     const map = new Map<string, Folder>();
@@ -165,7 +168,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
                 key={note.id}
                 note={note}
                 active={note.id === selectedId}
-                onClick={() => onSelect(note.id)}
+                onSelect={onSelect}
                 onTrash={onTrash}
                 folderColor={folder?.color}
                 folderName={folder?.name}

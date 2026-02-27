@@ -456,11 +456,12 @@ export function TimelineView({
               <TimelineEventCard
                 key={ev.id}
                 event={ev}
-                onClick={() => {
+                onSelect={(id) => {
                   setHeatmapDetailTechId(null);
-                  setEditingEvent(ev);
+                  const event = filteredEvents.find((e) => e.id === id);
+                  if (event) setEditingEvent(event);
                 }}
-                onToggleStar={() => onToggleStar(ev.id)}
+                onToggleStar={onToggleStar}
                 onDelete={(id) => setDeletingEventId(id)}
               />
             ))

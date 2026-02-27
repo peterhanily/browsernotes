@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, ShieldOff, KeyRound, Clock } from 'lucide-react';
+import { Shield, ShieldOff, KeyRound, Clock, AlertTriangle } from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import { EncryptionSetup } from './EncryptionSetup';
 import {
@@ -10,6 +10,7 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
   exportKeyRaw,
+  isSecureContext,
 } from '../../lib/crypto';
 import {
   isEncryptionEnabled,
@@ -157,6 +158,13 @@ export function EncryptionSettings() {
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-300">Encryption</h3>
+
+      {!isSecureContext() && (
+        <div className="flex items-start gap-2 p-2 rounded bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-xs">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span>Encryption requires HTTPS or localhost. It is unavailable over plain HTTP.</span>
+        </div>
+      )}
 
       {enabled ? (
         <>

@@ -7,7 +7,7 @@ import { ClsBadge } from '../Common/ClsBadge';
 interface NoteCardProps {
   note: Note;
   active: boolean;
-  onClick: () => void;
+  onSelect: (id: string) => void;
   onTrash?: (id: string) => void;
   folderColor?: string;
   folderName?: string;
@@ -15,15 +15,16 @@ interface NoteCardProps {
   onDragStart?: (e: React.DragEvent) => void;
 }
 
-export const NoteCard = React.memo(function NoteCard({ note, active, onClick, onTrash, folderColor, folderName, draggable, onDragStart }: NoteCardProps) {
+export const NoteCard = React.memo(function NoteCard({ note, active, onSelect, onTrash, folderColor, folderName, draggable, onDragStart }: NoteCardProps) {
   const preview = note.content.replace(/[#*`_[\]()>-]/g, '').trim();
+  const activeIOCCount = note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      onClick={() => onSelect(note.id)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(note.id); } }}
       draggable={draggable}
       onDragStart={onDragStart}
       className={cn(
@@ -67,10 +68,10 @@ export const NoteCard = React.memo(function NoteCard({ note, active, onClick, on
           </span>
         )}
         {note.clsLevel && <ClsBadge level={note.clsLevel} />}
-        {(note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
+        {activeIOCCount > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent/70 bg-accent/10 px-1.5 rounded-full">
             <Shield size={9} />
-            {note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length}
+            {activeIOCCount}
           </span>
         )}
         {note.tags.length > 0 && (

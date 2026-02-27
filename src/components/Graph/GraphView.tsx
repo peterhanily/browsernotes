@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useMemo, useCallback } from 'react';
-import { Loader2, Search, Network, Maximize2, ChevronDown, ChevronRight, HelpCircle, X as XIcon } from 'lucide-react';
+import { Loader2, Search, Network, Maximize2, ChevronDown, ChevronRight, HelpCircle, X as XIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Settings, IOCType } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { buildGraphData } from '../../lib/graph-data';
@@ -57,6 +57,7 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
   const [visibleIOCTypes, setVisibleIOCTypes] = useState<Set<IOCType>>(new Set(ALL_IOC_TYPES));
   const [visibleEdgeTypes, setVisibleEdgeTypes] = useState<Set<EdgeTypeFilter>>(new Set(['contains-ioc', 'ioc-relationship', 'timeline-link', 'entity-link']));
   const [editingIOCNode, setEditingIOCNode] = useState<GraphNode | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [linkDialogState, setLinkDialogState] = useState<{ sourceNodeId: string; targetNodeId: string } | null>(null);
   const [fitTrigger, setFitTrigger] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -220,13 +221,21 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
   const legendEntries = useMemo(() => getLegendEntries(), []);
 
   return (
-    <div className="flex flex-1 overflow-hidden h-full">
-      {/* Left sidebar — filters */}
-      <div className="w-52 border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto shrink-0">
+    <div className="flex flex-1 overflow-hidden h-full relative">
+      {/* Left sidebar — filters (collapsible) */}
+      <div className={`${sidebarCollapsed ? 'hidden' : 'w-52'} border-r border-gray-800 bg-gray-900 flex flex-col overflow-y-auto shrink-0`}>
         <div className="p-3 border-b border-gray-800">
           <div className="flex items-center gap-2 mb-2">
             <Network size={14} className="text-accent" />
             <span className="text-xs font-semibold text-gray-300">Entity Graph</span>
+            <button
+              onClick={() => setSidebarCollapsed(true)}
+              className="ml-auto p-0.5 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+              title="Collapse sidebar"
+              aria-label="Collapse graph sidebar"
+            >
+              <PanelLeftClose size={14} />
+            </button>
           </div>
           <div className="relative">
             <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -371,6 +380,16 @@ export function GraphView({ notes, tasks, timelineEvents, settings, layout: exte
 
       {/* Canvas */}
       <div data-tour="graph-canvas" className="flex-1 relative bg-gray-950">
+        {sidebarCollapsed && (
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            className="absolute top-2 left-2 z-10 p-1.5 rounded bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-700 shadow-lg"
+            title="Show filters"
+            aria-label="Expand graph sidebar"
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+        )}
         {filteredGraphData.nodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
             <Network size={48} className="mb-3" />

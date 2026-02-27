@@ -9,8 +9,8 @@ import { ClsBadge } from '../Common/ClsBadge';
 interface TimelineEventCardProps {
   event: TimelineEvent;
   active?: boolean;
-  onClick: () => void;
-  onToggleStar: () => void;
+  onSelect: (id: string) => void;
+  onToggleStar: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -21,7 +21,7 @@ function formatTime(timestamp: number): string {
 export const TimelineEventCard = React.memo(function TimelineEventCard({
   event,
   active,
-  onClick,
+  onSelect,
   onToggleStar,
   onDelete,
 }: TimelineEventCardProps) {
@@ -31,7 +31,7 @@ export const TimelineEventCard = React.memo(function TimelineEventCard({
 
   return (
     <button
-      onClick={onClick}
+      onClick={() => onSelect(event.id)}
       className={cn(
         'w-full text-left p-3 rounded-lg border transition-colors group',
         active
@@ -72,7 +72,7 @@ export const TimelineEventCard = React.memo(function TimelineEventCard({
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+            onClick={(e) => { e.stopPropagation(); onToggleStar(event.id); }}
             className={cn(
               'p-0.5 rounded transition-colors',
               event.starred

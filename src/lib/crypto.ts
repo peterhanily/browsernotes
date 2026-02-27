@@ -3,6 +3,12 @@
  * AES-256-GCM for field encryption, PBKDF2 for key derivation, AES-KW for key wrapping.
  */
 
+export function isSecureContext(): boolean {
+  return typeof globalThis.isSecureContext !== 'undefined'
+    ? globalThis.isSecureContext
+    : location.protocol === 'https:' || location.hostname === 'localhost';
+}
+
 const PBKDF2_ITERATIONS = 600_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12; // 96-bit nonce for AES-GCM

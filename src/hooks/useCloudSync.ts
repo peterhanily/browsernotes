@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import { useSettings } from './useSettings';
+import { useState, useCallback, useMemo } from 'react';
 import { exportJSON } from '../lib/export';
 import type { Note, ExportData, BackupDestination } from '../types';
 import {
@@ -25,16 +24,15 @@ function summarizeResults(results: DestinationPutResult[]): { allOk: boolean; er
   return { allOk: false, errorMsg: `${failed.length} of ${results.length} destinations failed` };
 }
 
-export function useCloudSync() {
-  const { settings } = useSettings();
+export function useCloudSync(backupDestinations?: BackupDestination[]) {
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [lastResults, setLastResults] = useState<DestinationPutResult[]>([]);
 
-  const destinations = settings.backupDestinations ?? [];
-  const enabledDestinations = destinations.filter((d) => d.enabled);
+  const destinations = useMemo(() => backupDestinations ?? [], [backupDestinations]);
+  const enabledDestinations = useMemo(() => destinations.filter((d) => d.enabled), [destinations]);
   const hasDestinations = enabledDestinations.length > 0;
 
   const pushFullBackup = useCallback(async () => {
@@ -42,7 +40,7 @@ export function useCloudSync() {
     setError(null);
     setProgress('Exporting data...');
     try {
-      const dests = (settings.backupDestinations ?? []).filter((d) => d.enabled);
+      const dests = destinations.filter((d) => d.enabled);
       if (dests.length === 0) throw new Error('No backup destinations configured. Go to Settings > Cloud Backup to add one.');
       const label = getLabel(dests);
 
@@ -80,14 +78,14 @@ export function useCloudSync() {
     } finally {
       setSyncing(false);
     }
-  }, [settings.backupDestinations]);
+  }, [destinations]);
 
   const shareNote = useCallback(async (note: Note, clipsFolderId?: string) => {
     setSyncing(true);
     setError(null);
     setProgress('Sharing note...');
     try {
-      const dests = (settings.backupDestinations ?? []).filter((d) => d.enabled);
+      const dests = destinations.filter((d) => d.enabled);
       if (dests.length === 0) throw new Error('No backup destinations configured.');
       const label = getLabel(dests);
 
@@ -110,14 +108,14 @@ export function useCloudSync() {
     } finally {
       setSyncing(false);
     }
-  }, [settings.backupDestinations]);
+  }, [destinations]);
 
   const shareIOCReport = useCallback(async (note: Note) => {
     setSyncing(true);
     setError(null);
     setProgress('Sharing IOC report...');
     try {
-      const dests = (settings.backupDestinations ?? []).filter((d) => d.enabled);
+      const dests = destinations.filter((d) => d.enabled);
       if (dests.length === 0) throw new Error('No backup destinations configured.');
       const label = getLabel(dests);
 
@@ -140,7 +138,7 @@ export function useCloudSync() {
     } finally {
       setSyncing(false);
     }
-  }, [settings.backupDestinations]);
+  }, [destinations]);
 
   const pushIOCs = useCallback(async (
     entries: IOCExportEntry[],
@@ -152,7 +150,7 @@ export function useCloudSync() {
     setError(null);
     setProgress('Pushing IOCs...');
     try {
-      const dests = (settings.backupDestinations ?? []).filter((d) => d.enabled);
+      const dests = destinations.filter((d) => d.enabled);
       if (dests.length === 0) throw new Error('No backup destinations configured.');
 
       const data = formatIOCsFlatJSON(entries, tiExportConfig);
@@ -180,7 +178,7 @@ export function useCloudSync() {
     } finally {
       setSyncing(false);
     }
-  }, [settings.backupDestinations]);
+  }, [destinations]);
 
   return {
     syncing,

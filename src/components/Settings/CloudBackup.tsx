@@ -17,7 +17,7 @@ const PROVIDER_OPTIONS: { value: CloudProvider; label: string }[] = [
 
 export function CloudBackup() {
   const { settings, updateSettings } = useSettings();
-  const cloud = useCloudSync();
+  const cloud = useCloudSync(settings.backupDestinations);
   const logActivity = useLogActivity();
 
   const destinations = settings.backupDestinations ?? [];

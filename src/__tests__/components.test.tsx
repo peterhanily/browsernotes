@@ -106,41 +106,41 @@ describe('NoteCard', () => {
   };
 
   it('renders note title', () => {
-    render(<NoteCard note={note} active={false} onClick={() => {}} />);
+    render(<NoteCard note={note} active={false} onSelect={() => {}} />);
     expect(screen.getByText('Test Note')).toBeInTheDocument();
   });
 
   it('shows tags', () => {
-    render(<NoteCard note={note} active={false} onClick={() => {}} />);
+    render(<NoteCard note={note} active={false} onSelect={() => {}} />);
     expect(screen.getByText('work')).toBeInTheDocument();
     expect(screen.getByText('important')).toBeInTheDocument();
   });
 
-  it('calls onClick when clicked', () => {
-    let clicked = false;
-    render(<NoteCard note={note} active={false} onClick={() => { clicked = true; }} />);
+  it('calls onSelect when clicked', () => {
+    let selectedId = '';
+    render(<NoteCard note={note} active={false} onSelect={(id) => { selectedId = id; }} />);
     fireEvent.click(screen.getByText('Test Note'));
-    expect(clicked).toBe(true);
+    expect(selectedId).toBe(note.id);
   });
 
   it('shows "Untitled" for empty title', () => {
     const untitled = { ...note, title: '' };
-    render(<NoteCard note={untitled} active={false} onClick={() => {}} />);
+    render(<NoteCard note={untitled} active={false} onSelect={() => {}} />);
     expect(screen.getByText('Untitled')).toBeInTheDocument();
   });
 
   it('shows folder name badge when folderName is set', () => {
-    render(<NoteCard note={note} active={false} onClick={() => {}} folderName="Work" folderColor="#3b82f6" />);
+    render(<NoteCard note={note} active={false} onSelect={() => {}} folderName="Work" folderColor="#3b82f6" />);
     expect(screen.getByText('Work')).toBeInTheDocument();
   });
 
   it('does not show folder badge when folderName is not set', () => {
-    render(<NoteCard note={note} active={false} onClick={() => {}} />);
+    render(<NoteCard note={note} active={false} onSelect={() => {}} />);
     expect(screen.queryByText('Work')).not.toBeInTheDocument();
   });
 
   it('applies folder color left border when not active', () => {
-    const { container } = render(<NoteCard note={note} active={false} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
+    const { container } = render(<NoteCard note={note} active={false} onSelect={() => {}} folderColor="#ef4444" folderName="Clips" />);
     const card = container.querySelector('div[role="button"]') as HTMLElement;
     expect(card).toBeTruthy();
     // jsdom normalizes hex to rgb
@@ -149,7 +149,7 @@ describe('NoteCard', () => {
   });
 
   it('does not apply folder color left border when active', () => {
-    const { container } = render(<NoteCard note={note} active={true} onClick={() => {}} folderColor="#ef4444" folderName="Clips" />);
+    const { container } = render(<NoteCard note={note} active={true} onSelect={() => {}} folderColor="#ef4444" folderName="Clips" />);
     const card = container.querySelector('div[role="button"]') as HTMLElement;
     expect(card).toBeTruthy();
     expect(card.style.borderLeftColor).toBe('');
@@ -167,7 +167,7 @@ describe('NoteCard', () => {
         ],
       },
     };
-    render(<NoteCard note={noteWithIOCs} active={false} onClick={() => {}} />);
+    render(<NoteCard note={noteWithIOCs} active={false} onSelect={() => {}} />);
     expect(screen.getByText('2')).toBeInTheDocument(); // 2 non-dismissed
   });
 });

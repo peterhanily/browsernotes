@@ -42,8 +42,6 @@ export function useTimelines() {
   }, []);
 
   const deleteTimeline = useCallback(async (id: string) => {
-    const all = await db.timelines.toArray();
-    if (all.length <= 1) return;
     await db.transaction('rw', [db.timelines, db.timelineEvents, db.folders], async () => {
       await db.timelines.delete(id);
       await db.timelineEvents.where('timelineId').equals(id).delete();

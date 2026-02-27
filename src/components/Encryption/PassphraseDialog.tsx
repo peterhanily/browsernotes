@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
 import { deriveWrappingKey, unwrapMasterKey, base64ToArrayBuffer, arrayBufferToBase64, exportKeyRaw } from '../../lib/crypto';
-import { getEncryptionMeta, getSessionDuration, cacheSessionKey } from '../../lib/encryptionStore';
+import { getEncryptionMeta, getSessionDuration, cacheSessionKey, clearEncryptionMeta, clearSessionCache } from '../../lib/encryptionStore';
 import { setSessionKey } from '../../lib/encryptionMiddleware';
+import { db } from '../../db';
 
 interface PassphraseDialogProps {
   onUnlocked: () => void;
@@ -14,6 +15,9 @@ export function PassphraseDialog({ onUnlocked }: PassphraseDialogProps) {
   const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const handleUnlock = async () => {
     setError('');
@@ -56,6 +60,65 @@ export function PassphraseDialog({ onUnlocked }: PassphraseDialogProps) {
     setPassphrase('');
     setError('');
   };
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await db.delete();
+      clearEncryptionMeta();
+      clearSessionCache();
+      window.location.reload();
+    } catch {
+      setResetting(false);
+    }
+  };
+
+  if (showReset) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-700 w-full max-w-md p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <AlertTriangle className="text-red-400" size={24} />
+            <h2 className="text-xl font-bold text-gray-100">Start Fresh</h2>
+          </div>
+
+          <p className="text-sm text-red-400 mb-4 font-medium">
+            This will permanently delete all your encrypted data (notes, tasks, timelines, etc.). This cannot be undone.
+          </p>
+
+          <p className="text-sm text-gray-400 mb-3">
+            Type <span className="font-mono font-bold text-gray-200">DELETE</span> to confirm.
+          </p>
+
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder='Type "DELETE" to confirm'
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-red-500 mb-3"
+            autoFocus
+          />
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowReset(false); setConfirmText(''); }}
+              disabled={resetting}
+              className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={confirmText !== 'DELETE' || resetting}
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              {resetting ? 'Deleting...' : 'Delete All Data & Start Fresh'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -112,9 +175,16 @@ export function PassphraseDialog({ onUnlocked }: PassphraseDialogProps) {
 
         <button
           onClick={toggleMode}
-          className="w-full text-sm text-accent hover:text-accent-hover transition-colors"
+          className="w-full text-sm text-accent hover:text-accent-hover transition-colors mb-2"
         >
           {useRecovery ? 'Use passphrase instead' : 'Use recovery key'}
+        </button>
+
+        <button
+          onClick={() => setShowReset(true)}
+          className="w-full text-sm text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          Forgot passphrase?
         </button>
       </div>
     </div>

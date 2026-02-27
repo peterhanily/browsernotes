@@ -213,30 +213,33 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
               </div>
             </div>
 
-            {/* Lever */}
+            {/* Slot machine arm */}
             <button
               onClick={spin}
               disabled={spinning}
-              className="relative w-10 flex flex-col items-center justify-start pt-1 cursor-pointer group disabled:cursor-not-allowed"
+              className="relative w-14 flex flex-col items-center cursor-pointer group disabled:cursor-not-allowed select-none"
               aria-label="Pull lever to spin"
               title="Pull lever"
             >
-              {/* Track */}
-              <div className="w-1.5 h-full bg-gray-600 rounded-full relative">
-                {/* Ball */}
+              {/* Mounting plate */}
+              <div className="w-5 h-full bg-gradient-to-r from-gray-500 to-gray-600 rounded-sm border border-gray-500 relative flex items-center justify-center">
+                {/* Pivot point */}
+                <div className="absolute top-2 w-3 h-3 rounded-full bg-gray-400 border border-gray-500 z-10" />
+                {/* Arm — pivots from top */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-red-500 shadow-lg shadow-red-500/30 transition-all ${
-                    leverPulled
-                      ? 'top-[calc(100%-24px)]'
-                      : 'top-0 group-hover:top-1'
-                  }`}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 origin-top transition-transform"
                   style={{
-                    transitionDuration: leverPulled ? '0.3s' : '0.6s',
+                    transform: leverPulled ? 'rotate(0deg)' : 'rotate(-60deg)',
+                    transitionDuration: leverPulled ? '0.2s' : '0.5s',
                     transitionTimingFunction: leverPulled ? 'ease-in' : 'cubic-bezier(0.34, 1.56, 0.64, 1)',
                   }}
-                />
+                >
+                  {/* Shaft */}
+                  <div className="w-1.5 h-10 bg-gradient-to-b from-gray-400 to-gray-500 mx-auto rounded-full" />
+                  {/* Grip ball */}
+                  <div className="w-7 h-7 -mt-1 mx-auto rounded-full bg-gradient-to-br from-red-400 to-red-600 shadow-lg shadow-red-500/40 border border-red-400/50 group-hover:from-red-300 group-hover:to-red-500 transition-colors" />
+                </div>
               </div>
-              <span className="text-[9px] text-gray-500 mt-1 font-medium tracking-tight">PULL</span>
             </button>
           </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, FileText, ListChecks, Shield, Tag, Trash2 } from 'lucide-react';
+import { Star, FileText, ListChecks, Shield, Tag, Trash2, MapPin } from 'lucide-react';
 import type { TimelineEvent } from '../../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { cn, truncate } from '../../lib/utils';
@@ -134,6 +134,14 @@ export const TimelineEventCard = React.memo(function TimelineEventCard({
         {event.linkedTaskIds.length > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
             <ListChecks size={9} />{event.linkedTaskIds.length}
+          </span>
+        )}
+        {event.latitude != null && event.longitude != null && (
+          <span
+            className="flex items-center gap-0.5 text-[10px] text-gray-500"
+            title={`${event.latitude.toFixed(4)}, ${event.longitude.toFixed(4)}`}
+          >
+            <MapPin size={9} />
           </span>
         )}
         {event.linkedIOCIds.length > 0 && (

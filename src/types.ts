@@ -258,6 +258,8 @@ export interface TimelineEvent {
   clsLevel?: string;
   iocAnalysis?: IOCAnalysis;
   iocTypes?: IOCType[];
+  latitude?: number;   // WGS84 (-90 to 90)
+  longitude?: number;  // WGS84 (-180 to 180)
   createdAt: number;
   updatedAt: number;
 }

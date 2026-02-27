@@ -21,6 +21,8 @@ interface TimelineEventFormProps {
   onCancel: () => void;
   onUpdateEvent?: (id: string, updates: Partial<TimelineEvent>) => void;
   defaultFolderId?: string;
+  defaultLatitude?: number;
+  defaultLongitude?: number;
 }
 
 function toDatetimeLocal(ms: number): string {
@@ -37,7 +39,7 @@ function fromDatetimeLocal(str: string): number {
 const ALL_EVENT_TYPES = Object.keys(TIMELINE_EVENT_TYPE_LABELS) as TimelineEventType[];
 const ALL_CONFIDENCE = Object.keys(CONFIDENCE_LEVELS) as ConfidenceLevel[];
 
-export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel, onUpdateEvent, defaultFolderId }: TimelineEventFormProps) {
+export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave, onCancel, onUpdateEvent, defaultFolderId, defaultLatitude, defaultLongitude }: TimelineEventFormProps) {
   const { settings } = useSettings();
 
   const [initialTs] = useState(() => Date.now());
@@ -58,6 +60,9 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const [rawData, setRawData] = useState(event?.rawData || '');
   const [rawDataOpen, setRawDataOpen] = useState(false);
   const [showIOCPanel, setShowIOCPanel] = useState(false);
+  const [latitude, setLatitude] = useState(event?.latitude?.toString() ?? defaultLatitude?.toString() ?? '');
+  const [longitude, setLongitude] = useState(event?.longitude?.toString() ?? defaultLongitude?.toString() ?? '');
+  const [locationOpen, setLocationOpen] = useState(!!(event?.latitude != null || defaultLatitude != null));
 
   const isEditMode = !!event;
   const iocCount = event?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
@@ -89,6 +94,9 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
       setStarred(event.starred);
       setClsLevel(event.clsLevel || '');
       setRawData(event.rawData || '');
+      setLatitude(event.latitude?.toString() ?? '');
+      setLongitude(event.longitude?.toString() ?? '');
+      setLocationOpen(event.latitude != null);
     }
   }, [event]);
 
@@ -97,6 +105,8 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
     if (!title.trim()) return;
 
     const parsedAssets = assets.split(',').map((s) => s.trim()).filter(Boolean);
+    const parsedLat = latitude ? parseFloat(latitude) : undefined;
+    const parsedLng = longitude ? parseFloat(longitude) : undefined;
 
     onSave({
       title: title.trim(),
@@ -113,6 +123,8 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
       starred,
       clsLevel: clsLevel || undefined,
       rawData: rawData.trim() || undefined,
+      latitude: parsedLat != null && isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : undefined,
+      longitude: parsedLng != null && isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180 ? parsedLng : undefined,
       // Preserve linked arrays on edit, default empty on create
       linkedIOCIds: event?.linkedIOCIds || [],
       linkedNoteIds: event?.linkedNoteIds || [],
@@ -302,6 +314,48 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
           className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
         />
         <label htmlFor="timeline-starred" className="text-xs text-gray-400">Starred</label>
+      </div>
+
+      {/* Location collapsible section */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setLocationOpen(!locationOpen)}
+          className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-300"
+        >
+          {locationOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          Location
+        </button>
+        {locationOpen && (
+          <div className="grid grid-cols-2 gap-3 mt-1">
+            <div>
+              <label className={labelClass}>Latitude</label>
+              <input
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                className={inputClass}
+                placeholder="-90 to 90"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Longitude</label>
+              <input
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                className={inputClass}
+                placeholder="-180 to 180"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Raw Data collapsible section */}

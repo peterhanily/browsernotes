@@ -223,6 +223,8 @@ function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
     clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
     iocAnalysis: sanitizeIOCAnalysis(r.iocAnalysis),
     iocTypes: Array.isArray(r.iocTypes) ? strArr(r.iocTypes).filter((t) => VALID_IOC_TYPES.includes(t)) as TimelineEvent['iocTypes'] : undefined,
+    latitude: typeof r.latitude === 'number' && isFinite(r.latitude) && r.latitude >= -90 && r.latitude <= 90 ? r.latitude : undefined,
+    longitude: typeof r.longitude === 'number' && isFinite(r.longitude) && r.longitude >= -180 && r.longitude <= 180 ? r.longitude : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };

@@ -374,3 +374,101 @@
     animation: none;
   }
 }
+
+/* ─── Leaflet dark theme overrides ─── */
+.leaflet-popup-content-wrapper {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.leaflet-popup-tip {
+  background: #1f2937;
+}
+
+.leaflet-popup-close-button {
+  color: #9ca3af !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #e5e7eb !important;
+}
+
+.light .leaflet-popup-content-wrapper {
+  background: #ffffff;
+  color: #1f2937;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.light .leaflet-popup-tip {
+  background: #ffffff;
+}
+
+.light .leaflet-popup-close-button {
+  color: #6b7280 !important;
+}
+
+/* Cluster marker styling */
+.leaflet-cluster-marker {
+  background: transparent !important;
+}
+
+.leaflet-cluster-icon {
+  width: 36px;
+  height: 36px;
+  background: #6366f1;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.light .leaflet-cluster-icon {
+  background: #4f46e5;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* Leaflet controls dark theme */
+.leaflet-control-zoom a {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+  border-color: #374151 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #374151 !important;
+}
+
+.light .leaflet-control-zoom a {
+  background-color: #ffffff !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+.light .leaflet-control-zoom a:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(31, 41, 55, 0.8) !important;
+  color: #6b7280 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #818cf8 !important;
+}
+
+.light .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.8) !important;
+  color: #9ca3af !important;
+}
+
+.light .leaflet-control-attribution a {
+  color: #4f46e5 !important;
+}

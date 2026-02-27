@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Search, ArrowUpDown, Star, List, Grid3X3, BarChart3, GanttChart, Download, Upload, Trash2 } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, Star, List, Grid3X3, BarChart3, GanttChart, MapPin, Download, Upload, Trash2 } from 'lucide-react';
 import type { TimelineEvent, TimelineEventType, Tag, Folder, Timeline } from '../../types';
 import { TimelineFeed } from './TimelineFeed';
 import { EventTypeFilterBar } from './EventTypeFilterBar';
@@ -8,6 +8,7 @@ import { MitreHeatmap } from './MitreHeatmap';
 import type { HeatmapColorMode } from './MitreHeatmap';
 import { MitreReport } from './MitreReport';
 import { TimelineGantt } from './TimelineGantt';
+import { TimelineMap } from './TimelineMap';
 import { TimelineEventCard } from './TimelineEventCard';
 import { Modal } from '../Common/Modal';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -157,7 +158,8 @@ export function TimelineView({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'feed' | 'heatmap' | 'report' | 'gantt'>('feed');
+  const [viewMode, setViewMode] = useState<'feed' | 'heatmap' | 'report' | 'gantt' | 'map'>('feed');
+  const [newEventCoords, setNewEventCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [heatmapColorMode, setHeatmapColorMode] = useState<HeatmapColorMode>('count');
   const [heatmapDetailTechId, setHeatmapDetailTechId] = useState<string | null>(null);
 
@@ -257,6 +259,14 @@ export function TimelineView({
           >
             <GanttChart size={16} />
           </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={cn('p-1 rounded', viewMode === 'map' ? 'bg-gray-700 text-gray-200' : 'text-gray-500 hover:text-gray-300')}
+            title="Map View"
+            aria-label="Map View"
+          >
+            <MapPin size={16} />
+          </button>
         </div>
 
         {/* Color mode pills — heatmap only */}
@@ -340,6 +350,19 @@ export function TimelineView({
             onToggleStar={onToggleStar}
           />
         </div>
+      ) : viewMode === 'map' ? (
+        <div className="flex-1 overflow-hidden">
+          <TimelineMap
+            events={filteredEvents}
+            onSelect={handleSelect}
+            onToggleStar={onToggleStar}
+            onDelete={(id) => setDeletingEventId(id)}
+            onCreateEventAtLocation={(lat, lng) => {
+              setNewEventCoords({ lat, lng });
+              setShowNewEvent(true);
+            }}
+          />
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-4">
           {viewMode === 'feed' ? (
@@ -390,14 +413,16 @@ export function TimelineView({
       </Modal>
 
       {/* New Event Modal */}
-      <Modal open={showNewEvent} onClose={() => setShowNewEvent(false)} title="New Event" wide>
+      <Modal open={showNewEvent} onClose={() => { setShowNewEvent(false); setNewEventCoords(null); }} title="New Event" wide>
         <TimelineEventForm
           folders={folders}
           allTags={allTags}
           onCreateTag={onCreateTag}
-          onSave={handleSaveNew}
-          onCancel={() => setShowNewEvent(false)}
+          onSave={(data) => { handleSaveNew(data); setNewEventCoords(null); }}
+          onCancel={() => { setShowNewEvent(false); setNewEventCoords(null); }}
           defaultFolderId={selectedFolderId}
+          defaultLatitude={newEventCoords?.lat}
+          defaultLongitude={newEventCoords?.lng}
         />
       </Modal>
 

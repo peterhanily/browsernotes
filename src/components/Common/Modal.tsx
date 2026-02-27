@@ -24,7 +24,7 @@ export function Modal({ open, onClose, title, children, wide }: ModalProps) {
 
   // Stable ref for onClose so the keydown listener doesn't churn
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; });
 
   // Focus trap
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

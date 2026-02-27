@@ -103,11 +103,13 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
     return headers;
   }, [sortedEvents, groupByType]);
 
+  // Stable fallback for empty chart (captured once at mount)
+  const [emptyFallbackTime] = useState(() => Date.now());
+
   // Time range
   const { minTime, maxTime, span } = useMemo(() => {
     if (sortedEvents.length === 0) {
-      const now = Date.now();
-      return { minTime: now, maxTime: now + 86400000, span: 86400000 };
+      return { minTime: emptyFallbackTime, maxTime: emptyFallbackTime + 86400000, span: 86400000 };
     }
     let min = Infinity;
     let max = -Infinity;
@@ -126,7 +128,7 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
     const rawSpan = max - min;
     const padding = rawSpan * PADDING_FRACTION;
     return { minTime: min - padding, maxTime: max + padding, span: rawSpan + padding * 2 };
-  }, [sortedEvents]);
+  }, [sortedEvents, emptyFallbackTime]);
 
   // Zoom: pixels per millisecond. Default computed to fit container.
   const [containerWidth, setContainerWidth] = useState(800);
@@ -135,8 +137,7 @@ export function TimelineGantt({ events, onSelect, onToggleStar: _onToggleStar }:
   const pxPerMs = zoomLevel ?? defaultPxPerMs;
 
   // Reset zoom when events change
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setZoomLevel(null); }, [events]);
+  useEffect(() => { setZoomLevel(null); }, [events]); // eslint-disable-line react-hooks/set-state-in-effect
 
   // Track container width
   useEffect(() => {

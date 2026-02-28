@@ -436,7 +436,7 @@ export function NoteEditor({
           title="IOC Analysis"
           aria-label="Toggle IOC analysis panel"
         >
-          <span className="text-[10px] font-bold tracking-wide">IOC</span>
+          <span className="text-xs leading-none">☣️</span>
           {iocCount > 0 && (
             <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
               {iocCount}
@@ -451,7 +451,7 @@ export function NoteEditor({
             title={defangPreview ? 'Show original IOCs' : 'Defang IOCs in preview'}
             aria-label="Toggle defanged IOC display"
           >
-            <span className="text-[10px] font-bold tracking-wide">DEFANG</span>
+            <span className="text-xs leading-none">🐍</span>
           </button>
         )}
 

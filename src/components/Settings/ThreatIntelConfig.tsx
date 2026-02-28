@@ -207,7 +207,7 @@ export function ThreatIntelConfig() {
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-        <span className="text-[10px] font-bold tracking-wide text-accent">IOC</span>
+        <span className="text-sm leading-none">☣️</span>
         Threat Intel Configuration
       </h3>
 

@@ -70,7 +70,7 @@ export const NoteCard = React.memo(function NoteCard({ note, active, onSelect, o
         {note.clsLevel && <ClsBadge level={note.clsLevel} />}
         {activeIOCCount > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent/70 bg-accent/10 px-1.5 rounded-full">
-            <span className="text-[8px] font-bold leading-none">IOC</span>
+            <span className="text-[9px] leading-none">☣️</span>
             {activeIOCCount}
           </span>
         )}

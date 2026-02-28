@@ -270,7 +270,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
               title="IOC Analysis"
               aria-label="Toggle IOC analysis"
             >
-              <span className="text-[10px] font-bold tracking-wide">IOC</span>
+              <span className="text-xs leading-none">☣️</span>
               {iocCount > 0 && (
                 <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">{iocCount}</span>
               )}

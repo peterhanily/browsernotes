@@ -249,7 +249,7 @@ export function Sidebar({
           onClick={() => nav(() => navToView('graph'))}
         />
         <SidebarItem
-          icon={<span className="text-[11px] font-bold tracking-wide">IOC</span>}
+          icon={<span className="text-base leading-none">☣️</span>}
           label="IOC Stats"
           count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
           active={activeView === 'ioc-stats'}

@@ -320,14 +320,14 @@ export function TrashArchiveView({
               })}
             </EntitySection>
 
-            <EntitySection icon={<span className="text-[10px] font-bold tracking-wide text-accent">IOC</span>} label="IOCs" count={items.iocs.length}>
+            <EntitySection icon={<span className="text-xs leading-none">☣️</span>} label="IOCs" count={items.iocs.length}>
               {items.iocs.map((ioc) => {
                 const actions = makeActions(ioc.id, onRestoreIOC, onDeleteIOCPermanently, onUnarchiveIOC, onTrashIOC);
                 const typeLabel = IOC_TYPE_LABELS[ioc.type]?.label || ioc.type;
                 return (
                   <ItemRow
                     key={ioc.id}
-                    icon={<span className="text-[10px] font-bold tracking-wide text-accent">IOC</span>}
+                    icon={<span className="text-xs leading-none">☣️</span>}
                     title={`${ioc.value} (${typeLabel})`}
                     folderName={getFolderName(ioc.folderId)}
                     timestamp={isTrash ? ioc.trashedAt : ioc.updatedAt}

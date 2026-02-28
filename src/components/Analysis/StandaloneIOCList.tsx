@@ -78,7 +78,7 @@ export function StandaloneIOCList({
       <div className="flex-1 overflow-y-auto p-4">
         {iocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
-            <span className="text-3xl font-bold text-gray-600 mb-3">IOC</span>
+            <span className="text-3xl mb-3">☣️</span>
             <p className="text-lg font-medium">No standalone IOCs yet</p>
             <p className="text-sm mt-1">Create IOCs to track indicators independently</p>
           </div>

@@ -118,7 +118,7 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
             title="Boards"
           />
           <EntityChip
-            icon={<span className="text-[8px] font-bold leading-none">IOC</span>}
+            icon={<span className="text-[9px] leading-none">☣️</span>}
             count={entityCounts.iocs}
             active={activeView === 'ioc-stats'}
             onClick={() => onViewChange('ioc-stats')}

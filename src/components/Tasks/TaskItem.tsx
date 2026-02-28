@@ -66,7 +66,7 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
       <div className="flex items-center gap-2 shrink-0">
         {(task.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-            <span className="text-[8px] font-bold leading-none">IOC</span>
+            <span className="text-[9px] leading-none">☣️</span>
             {task.iocAnalysis?.iocs.filter((i) => !i.dismissed).length}
           </span>
         )}

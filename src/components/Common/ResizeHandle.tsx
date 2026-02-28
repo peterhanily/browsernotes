@@ -3,9 +3,10 @@ import { cn } from '../../lib/utils';
 interface ResizeHandleProps {
   isDragging: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  lockButton?: React.ReactNode;
 }
 
-export function ResizeHandle({ isDragging, onMouseDown }: ResizeHandleProps) {
+export function ResizeHandle({ isDragging, onMouseDown, lockButton }: ResizeHandleProps) {
   return (
     <div
       onMouseDown={onMouseDown}
@@ -16,6 +17,7 @@ export function ResizeHandle({ isDragging, onMouseDown }: ResizeHandleProps) {
     >
       {/* Wider invisible hit area */}
       <div className="absolute inset-y-0 -left-1 -right-1" />
+      {lockButton}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -72,10 +72,12 @@ export function NoteEditor({
   const [defangPreview, setDefangPreview] = useState(false);
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [annotationText, setAnnotationText] = useState('');
+  const [scrollLocked, setScrollLocked] = useState(true);
   const cloud = useCloudSync(externalSettings?.backupDestinations);
   const logActivity = useLogActivity();
   const titleRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -449,6 +451,36 @@ export function NoteEditor({
     }
   }, [cloud.syncing, cloud.progress, cloud.error]);
 
+  // Scroll sync between editor and preview in split mode
+  useEffect(() => {
+    if (!scrollLocked || editorMode !== 'split') return;
+    const editor = textareaRef.current;
+    const preview = previewRef.current;
+    if (!editor || !preview) return;
+
+    let syncing = false;
+
+    const syncScroll = (source: HTMLElement, target: HTMLElement) => {
+      if (syncing) return;
+      syncing = true;
+      const maxScroll = source.scrollHeight - source.clientHeight;
+      const ratio = maxScroll > 0 ? source.scrollTop / maxScroll : 0;
+      const targetMax = target.scrollHeight - target.clientHeight;
+      target.scrollTop = ratio * targetMax;
+      requestAnimationFrame(() => { syncing = false; });
+    };
+
+    const onEditorScroll = () => syncScroll(editor, preview);
+    const onPreviewScroll = () => syncScroll(preview, editor);
+
+    editor.addEventListener('scroll', onEditorScroll);
+    preview.addEventListener('scroll', onPreviewScroll);
+    return () => {
+      editor.removeEventListener('scroll', onEditorScroll);
+      preview.removeEventListener('scroll', onPreviewScroll);
+    };
+  }, [scrollLocked, editorMode]);
+
   const stats = wordCount(content);
   const showEditor = editorMode === 'edit' || editorMode === 'split';
   const showPreview = editorMode === 'preview' || editorMode === 'split';
@@ -744,10 +776,25 @@ export function NoteEditor({
             </div>
           )}
           {editorMode === 'split' && (
-            <ResizeHandle isDragging={editorPreview.isDragging} onMouseDown={editorPreview.handleMouseDown} />
+            <ResizeHandle
+              isDragging={editorPreview.isDragging}
+              onMouseDown={editorPreview.handleMouseDown}
+              lockButton={
+                <button
+                  onClick={(e) => { e.stopPropagation(); setScrollLocked(!scrollLocked); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 border border-gray-600 hover:border-accent/50 text-gray-400 hover:text-gray-200 transition-colors"
+                  title={scrollLocked ? 'Unlock scroll (scroll independently)' : 'Lock scroll (scroll together)'}
+                  aria-label={scrollLocked ? 'Unlock scroll sync' : 'Lock scroll sync'}
+                >
+                  {scrollLocked ? <Lock size={12} /> : <LockOpen size={12} />}
+                </button>
+              }
+            />
           )}
           {showPreview && (
             <div
+              ref={editorMode === 'split' ? previewRef : undefined}
               className="overflow-y-auto p-2 sm:p-4"
               style={editorMode === 'split' ? { width: `${(1 - editorPreview.ratio) * 100}%` } : { flex: 1 }}
             >

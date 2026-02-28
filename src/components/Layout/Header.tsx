@@ -184,6 +184,13 @@ export function Header({
         <span data-tour="theme-toggle">
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </span>
+        <a
+          href="?demo=1"
+          className="px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold tracking-wide uppercase text-accent hover:text-accent-hover hover:bg-gray-800 transition-colors"
+          title="Load sample investigation demo"
+        >
+          Demo
+        </a>
         {onStartTour && (
           <button
             onClick={onStartTour}

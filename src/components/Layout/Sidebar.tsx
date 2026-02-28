@@ -3,6 +3,7 @@ import {
   FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
+  LayoutDashboard,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -217,6 +218,12 @@ export function Sidebar({
 
       <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto p-2 space-y-1" aria-label="Views">
         {/* Views */}
+        <SidebarItem
+          icon={<LayoutDashboard size={18} />}
+          label="Dashboard"
+          active={activeView === 'dashboard' && !showTrash && !showArchive}
+          onClick={() => nav(() => navToView('dashboard'))}
+        />
         <SidebarItem
           icon={<FileText size={18} />}
           label="Notes"

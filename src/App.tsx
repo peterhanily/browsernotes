@@ -25,6 +25,8 @@ import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType, StandaloneIOC } from './types';
+import { DEFAULT_QUICK_LINKS } from './types';
+import { DashboardView } from './components/Dashboard/DashboardView';
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile, exportInvestigationJSON } from './lib/export';
@@ -373,7 +375,7 @@ export default function App() {
   }, [deleteTag, tags, activityLog]);
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' ? settings.defaultView : 'notes';
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
@@ -1096,6 +1098,11 @@ export default function App() {
             onTrashIOC={loggedTrashIOC}
             onUnarchiveIOC={loggedToggleArchiveIOC}
             onEmptyAllTrash={emptyAllTrash}
+          />
+        ) : activeView === 'dashboard' ? (
+          <DashboardView
+            links={settings.quickLinks ?? DEFAULT_QUICK_LINKS}
+            onUpdateLinks={(links) => updateSettings({ quickLinks: links })}
           />
         ) : activeView === 'ioc-stats' ? (
           <div className="flex-1 flex flex-col overflow-y-auto">

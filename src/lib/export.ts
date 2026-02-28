@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 
@@ -14,6 +14,16 @@ export async function exportJSON(): Promise<string> {
     db.whiteboards.toArray(),
   ]);
 
+  // Include quick links from settings if user has customized them
+  let quickLinks: QuickLink[] | undefined;
+  try {
+    const stored = localStorage.getItem('threatcaddy-settings');
+    if (stored) {
+      const s = JSON.parse(stored);
+      if (Array.isArray(s.quickLinks)) quickLinks = s.quickLinks;
+    }
+  } catch { /* ignore */ }
+
   const data: ExportData = {
     version: 1,
     exportedAt: Date.now(),
@@ -24,6 +34,7 @@ export async function exportJSON(): Promise<string> {
     timelineEvents,
     timelines,
     whiteboards,
+    quickLinks,
   };
 
   return JSON.stringify(data, null, 2);
@@ -286,6 +297,20 @@ function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
   };
 }
 
+function sanitizeQuickLink(raw: unknown): QuickLink | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || typeof r.title !== 'string' || typeof r.url !== 'string') return null;
+  return {
+    id: str(r.id),
+    title: str(r.title),
+    url: str(r.url),
+    description: r.description != null ? str(r.description) : undefined,
+    color: r.color != null ? str(r.color) : undefined,
+    icon: r.icon != null ? str(r.icon) : undefined,
+  };
+}
+
 export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
@@ -327,6 +352,11 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     }
   }
 
+  // Sanitize quickLinks if present
+  const quickLinks = (Array.isArray(data.quickLinks) ? data.quickLinks : [])
+    .map(sanitizeQuickLink)
+    .filter((l: QuickLink | null): l is QuickLink => l !== null && !!l.id);
+
   await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards], async () => {
     await db.notes.clear();
     await db.tasks.clear();
@@ -344,6 +374,16 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.timelines.bulkAdd(timelines);
     await db.whiteboards.bulkAdd(whiteboards);
   });
+
+  // Restore quick links to settings if present in backup
+  if (quickLinks.length > 0) {
+    try {
+      const stored = localStorage.getItem('threatcaddy-settings');
+      const settings = stored ? JSON.parse(stored) : {};
+      settings.quickLinks = quickLinks;
+      localStorage.setItem('threatcaddy-settings', JSON.stringify(settings));
+    } catch { /* ignore */ }
+  }
 
   return {
     notes: notes.length,

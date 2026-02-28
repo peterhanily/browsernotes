@@ -120,9 +120,29 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
-export type ViewMode = 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
+
+export interface QuickLink {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+}
+
+export const DEFAULT_QUICK_LINKS: QuickLink[] = [
+  { id: 'ql-1', title: 'VirusTotal',      url: 'https://www.virustotal.com',     description: 'File & URL analyzer',         color: '#3b82f6', icon: '\uD83D\uDD0D' },
+  { id: 'ql-2', title: 'MITRE ATT&CK',    url: 'https://attack.mitre.org',       description: 'Adversary tactics & techniques', color: '#ef4444', icon: '\u2694\uFE0F' },
+  { id: 'ql-3', title: 'Shodan',           url: 'https://www.shodan.io',          description: 'Internet-connected device search', color: '#10b981', icon: '\uD83C\uDF10' },
+  { id: 'ql-4', title: 'AbuseIPDB',        url: 'https://www.abuseipdb.com',      description: 'IP address abuse reports',     color: '#f97316', icon: '\uD83D\uDEE1\uFE0F' },
+  { id: 'ql-5', title: 'AlienVault OTX',   url: 'https://otx.alienvault.com',     description: 'Open threat exchange',        color: '#8b5cf6', icon: '\uD83D\uDC7E' },
+  { id: 'ql-6', title: 'CVE Database',     url: 'https://www.cve.org',            description: 'Common vulnerabilities',      color: '#eab308', icon: '\uD83D\uDCCB' },
+  { id: 'ql-7', title: 'URLhaus',          url: 'https://urlhaus.abuse.ch',       description: 'Malicious URL tracker',       color: '#ec4899', icon: '\uD83D\uDD17' },
+  { id: 'ql-8', title: 'MalwareBazaar',    url: 'https://bazaar.abuse.ch',        description: 'Malware sample sharing',      color: '#06b6d4', icon: '\u2623\uFE0F' },
+];
 
 export interface Settings {
   theme: 'dark' | 'light';
@@ -141,6 +161,7 @@ export interface Settings {
   tiRelationshipTypes?: Record<string, IOCRelationshipDef>;
   tiIocStatuses?: string[];
   backupDestinations?: BackupDestination[];
+  quickLinks?: QuickLink[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -411,6 +432,7 @@ export interface ExportData {
   timelineEvents?: TimelineEvent[];
   timelines?: Timeline[];
   whiteboards?: Whiteboard[];
+  quickLinks?: QuickLink[];
 }
 
 export const TAG_COLORS = [

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload, Briefcase } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings } from '../../types';
 import { NOTE_COLORS } from '../../types';
@@ -9,6 +9,8 @@ import { TagInput } from '../Common/TagInput';
 import { IOCPanel } from '../Analysis/IOCPanel';
 import { ResizeHandle } from '../Common/ResizeHandle';
 import { EntityLinker } from '../Common/EntityLinker';
+import { SlashCommandMenu } from './SlashCommandMenu';
+import { SLASH_COMMANDS, getCaretCoordinates } from './slashCommands';
 import { useCloudSync } from '../../hooks/useCloudSync';
 import { useResizable } from '../../hooks/useResizable';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
@@ -65,9 +67,18 @@ export function NoteEditor({
   const cloud = useCloudSync(externalSettings?.backupDestinations);
   const logActivity = useLogActivity();
   const titleRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const shareMsgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Slash command menu state
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashTriggerPos, setSlashTriggerPos] = useState<number | null>(null);
+  const [slashFilter, setSlashFilter] = useState('');
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+  const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
 
   // Auto-extract IOCs on content changes
   useAutoIOCExtraction({
@@ -119,13 +130,37 @@ export function NoteEditor({
     saveTimeoutRef.current = setTimeout(() => save({ title: value }), 500);
   };
 
-  const handleContentChange = (value: string) => {
+  const handleContentChange = useCallback((value: string) => {
     setContent(value);
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => save({ content: value }), 500);
-  };
+  }, [save]);
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Slash command menu keyboard navigation
+    if (slashMenuOpen && filteredSlashCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashActiveIndex(i => Math.min(i + 1, filteredSlashCommands.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashActiveIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        executeSlashCommand(filteredSlashCommands[slashActiveIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashMenuOpen(false);
+        return;
+      }
+    }
+
     const textarea = e.currentTarget;
     const ctrl = e.ctrlKey || e.metaKey;
 
@@ -164,6 +199,96 @@ export function NoteEditor({
       textarea.focus();
     }, 0);
   };
+
+  // Slash commands: filtered list
+  const filteredSlashCommands = useMemo(() => {
+    if (!slashFilter) return SLASH_COMMANDS;
+    const q = slashFilter.toLowerCase();
+    return SLASH_COMMANDS.filter(c =>
+      c.label.toLowerCase().includes(q) ||
+      c.id.toLowerCase().includes(q) ||
+      c.keywords.some(k => k.includes(q))
+    );
+  }, [slashFilter]);
+
+  // Reset active index when filter changes
+  useEffect(() => {
+    setSlashActiveIndex(0);
+  }, [slashFilter]);
+
+  // Slash commands: detect "/" trigger
+  const detectSlashTrigger = useCallback((value: string, cursorPos: number) => {
+    for (let i = cursorPos - 1; i >= Math.max(0, cursorPos - 31); i--) {
+      const ch = value[i];
+      if (ch === ' ' || ch === '\n') {
+        setSlashMenuOpen(false);
+        return;
+      }
+      if (ch === '/') {
+        if (i === 0 || value[i - 1] === ' ' || value[i - 1] === '\n') {
+          const filter = value.slice(i + 1, cursorPos);
+          setSlashMenuOpen(true);
+          setSlashTriggerPos(i);
+          setSlashFilter(filter);
+          // Update menu position
+          if (textareaRef.current) {
+            setSlashMenuPosition(getCaretCoordinates(textareaRef.current, i));
+          }
+          return;
+        }
+        setSlashMenuOpen(false);
+        return;
+      }
+    }
+    setSlashMenuOpen(false);
+  }, []);
+
+  // Slash commands: execute selected command
+  const executeSlashCommand = useCallback((command: typeof SLASH_COMMANDS[number]) => {
+    const textarea = textareaRef.current;
+    if (!textarea || slashTriggerPos === null) return;
+
+    const cursor = textarea.selectionStart;
+    let insertText = command.insert;
+
+    // Handle dynamic inserts
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    if (insertText === '__DATE__') {
+      insertText = dateStr;
+    } else if (insertText === '__DATETIME__') {
+      insertText = `${dateStr} ${timeStr} UTC`;
+    }
+
+    const newContent = content.slice(0, slashTriggerPos) + insertText + content.slice(cursor);
+    handleContentChange(newContent);
+
+    setSlashMenuOpen(false);
+    setSlashTriggerPos(null);
+    setSlashFilter('');
+    setSlashActiveIndex(0);
+
+    // Reposition cursor
+    const newCursorPos = slashTriggerPos + insertText.length + (command.cursorOffset ?? 0);
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+      textarea.focus();
+    }, 0);
+  }, [content, slashTriggerPos, handleContentChange]);
+
+  // Slash commands: click-outside to close
+  useEffect(() => {
+    if (!slashMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (slashMenuRef.current && !slashMenuRef.current.contains(e.target as Node)) {
+        setSlashMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [slashMenuOpen]);
 
   // Show share feedback when cloud sync finishes
   useEffect(() => {
@@ -406,18 +531,36 @@ export function NoteEditor({
         >
           {showEditor && (
             <div
-              className="flex flex-col overflow-hidden"
+              className="relative flex flex-col overflow-hidden"
               style={editorMode === 'split' ? { width: `${editorPreview.ratio * 100}%` } : { flex: 1 }}
             >
               <textarea
+                ref={textareaRef}
                 value={content}
-                onChange={(e) => handleContentChange(e.target.value)}
+                onChange={(e) => {
+                  handleContentChange(e.target.value);
+                  const val = e.target.value;
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      detectSlashTrigger(val, textareaRef.current.selectionStart);
+                    }
+                  }, 0);
+                }}
                 onKeyDown={handleEditorKeyDown}
                 className="note-editor flex-1 w-full p-2 sm:p-4 bg-transparent text-gray-200 placeholder-gray-600 focus:outline-none text-sm leading-relaxed"
                 placeholder="Start writing in markdown..."
                 readOnly={note.trashed}
                 aria-label="Note content editor"
               />
+              {slashMenuOpen && filteredSlashCommands.length > 0 && (
+                <SlashCommandMenu
+                  commands={filteredSlashCommands}
+                  activeIndex={slashActiveIndex}
+                  position={slashMenuPosition}
+                  onSelect={executeSlashCommand}
+                  menuRef={slashMenuRef}
+                />
+              )}
             </div>
           )}
           {editorMode === 'split' && (

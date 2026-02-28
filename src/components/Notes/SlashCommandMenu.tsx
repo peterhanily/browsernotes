@@ -1,0 +1,86 @@
+import { useEffect, useRef, type RefObject } from 'react';
+import type { SlashCommand } from './slashCommands';
+
+const CATEGORY_ORDER: SlashCommand['category'][] = ['Formatting', 'Blocks', 'Threat Intel', 'Insert'];
+
+interface SlashCommandMenuProps {
+  commands: SlashCommand[];
+  activeIndex: number;
+  position: { top: number; left: number };
+  onSelect: (command: SlashCommand) => void;
+  menuRef: RefObject<HTMLDivElement | null>;
+}
+
+export function SlashCommandMenu({ commands, activeIndex, position, onSelect, menuRef }: SlashCommandMenuProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (listRef.current) {
+      const el = listRef.current.querySelector(`[data-index="${activeIndex}"]`) as HTMLElement | undefined;
+      el?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
+  // Group commands by category, preserving order
+  const grouped = CATEGORY_ORDER
+    .map(cat => ({ category: cat, items: commands.filter(c => c.category === cat) }))
+    .filter(g => g.items.length > 0);
+
+  // Compute global index for each command
+  let globalIdx = 0;
+  const indexedGroups = grouped.map(g => ({
+    category: g.category,
+    items: g.items.map(cmd => ({ cmd, index: globalIdx++ })),
+  }));
+
+  const lineHeight = 24;
+  const menuTop = position.top + lineHeight;
+  const menuLeft = Math.max(0, position.left);
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-y-auto"
+      style={{
+        top: menuTop,
+        left: menuLeft,
+        maxHeight: 320,
+        minWidth: 260,
+        maxWidth: 340,
+      }}
+    >
+      <div ref={listRef}>
+        {indexedGroups.map(group => (
+          <div key={group.category}>
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold sticky top-0 bg-gray-800">
+              {group.category}
+            </div>
+            {group.items.map(({ cmd, index }) => {
+              const Icon = cmd.icon;
+              return (
+                <button
+                  key={cmd.id}
+                  data-index={index}
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-sm transition-colors ${
+                    index === activeIndex ? 'bg-gray-700 text-gray-100' : 'text-gray-300 hover:bg-gray-700/50'
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onSelect(cmd);
+                  }}
+                >
+                  <Icon size={16} className="shrink-0 text-gray-400" />
+                  <div className="min-w-0">
+                    <span className="font-medium">{cmd.label}</span>
+                    <span className="ml-2 text-xs text-gray-500">{cmd.description}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

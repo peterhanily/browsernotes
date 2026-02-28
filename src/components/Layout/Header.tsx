@@ -17,9 +17,7 @@ interface HeaderProps {
   onNewWhiteboard: () => void;
   onNewIOC?: () => void;
   onImportData?: () => void;
-  onToggleSidebar: () => void;
   onMobileMenuToggle: () => void;
-  sidebarCollapsed: boolean;
   onQuickSave: () => void;
   onQuickLoad: (file: File) => void;
   onStartTour?: () => void;
@@ -39,9 +37,7 @@ export function Header({
   onNewWhiteboard,
   onNewIOC,
   onImportData,
-  onToggleSidebar,
   onMobileMenuToggle,
-  sidebarCollapsed,
   onQuickSave,
   onQuickLoad,
   onStartTour,
@@ -68,17 +64,7 @@ export function Header({
       >
         <Menu size={20} />
       </button>
-      {/* Desktop sidebar toggle - visible when sidebar is collapsed */}
-      {sidebarCollapsed && (
-        <button
-          onClick={onToggleSidebar}
-          className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors hidden md:block"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
-        >
-          <Menu size={20} />
-        </button>
-      )}
+      {/* Desktop sidebar toggle removed — icon rail handles panel toggle */}
 
       {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
         <div className="flex items-center gap-1.5 sm:gap-2.5 mr-1 sm:mr-2">

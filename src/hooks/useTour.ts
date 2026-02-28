@@ -6,6 +6,8 @@ export interface UseTourOptions {
   onComplete?: () => void;
   /** Called when a tour step requires navigating to a different view. */
   onNavigate?: (view: ViewMode) => void;
+  /** Called when a tour step requires the settings panel to be shown/hidden. */
+  onShowSettings?: (show: boolean) => void;
 }
 
 export interface TourState {
@@ -65,6 +67,7 @@ export function useTour(options?: UseTourOptions) {
     if (step?.view && optionsRef.current?.onNavigate) {
       optionsRef.current.onNavigate(step.view);
     }
+    optionsRef.current?.onShowSettings?.(!!step?.showSettings);
   }, []);
 
   /** Restore the view that was active before the tour started. */
@@ -73,6 +76,7 @@ export function useTour(options?: UseTourOptions) {
       optionsRef.current.onNavigate(preTourViewRef.current);
     }
     preTourViewRef.current = null;
+    optionsRef.current?.onShowSettings?.(false);
   }, []);
 
   const start = useCallback((currentView?: ViewMode) => {
@@ -81,6 +85,7 @@ export function useTour(options?: UseTourOptions) {
     if (firstStep?.view && optionsRef.current?.onNavigate) {
       optionsRef.current.onNavigate(firstStep.view);
     }
+    optionsRef.current?.onShowSettings?.(!!firstStep?.showSettings);
     stepRef.current = 0;
     setCurrentStepIndex(0);
     setIsActive(true);

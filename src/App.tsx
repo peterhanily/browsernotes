@@ -78,12 +78,13 @@ export default function App() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
-  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents } = useFolders();
-  const { tags, createTag, updateTag, deleteTag } = useTags();
+  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, reload: reloadFolders } = useFolders();
+  const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
 
   const tour = useTour({
     onComplete: () => updateSettings({ tourCompleted: true }),
     onNavigate: (view) => setActiveView(view),
+    onShowSettings: (show) => setShowSettings(show),
   });
 
   const activityLog = useActivityLog();
@@ -782,8 +783,10 @@ export default function App() {
     reloadTimelines();
     reloadWhiteboards();
     standaloneIOCsHook.reload();
+    reloadFolders();
+    reloadTags();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload]);
+  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, reloadFolders, reloadTags]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {
@@ -808,13 +811,8 @@ export default function App() {
     const text = await pendingImportFile.text();
     await importJSON(text);
     setPendingImportFile(null);
-    notes.reload();
-    tasks.reload();
-    timeline.reload();
-    reloadTimelines();
-    reloadWhiteboards();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
+    handleImportComplete();
+  }, [pendingImportFile, handleImportComplete]);
 
   // Sample investigation
   const sampleLoaded = useMemo(() => folders.some((f) => f.id === 'sample-investigation'), [folders]);
@@ -835,7 +833,7 @@ export default function App() {
     // Navigate to sample
     setSelectedFolderId('sample-investigation');
     navigateTo('notes');
-    activityLog.log('data', 'import', 'Loaded sample investigation "Operation STARDUST"');
+    activityLog.log('data', 'import', 'Loaded sample investigation "Operation DARK GLACIER"');
   }, [handleImportComplete, navigateTo, activityLog]);
 
   const handleDeleteSample = useCallback(async () => {
@@ -861,7 +859,7 @@ export default function App() {
     if (selectedFolderId === 'sample-investigation') {
       setSelectedFolderId(undefined);
     }
-    activityLog.log('data', 'delete', 'Removed sample investigation "Operation STARDUST"');
+    activityLog.log('data', 'delete', 'Removed sample investigation "Operation DARK GLACIER"');
   }, [handleImportComplete, selectedFolderId, activityLog]);
 
   // Keyboard shortcuts

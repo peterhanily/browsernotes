@@ -93,7 +93,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-300">Sample Data</h3>
             <p className="text-xs text-gray-500">
-              Load a pre-built APT investigation (Operation STARDUST) to explore ThreatCaddy's features. Includes notes, tasks, timeline events, IOCs, and a whiteboard.
+              Load a pre-built APT investigation (Operation DARK GLACIER) to explore ThreatCaddy's features. Includes notes, tasks, timeline events, IOCs, and a whiteboard.
             </p>
             {sampleLoaded ? (
               <button

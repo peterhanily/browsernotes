@@ -56,11 +56,13 @@ export function useFolders() {
     const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
     const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
     const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+    const iocsInFolder = await db.standaloneIOCs.where('folderId').equals(id).toArray();
     await Promise.all([
       ...notesInFolder.map((n) => db.notes.update(n.id, { folderId: undefined })),
       ...tasksInFolder.map((t) => db.tasks.update(t.id, { folderId: undefined })),
       ...eventsInFolder.map((e) => db.timelineEvents.update(e.id, { folderId: undefined })),
       ...whiteboardsInFolder.map((w) => db.whiteboards.update(w.id, { folderId: undefined })),
+      ...iocsInFolder.map((i) => db.standaloneIOCs.update(i.id, { folderId: undefined })),
     ]);
     setFolders((prev) => prev.filter((f) => f.id !== id));
   }, []);
@@ -71,11 +73,13 @@ export function useFolders() {
     const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
     const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
     const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+    const iocsInFolder = await db.standaloneIOCs.where('folderId').equals(id).toArray();
 
     const noteIds = notesInFolder.map(n => n.id);
     const taskIds = tasksInFolder.map(t => t.id);
     const eventIds = eventsInFolder.map(e => e.id);
     const whiteboardIds = whiteboardsInFolder.map(w => w.id);
+    const iocIds = iocsInFolder.map(i => i.id);
 
     // Bulk-delete all entities
     await Promise.all([
@@ -83,6 +87,7 @@ export function useFolders() {
       db.tasks.bulkDelete(taskIds),
       db.timelineEvents.bulkDelete(eventIds),
       db.whiteboards.bulkDelete(whiteboardIds),
+      db.standaloneIOCs.bulkDelete(iocIds),
     ]);
 
     // Clean orphaned cross-entity links
@@ -100,6 +105,9 @@ export function useFolders() {
       await db.timelineEvents.filter(e => e.linkedNoteIds.some(nid => noteIdSet.has(nid))).modify(e => {
         e.linkedNoteIds = e.linkedNoteIds.filter(nid => !noteIdSet.has(nid));
       });
+      await db.standaloneIOCs.filter(i => i.linkedNoteIds?.some(nid => noteIdSet.has(nid)) ?? false).modify(i => {
+        i.linkedNoteIds = (i.linkedNoteIds ?? []).filter(nid => !noteIdSet.has(nid));
+      });
     }
 
     if (taskIdSet.size > 0) {
@@ -112,6 +120,9 @@ export function useFolders() {
       await db.timelineEvents.filter(e => e.linkedTaskIds.some(tid => taskIdSet.has(tid))).modify(e => {
         e.linkedTaskIds = e.linkedTaskIds.filter(tid => !taskIdSet.has(tid));
       });
+      await db.standaloneIOCs.filter(i => i.linkedTaskIds?.some(tid => taskIdSet.has(tid)) ?? false).modify(i => {
+        i.linkedTaskIds = (i.linkedTaskIds ?? []).filter(tid => !taskIdSet.has(tid));
+      });
     }
 
     if (eventIdSet.size > 0) {
@@ -120,6 +131,9 @@ export function useFolders() {
       });
       await db.tasks.filter(t => t.linkedTimelineEventIds?.some(eid => eventIdSet.has(eid)) ?? false).modify(t => {
         t.linkedTimelineEventIds = (t.linkedTimelineEventIds ?? []).filter(eid => !eventIdSet.has(eid));
+      });
+      await db.standaloneIOCs.filter(i => i.linkedTimelineEventIds?.some(eid => eventIdSet.has(eid)) ?? false).modify(i => {
+        i.linkedTimelineEventIds = (i.linkedTimelineEventIds ?? []).filter(eid => !eventIdSet.has(eid));
       });
     }
 

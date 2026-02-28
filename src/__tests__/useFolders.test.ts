@@ -11,6 +11,7 @@ describe('useFolders', () => {
     await db.tasks.clear();
     await db.timelineEvents.clear();
     await db.whiteboards.clear();
+    await db.standaloneIOCs.clear();
   });
 
   it('starts with empty folders', async () => {
@@ -243,6 +244,29 @@ describe('useFolders', () => {
       const wb = await db.whiteboards.get('w1');
       expect(wb!.folderId).toBeUndefined();
     });
+
+    it('unsets folderId on standaloneIOCs in the deleted folder', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('Doomed');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.standaloneIOCs.add({
+        id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'high',
+        tags: [], trashed: false, archived: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.deleteFolder(folderId);
+      });
+
+      const ioc = await db.standaloneIOCs.get('ioc1');
+      expect(ioc!.folderId).toBeUndefined();
+    });
   });
 
   describe('deleteFolderWithContents', () => {
@@ -357,6 +381,34 @@ describe('useFolders', () => {
       const outside = await db.notes.get('n-outside');
       expect(outside!.linkedNoteIds).toEqual(['other-note']);
       expect(outside!.linkedTaskIds).toEqual([]);
+    });
+
+    it('deletes standaloneIOCs in the folder', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('Nuke');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.standaloneIOCs.add({
+        id: 'ioc-inside', type: 'ipv4', value: '10.0.0.1', confidence: 'high',
+        tags: [], trashed: false, archived: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.standaloneIOCs.add({
+        id: 'ioc-outside', type: 'domain', value: 'example.com', confidence: 'medium',
+        tags: [], trashed: false, archived: false,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.deleteFolderWithContents(folderId);
+      });
+
+      expect(await db.standaloneIOCs.get('ioc-inside')).toBeUndefined();
+      expect(await db.standaloneIOCs.get('ioc-outside')).toBeDefined();
     });
   });
 });

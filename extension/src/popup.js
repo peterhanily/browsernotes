@@ -138,4 +138,4 @@ setInterval(loadStats, 2000);
 
 // Show platform-appropriate shortcut
 const isMac = /Mac/i.test(navigator.platform);
-document.getElementById('shortcut-kbd').textContent = isMac ? 'Ctrl+Shift+S' : 'Alt+Shift+S';
+document.getElementById('shortcut-kbd').textContent = isMac ? '⌃+Shift+X' : 'Alt+Shift+X';

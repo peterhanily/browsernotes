@@ -426,7 +426,8 @@ async function saveCapture(note) {
     entityType: note.entityType || 'note',
     folderName: note.folderName || '',
     clsLevel: note.clsLevel || '',
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    sent: false
   };
 
   captures.push(capture);

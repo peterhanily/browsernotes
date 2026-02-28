@@ -40,6 +40,7 @@ import type { InvestigationStatus } from './types';
 import { GraphView } from './components/Graph/GraphView';
 import { IOCStatsView } from './components/Analysis/IOCStatsView';
 import { StandaloneIOCForm } from './components/Analysis/StandaloneIOCForm';
+import { StandaloneIOCList } from './components/Analysis/StandaloneIOCList';
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -1028,19 +1029,37 @@ export default function App() {
             onDeleteSample={handleDeleteSample}
           />
         ) : activeView === 'ioc-stats' ? (
-          <IOCStatsView
-            notes={screensafeNotes}
-            tasks={screensafeTasks}
-            timelineEvents={screensafeTimelineEvents}
-            standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
-            settings={settings}
-            scopedNotes={investigationNotes}
-            scopedTasks={investigationTasks}
-            scopedTimelineEvents={investigationTimelineEvents}
-            scopedStandaloneIOCs={investigationStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
-            selectedFolderId={selectedFolderId}
-            selectedFolderName={selectedFolder?.name}
-          />
+          <div className="flex-1 flex flex-col overflow-y-auto">
+            <IOCStatsView
+              notes={screensafeNotes}
+              tasks={screensafeTasks}
+              timelineEvents={screensafeTimelineEvents}
+              standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
+              settings={settings}
+              scopedNotes={investigationNotes}
+              scopedTasks={investigationTasks}
+              scopedTimelineEvents={investigationTimelineEvents}
+              scopedStandaloneIOCs={investigationStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
+              selectedFolderId={selectedFolderId}
+              selectedFolderName={selectedFolder?.name}
+            />
+            <div className="border-t border-gray-800">
+              <StandaloneIOCList
+                iocs={filteredStandaloneIOCs}
+                folders={folders}
+                onCreate={loggedCreateIOC}
+                onUpdate={standaloneIOCsHook.updateIOC}
+                onDelete={loggedDeleteIOC}
+                onTrash={loggedTrashIOC}
+                onRestore={loggedRestoreIOC}
+                onToggleArchive={loggedToggleArchiveIOC}
+                showTrash={showTrash}
+                showArchive={showArchive}
+                onEmptyTrash={loggedEmptyTrashIOCs}
+                defaultFolderId={selectedFolderId}
+              />
+            </div>
+          </div>
         ) : activeView === 'activity' ? (
           <ActivityLogView
             entries={activityLog.entries}

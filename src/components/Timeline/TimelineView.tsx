@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Search, ArrowUpDown, Star, List, Grid3X3, BarChart3, GanttChart, MapPin, Download, Upload, Trash2 } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, Star, List, Grid3X3, BarChart3, GanttChart, MapPin, Download, Upload, Trash2, RotateCcw } from 'lucide-react';
 import type { TimelineEvent, TimelineEventType, Tag, Folder, Timeline } from '../../types';
 import { TimelineFeed } from './TimelineFeed';
 import { EventTypeFilterBar } from './EventTypeFilterBar';
@@ -441,6 +441,16 @@ export function TimelineView({
               onUpdateEvent={onUpdateEvent}
             />
             <div className="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2">
+              {editingEvent.trashed && onRestoreEvent && (
+                <button
+                  type="button"
+                  onClick={() => { onRestoreEvent(editingEvent.id); setEditingEvent(null); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-green-500 hover:text-green-400 hover:bg-gray-800 text-sm transition-colors"
+                  title="Restore"
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
               {onTrashEvent && !editingEvent.trashed ? (
                 <button
                   type="button"

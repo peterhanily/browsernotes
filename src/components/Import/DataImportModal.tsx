@@ -64,7 +64,7 @@ export function DataImportModal({
   const [importError, setImportError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Reset state when modal opens
   useEffect(() => {

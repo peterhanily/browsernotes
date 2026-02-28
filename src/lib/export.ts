@@ -156,6 +156,8 @@ function sanitizeTask(raw: unknown): Task | null {
     linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
+    trashed: bool(r.trashed),
+    archived: bool(r.archived),
     completedAt: r.completedAt != null ? num(r.completedAt) : undefined,
   };
 }
@@ -225,6 +227,8 @@ function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
     iocTypes: Array.isArray(r.iocTypes) ? strArr(r.iocTypes).filter((t) => VALID_IOC_TYPES.includes(t)) as TimelineEvent['iocTypes'] : undefined,
     latitude: typeof r.latitude === 'number' && isFinite(r.latitude) && r.latitude >= -90 && r.latitude <= 90 ? r.latitude : undefined,
     longitude: typeof r.longitude === 'number' && isFinite(r.longitude) && r.longitude >= -180 && r.longitude <= 180 ? r.longitude : undefined,
+    trashed: bool(r.trashed),
+    archived: bool(r.archived),
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
@@ -254,6 +258,8 @@ function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
     appState: r.appState != null ? str(r.appState) : undefined,
     folderId: r.folderId != null ? str(r.folderId) : undefined,
     tags: strArr(r.tags),
+    trashed: bool(r.trashed),
+    archived: bool(r.archived),
     order: num(r.order),
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),

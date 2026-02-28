@@ -185,7 +185,7 @@ describe('useFolders', () => {
       await db.tasks.add({
         id: 't1', title: 'Task in folder', tags: [],
         completed: false, priority: 'none', status: 'todo',
-        order: 1, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+        order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {
@@ -210,6 +210,7 @@ describe('useFolders', () => {
         eventType: 'other', source: '', confidence: 'low',
         linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
         mitreAttackIds: [], assets: [], tags: [], starred: false,
+        trashed: false, archived: false,
         folderId, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
       });
 
@@ -232,7 +233,7 @@ describe('useFolders', () => {
 
       await db.whiteboards.add({
         id: 'w1', name: 'Whiteboard in folder', elements: '[]',
-        tags: [], order: 1, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+        tags: [], order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {
@@ -263,18 +264,19 @@ describe('useFolders', () => {
       await db.tasks.add({
         id: 't1', title: 'Task in folder', tags: [],
         completed: false, priority: 'none', status: 'todo',
-        order: 1, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+        order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
       });
       await db.timelineEvents.add({
         id: 'e1', title: 'Event in folder', timestamp: Date.now(),
         eventType: 'other', source: '', confidence: 'low',
         linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
         mitreAttackIds: [], assets: [], tags: [], starred: false,
+        trashed: false, archived: false,
         folderId, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
       });
       await db.whiteboards.add({
         id: 'w1', name: 'Whiteboard in folder', elements: '[]',
-        tags: [], order: 1, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+        tags: [], order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {
@@ -337,7 +339,7 @@ describe('useFolders', () => {
       await db.tasks.add({
         id: 't-inside', title: 'Task inside', tags: [],
         completed: false, priority: 'none', status: 'todo',
-        order: 1, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+        order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
       });
       // Note outside that links to the deleted note and task
       await db.notes.add({

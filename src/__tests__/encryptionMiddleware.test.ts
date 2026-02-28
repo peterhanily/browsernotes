@@ -56,7 +56,8 @@ function makeNote(id: string, title = 'Test Note', content = 'Secret content') {
 function makeTask(id: string, title = 'Test Task') {
   return {
     id, title, completed: false, priority: 'none' as const, tags: [],
-    status: 'todo' as const, order: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    status: 'todo' as const, order: 0, trashed: false, archived: false,
+    createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

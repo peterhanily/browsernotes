@@ -238,7 +238,7 @@ describe('exportJSON / importJSON roundtrip', () => {
     });
     await db.tasks.add({
       id: 't1', title: 'Test Task', completed: false, priority: 'high',
-      tags: [], status: 'todo', order: 1, createdAt: 1000, updatedAt: 2000,
+      tags: [], status: 'todo', order: 1, trashed: false, archived: false, createdAt: 1000, updatedAt: 2000,
     });
     await db.folders.add({ id: 'f1', name: 'Work', order: 1, createdAt: 1000 });
     await db.tags.add({ id: 'tg1', name: 'test', color: '#ff0000' });
@@ -284,7 +284,7 @@ describe('exportJSON / importJSON roundtrip', () => {
     });
     await db.tasks.add({
       id: 't1', title: 'Classified Task', completed: false, priority: 'high',
-      tags: [], status: 'todo', order: 1, createdAt: 1000, updatedAt: 2000,
+      tags: [], status: 'todo', order: 1, trashed: false, archived: false, createdAt: 1000, updatedAt: 2000,
       clsLevel: 'TLP:RED',
       linkedNoteIds: ['n1'],
       linkedTaskIds: [],
@@ -302,6 +302,7 @@ describe('exportJSON / importJSON roundtrip', () => {
       id: 'ev1', timestamp: 5000, title: 'Event 1', eventType: 'other',
       source: 'test', confidence: 'high', linkedIOCIds: [], linkedNoteIds: ['n1'],
       linkedTaskIds: ['t1'], mitreAttackIds: [], assets: [], tags: [], starred: false,
+      trashed: false, archived: false,
       timelineId: 'tl1', createdAt: 1000, updatedAt: 2000,
       clsLevel: 'TLP:AMBER',
       iocAnalysis: {
@@ -656,6 +657,7 @@ describe('exportEventsJSON', () => {
     id: 'ev1', timestamp: 5000, title: 'Event 1', eventType: 'other',
     source: 'test', confidence: 'high', linkedIOCIds: [], linkedNoteIds: [],
     linkedTaskIds: [], mitreAttackIds: [], assets: [], tags: [], starred: false,
+    trashed: false, archived: false,
     timelineId: 'tl1', createdAt: 1000, updatedAt: 2000,
   };
 

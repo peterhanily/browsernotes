@@ -126,7 +126,7 @@ describe('useTags', () => {
     await db.tasks.add({
       id: 't1', title: 'Tagged task', tags: ['old-tag'],
       completed: false, priority: 'none', status: 'todo',
-      order: 1, createdAt: Date.now(), updatedAt: Date.now(),
+      order: 1, trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
     });
 
     await act(async () => {
@@ -150,7 +150,7 @@ describe('useTags', () => {
       id: 'e1', timestamp: Date.now(), title: 'Event', eventType: 'other',
       source: '', confidence: 'medium', linkedIOCIds: [], linkedNoteIds: [],
       linkedTaskIds: [], mitreAttackIds: [], assets: [], tags: ['old-tag'],
-      starred: false, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
+      starred: false, trashed: false, archived: false, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
     });
 
     await act(async () => {
@@ -172,7 +172,7 @@ describe('useTags', () => {
 
     await db.whiteboards.add({
       id: 'w1', name: 'Board', elements: '[]', tags: ['old-tag'],
-      order: 0, createdAt: Date.now(), updatedAt: Date.now(),
+      order: 0, trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
     });
 
     await act(async () => {
@@ -259,7 +259,7 @@ describe('useTags', () => {
       await db.tasks.add({
         id: 't1', title: 'Task', tags: ['remove-me', 'keep-me'],
         completed: false, priority: 'none', status: 'todo',
-        order: 1, createdAt: Date.now(), updatedAt: Date.now(),
+        order: 1, trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {
@@ -283,7 +283,7 @@ describe('useTags', () => {
         id: 'e1', timestamp: Date.now(), title: 'Event', eventType: 'other',
         source: '', confidence: 'medium', linkedIOCIds: [], linkedNoteIds: [],
         linkedTaskIds: [], mitreAttackIds: [], assets: [], tags: ['remove-me', 'keep-me'],
-        starred: false, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
+        starred: false, trashed: false, archived: false, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {
@@ -305,7 +305,7 @@ describe('useTags', () => {
 
       await db.whiteboards.add({
         id: 'w1', name: 'Board', elements: '[]', tags: ['remove-me', 'keep-me'],
-        order: 0, createdAt: Date.now(), updatedAt: Date.now(),
+        order: 0, trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
       });
 
       await act(async () => {

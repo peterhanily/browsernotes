@@ -484,7 +484,7 @@ describe('Whiteboards', () => {
     const now = Date.now();
     await db.whiteboards.add({
       id: 'wb1', name: 'Attack Map', elements: '[]', tags: [],
-      order: 0, createdAt: now, updatedAt: now,
+      order: 0, trashed: false, archived: false, createdAt: now, updatedAt: now,
     });
 
     const wb = await db.whiteboards.get('wb1');
@@ -503,8 +503,8 @@ describe('Whiteboards', () => {
   it('supports querying by folderId', async () => {
     const now = Date.now();
     await db.whiteboards.bulkAdd([
-      { id: 'wb1', name: 'A', elements: '[]', tags: [], folderId: 'f1', order: 0, createdAt: now, updatedAt: now },
-      { id: 'wb2', name: 'B', elements: '[]', tags: [], folderId: 'f2', order: 1, createdAt: now, updatedAt: now },
+      { id: 'wb1', name: 'A', elements: '[]', tags: [], folderId: 'f1', order: 0, trashed: false, archived: false, createdAt: now, updatedAt: now },
+      { id: 'wb2', name: 'B', elements: '[]', tags: [], folderId: 'f2', order: 1, trashed: false, archived: false, createdAt: now, updatedAt: now },
     ]);
 
     const inF1 = await db.whiteboards.where('folderId').equals('f1').toArray();
@@ -515,8 +515,8 @@ describe('Whiteboards', () => {
   it('supports multi-value index on tags', async () => {
     const now = Date.now();
     await db.whiteboards.bulkAdd([
-      { id: 'wb1', name: 'A', elements: '[]', tags: ['network'], order: 0, createdAt: now, updatedAt: now },
-      { id: 'wb2', name: 'B', elements: '[]', tags: ['network', 'c2'], order: 1, createdAt: now, updatedAt: now },
+      { id: 'wb1', name: 'A', elements: '[]', tags: ['network'], order: 0, trashed: false, archived: false, createdAt: now, updatedAt: now },
+      { id: 'wb2', name: 'B', elements: '[]', tags: ['network', 'c2'], order: 1, trashed: false, archived: false, createdAt: now, updatedAt: now },
     ]);
 
     const withNetwork = await db.whiteboards.where('tags').equals('network').toArray();
@@ -526,8 +526,8 @@ describe('Whiteboards', () => {
   it('supports ordering by order field', async () => {
     const now = Date.now();
     await db.whiteboards.bulkAdd([
-      { id: 'wb3', name: 'C', elements: '[]', tags: [], order: 3, createdAt: now, updatedAt: now },
-      { id: 'wb1', name: 'A', elements: '[]', tags: [], order: 1, createdAt: now, updatedAt: now },
+      { id: 'wb3', name: 'C', elements: '[]', tags: [], order: 3, trashed: false, archived: false, createdAt: now, updatedAt: now },
+      { id: 'wb1', name: 'A', elements: '[]', tags: [], order: 1, trashed: false, archived: false, createdAt: now, updatedAt: now },
     ]);
 
     const sorted = await db.whiteboards.orderBy('order').toArray();

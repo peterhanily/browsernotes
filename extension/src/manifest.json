@@ -40,8 +40,8 @@
   "commands": {
     "capture-selection": {
       "suggested_key": {
-        "default": "Ctrl+Shift+N",
-        "mac": "Command+Shift+N"
+        "default": "Alt+Shift+S",
+        "mac": "MacCtrl+Shift+S"
       },
       "description": "Capture selected text or full page"
     }

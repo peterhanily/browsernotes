@@ -334,8 +334,10 @@ async function sendAllToTarget() {
       // Mark captures as sent and remove them
       const allCaptures = await loadCaptures();
       const sentIds = new Set(unsent.map(c => c.id));
-      const remaining = allCaptures.filter(c => !sentIds.has(c.id));
-      await chrome.storage.local.set({ captures: remaining });
+      for (const c of allCaptures) {
+        if (sentIds.has(c.id)) c.sent = true;
+      }
+      await chrome.storage.local.set({ captures: allCaptures });
       await refresh();
       showToast(`${unsent.length} clip(s) sent successfully!`);
     } else {

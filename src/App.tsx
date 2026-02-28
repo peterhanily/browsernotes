@@ -735,11 +735,20 @@ export default function App() {
     navigateTo('notes', { selectedNoteId: note.id });
   }, [loggedCreateNote, selectedFolderId, showQuickCapture, navigateTo, folders]);
 
+  const [pendingNewTask, setPendingNewTask] = useState(false);
+  const [pendingNewEvent, setPendingNewEvent] = useState(false);
+
   const handleNewTask = useCallback(async () => {
+    setShowTrash(false);
+    setShowArchive(false);
+    setPendingNewTask(true);
     navigateTo('tasks');
   }, [navigateTo]);
 
   const handleNewTimelineEvent = useCallback(() => {
+    setShowTrash(false);
+    setShowArchive(false);
+    setPendingNewEvent(true);
     navigateTo('timeline');
   }, [navigateTo]);
 
@@ -1091,6 +1100,8 @@ export default function App() {
             showTrash={showTrash}
             showArchive={showArchive}
             onEmptyTrash={loggedEmptyTrashEvents}
+            openNewForm={pendingNewEvent}
+            onNewFormOpened={() => setPendingNewEvent(false)}
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
@@ -1133,6 +1144,8 @@ export default function App() {
             showTrash={showTrash}
             showArchive={showArchive}
             onEmptyTrash={loggedEmptyTrashTasks}
+            openNewForm={pendingNewTask}
+            onNewFormOpened={() => setPendingNewTask(false)}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */

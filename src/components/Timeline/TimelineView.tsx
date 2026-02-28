@@ -49,6 +49,8 @@ interface TimelineViewProps {
   showTrash?: boolean;
   showArchive?: boolean;
   onEmptyTrash?: () => void;
+  openNewForm?: boolean;
+  onNewFormOpened?: () => void;
 }
 
 function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; timelines: Timeline[]; onImportClick: () => void }) {
@@ -164,9 +166,19 @@ export function TimelineView({
   showTrash,
   showArchive,
   onEmptyTrash,
+  openNewForm,
+  onNewFormOpened,
 }: TimelineViewProps) {
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showNewEvent, setShowNewEvent] = useState(false);
+
+  // Open creation form when triggered externally (e.g. from header "+ New" dropdown)
+  useEffect(() => {
+    if (!openNewForm) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: syncing external prop to local modal state
+    setShowNewEvent(true);
+    onNewFormOpened?.();
+  }, [openNewForm, onNewFormOpened]);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedEventTypes, setSelectedEventTypes] = useState<TimelineEventType[]>([]);

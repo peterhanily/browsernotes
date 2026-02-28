@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ListChecks, LayoutGrid, Plus, Filter, Trash2 } from 'lucide-react';
 import type { Task, Note, TimelineEvent, TaskStatus, TaskViewMode, Tag, Folder } from '../../types';
 import { TaskItem } from './TaskItem';
@@ -30,6 +30,8 @@ interface TaskListProps {
   showTrash?: boolean;
   showArchive?: boolean;
   onEmptyTrash?: () => void;
+  openNewForm?: boolean;
+  onNewFormOpened?: () => void;
 }
 
 export function TaskListView({
@@ -54,9 +56,19 @@ export function TaskListView({
   showTrash,
   showArchive,
   onEmptyTrash,
+  openNewForm,
+  onNewFormOpened,
 }: TaskListProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
+
+  // Open creation form when triggered externally (e.g. from header "+ New" dropdown)
+  useEffect(() => {
+    if (!openNewForm) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: syncing external prop to local modal state
+    setShowNewTask(true);
+    onNewFormOpened?.();
+  }, [openNewForm, onNewFormOpened]);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
   const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 

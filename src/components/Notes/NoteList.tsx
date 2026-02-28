@@ -1,7 +1,6 @@
-import { ArrowUpDown, FileText, Trash2, Download } from 'lucide-react';
+import { ArrowUpDown, FileText, Download } from 'lucide-react';
 import type { Note, SortOption, IOCType, Folder } from '../../types';
 import { NoteCard } from './NoteCard';
-import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IOCFilterBar } from '../Clips/IOCFilterBar';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { formatIOCsJSON, formatIOCsCSV, formatIOCsFlatJSON, formatIOCsFlatCSV } from '../../lib/ioc-export';
@@ -15,8 +14,6 @@ interface NoteListProps {
   sort: SortOption;
   onSortChange: (sort: SortOption) => void;
   title?: string;
-  showTrash?: boolean;
-  onEmptyTrash?: () => void;
   selectedIOCTypes?: IOCType[];
   onIOCTypesChange?: (types: IOCType[]) => void;
   folders?: Folder[];
@@ -24,8 +21,7 @@ interface NoteListProps {
   onTrash?: (id: string) => void;
 }
 
-export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, showTrash, onEmptyTrash, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash }: NoteListProps) {
-  const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
+export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, title, selectedIOCTypes, onIOCTypesChange, folders, tiExportConfig, onTrash }: NoteListProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -92,17 +88,6 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
         <span className="text-sm font-medium text-gray-300">{title || 'Notes'} ({notes.length})</span>
         <div className="flex items-center gap-1">
-          {showTrash && notes.length > 0 && (
-            <button
-              onClick={() => setConfirmEmptyTrash(true)}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-red-400 hover:bg-gray-800 hover:text-red-300 transition-colors"
-              aria-label="Empty trash"
-              title="Empty trash"
-            >
-              <Trash2 size={12} />
-              <span className="hidden sm:inline">Empty</span>
-            </button>
-          )}
           {notesWithIOCs.length > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -157,8 +142,8 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         {notes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-600">
             <FileText size={32} className="mb-2" />
-            <p className="text-sm">{showTrash ? 'Trash is empty' : 'No notes yet'}</p>
-            {!showTrash && <p className="text-xs mt-1">Press Ctrl+N to create one</p>}
+            <p className="text-sm">No notes yet</p>
+            <p className="text-xs mt-1">Press Ctrl+N to create one</p>
           </div>
         ) : (
           notes.map((note) => {
@@ -180,15 +165,6 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         )}
       </div>
 
-      <ConfirmDialog
-        open={confirmEmptyTrash}
-        onClose={() => setConfirmEmptyTrash(false)}
-        onConfirm={() => { onEmptyTrash?.(); setConfirmEmptyTrash(false); }}
-        title="Empty Trash"
-        message="All notes in trash will be permanently deleted. This cannot be undone."
-        confirmLabel="Empty Trash"
-        danger
-      />
     </div>
   );
 }

@@ -411,4 +411,266 @@ describe('useFolders', () => {
       expect(await db.standaloneIOCs.get('ioc-outside')).toBeDefined();
     });
   });
+
+  describe('trashFolderContents', () => {
+    it('trashes non-trashed entities and deletes the folder', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToTrash');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n1', title: 'Note', content: '', tags: [],
+        pinned: false, archived: false, trashed: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.tasks.add({
+        id: 't1', title: 'Task', tags: [],
+        completed: false, priority: 'none', status: 'todo',
+        order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.timelineEvents.add({
+        id: 'e1', title: 'Event', timestamp: Date.now(),
+        eventType: 'other', source: '', confidence: 'low',
+        linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+        mitreAttackIds: [], assets: [], tags: [], starred: false,
+        trashed: false, archived: false,
+        folderId, timelineId: 'tl1', createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.whiteboards.add({
+        id: 'w1', name: 'WB', elements: '[]',
+        tags: [], order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.standaloneIOCs.add({
+        id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'high',
+        tags: [], trashed: false, archived: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.trashFolderContents(folderId);
+      });
+
+      // Folder should be deleted
+      expect(result.current.folders).toHaveLength(0);
+      expect(await db.folders.get(folderId)).toBeUndefined();
+
+      // Entities should be trashed
+      const note = await db.notes.get('n1');
+      expect(note!.trashed).toBe(true);
+      expect(note!.trashedAt).toBeDefined();
+
+      const task = await db.tasks.get('t1');
+      expect(task!.trashed).toBe(true);
+      expect(task!.trashedAt).toBeDefined();
+
+      const event = await db.timelineEvents.get('e1');
+      expect(event!.trashed).toBe(true);
+
+      const wb = await db.whiteboards.get('w1');
+      expect(wb!.trashed).toBe(true);
+
+      const ioc = await db.standaloneIOCs.get('ioc1');
+      expect(ioc!.trashed).toBe(true);
+    });
+
+    it('preserves existing trashedAt on already-trashed items', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToTrash');
+      });
+      const folderId = result.current.folders[0].id;
+
+      const earlyTimestamp = Date.now() - 100000;
+      await db.notes.add({
+        id: 'n-already', title: 'Already trashed', content: '', tags: [],
+        pinned: false, archived: false, trashed: true, trashedAt: earlyTimestamp,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.trashFolderContents(folderId);
+      });
+
+      const note = await db.notes.get('n-already');
+      expect(note!.trashedAt).toBe(earlyTimestamp);
+    });
+
+    it('does not affect entities outside the folder', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToTrash');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n-inside', title: 'Inside', content: '', tags: [],
+        pinned: false, archived: false, trashed: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.notes.add({
+        id: 'n-outside', title: 'Outside', content: '', tags: [],
+        pinned: false, archived: false, trashed: false,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.trashFolderContents(folderId);
+      });
+
+      const inside = await db.notes.get('n-inside');
+      expect(inside!.trashed).toBe(true);
+      const outside = await db.notes.get('n-outside');
+      expect(outside!.trashed).toBe(false);
+    });
+  });
+
+  describe('archiveFolder', () => {
+    it('sets folder status to archived and archives non-trashed entities', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToArchive');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n1', title: 'Note', content: '', tags: [],
+        pinned: false, archived: false, trashed: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+      await db.tasks.add({
+        id: 't1', title: 'Task', tags: [],
+        completed: false, priority: 'none', status: 'todo',
+        order: 1, trashed: false, archived: false, folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.archiveFolder(folderId);
+      });
+
+      // Folder status should be archived
+      const folder = await db.folders.get(folderId);
+      expect(folder!.status).toBe('archived');
+      expect(result.current.folders[0].status).toBe('archived');
+
+      // Entities should be archived
+      const note = await db.notes.get('n1');
+      expect(note!.archived).toBe(true);
+      const task = await db.tasks.get('t1');
+      expect(task!.archived).toBe(true);
+    });
+
+    it('skips trashed entities when archiving', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToArchive');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n-trashed', title: 'Trashed', content: '', tags: [],
+        pinned: false, archived: false, trashed: true,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.archiveFolder(folderId);
+      });
+
+      const note = await db.notes.get('n-trashed');
+      expect(note!.archived).toBe(false);
+    });
+
+    it('does not affect entities outside the folder', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToArchive');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n-outside', title: 'Outside', content: '', tags: [],
+        pinned: false, archived: false, trashed: false,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.archiveFolder(folderId);
+      });
+
+      const note = await db.notes.get('n-outside');
+      expect(note!.archived).toBe(false);
+    });
+  });
+
+  describe('unarchiveFolder', () => {
+    it('sets folder status to active and unarchives archived entities', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToUnarchive');
+      });
+      const folderId = result.current.folders[0].id;
+
+      // Archive it first
+      await act(async () => {
+        await result.current.archiveFolder(folderId);
+      });
+
+      await db.notes.add({
+        id: 'n1', title: 'Archived note', content: '', tags: [],
+        pinned: false, archived: true, trashed: false,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.unarchiveFolder(folderId);
+      });
+
+      const folder = await db.folders.get(folderId);
+      expect(folder!.status).toBe('active');
+      expect(result.current.folders[0].status).toBe('active');
+
+      const note = await db.notes.get('n1');
+      expect(note!.archived).toBe(false);
+    });
+
+    it('skips trashed entities when unarchiving', async () => {
+      const { result } = renderHook(() => useFolders());
+      await act(async () => {});
+
+      await act(async () => {
+        await result.current.createFolder('ToUnarchive');
+      });
+      const folderId = result.current.folders[0].id;
+
+      await db.notes.add({
+        id: 'n-trashed', title: 'Trashed', content: '', tags: [],
+        pinned: false, archived: true, trashed: true,
+        folderId, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+
+      await act(async () => {
+        await result.current.unarchiveFolder(folderId);
+      });
+
+      const note = await db.notes.get('n-trashed');
+      // Still archived because it's trashed (skipped by unarchive)
+      expect(note!.archived).toBe(true);
+    });
+  });
 });

@@ -142,6 +142,68 @@ export function useFolders() {
     setFolders((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
+  const trashFolderContents = useCallback(async (id: string) => {
+    const now = Date.now();
+    const notesInFolder = await db.notes.where('folderId').equals(id).toArray();
+    const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
+    const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
+    const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+    const iocsInFolder = await db.standaloneIOCs.where('folderId').equals(id).toArray();
+
+    await Promise.all([
+      ...notesInFolder.filter((n) => !n.trashed).map((n) => db.notes.update(n.id, { trashed: true, trashedAt: now })),
+      ...tasksInFolder.filter((t) => !t.trashed).map((t) => db.tasks.update(t.id, { trashed: true, trashedAt: now })),
+      ...eventsInFolder.filter((e) => !e.trashed).map((e) => db.timelineEvents.update(e.id, { trashed: true, trashedAt: now })),
+      ...whiteboardsInFolder.filter((w) => !w.trashed).map((w) => db.whiteboards.update(w.id, { trashed: true, trashedAt: now })),
+      ...iocsInFolder.filter((i) => !i.trashed).map((i) => db.standaloneIOCs.update(i.id, { trashed: true, trashedAt: now })),
+    ]);
+
+    await db.folders.delete(id);
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const archiveFolder = useCallback(async (id: string) => {
+    await db.folders.update(id, { status: 'archived', updatedAt: Date.now() });
+    const notesInFolder = await db.notes.where('folderId').equals(id).toArray();
+    const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
+    const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
+    const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+    const iocsInFolder = await db.standaloneIOCs.where('folderId').equals(id).toArray();
+
+    await Promise.all([
+      ...notesInFolder.filter((n) => !n.trashed).map((n) => db.notes.update(n.id, { archived: true })),
+      ...tasksInFolder.filter((t) => !t.trashed).map((t) => db.tasks.update(t.id, { archived: true })),
+      ...eventsInFolder.filter((e) => !e.trashed).map((e) => db.timelineEvents.update(e.id, { archived: true })),
+      ...whiteboardsInFolder.filter((w) => !w.trashed).map((w) => db.whiteboards.update(w.id, { archived: true })),
+      ...iocsInFolder.filter((i) => !i.trashed).map((i) => db.standaloneIOCs.update(i.id, { archived: true })),
+    ]);
+
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, status: 'archived' as const, updatedAt: Date.now() } : f)).sort((a, b) => a.order - b.order)
+    );
+  }, []);
+
+  const unarchiveFolder = useCallback(async (id: string) => {
+    await db.folders.update(id, { status: 'active', updatedAt: Date.now() });
+    const notesInFolder = await db.notes.where('folderId').equals(id).toArray();
+    const tasksInFolder = await db.tasks.where('folderId').equals(id).toArray();
+    const eventsInFolder = await db.timelineEvents.where('folderId').equals(id).toArray();
+    const whiteboardsInFolder = await db.whiteboards.where('folderId').equals(id).toArray();
+    const iocsInFolder = await db.standaloneIOCs.where('folderId').equals(id).toArray();
+
+    await Promise.all([
+      ...notesInFolder.filter((n) => n.archived && !n.trashed).map((n) => db.notes.update(n.id, { archived: false })),
+      ...tasksInFolder.filter((t) => t.archived && !t.trashed).map((t) => db.tasks.update(t.id, { archived: false })),
+      ...eventsInFolder.filter((e) => e.archived && !e.trashed).map((e) => db.timelineEvents.update(e.id, { archived: false })),
+      ...whiteboardsInFolder.filter((w) => w.archived && !w.trashed).map((w) => db.whiteboards.update(w.id, { archived: false })),
+      ...iocsInFolder.filter((i) => i.archived && !i.trashed).map((i) => db.standaloneIOCs.update(i.id, { archived: false })),
+    ]);
+
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, status: 'active' as const, updatedAt: Date.now() } : f)).sort((a, b) => a.order - b.order)
+    );
+  }, []);
+
   return {
     folders,
     createFolder,
@@ -149,6 +211,9 @@ export function useFolders() {
     updateFolder,
     deleteFolder,
     deleteFolderWithContents,
+    trashFolderContents,
+    archiveFolder,
+    unarchiveFolder,
     reload: loadFolders,
   };
 }

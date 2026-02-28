@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Settings as SettingsIcon,
-  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, ShieldCheck, Info, Dices,
+  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, ShieldCheck, Info, Dices, RotateCcw,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -25,7 +25,9 @@ interface SidebarProps {
   onShowArchive: (show: boolean) => void;
   onCreateFolder: (name: string) => void;
   onDeleteFolder: (id: string) => void;
-  onDeleteFolderWithContents: (id: string) => void;
+  onTrashFolderContents: (id: string) => void;
+  onArchiveFolder: (id: string) => void;
+  onUnarchiveFolder: (id: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onOpenSettings: () => void;
   collapsed: boolean;
@@ -72,7 +74,9 @@ export function Sidebar({
   onShowArchive,
   onCreateFolder,
   onDeleteFolder,
-  onDeleteFolderWithContents,
+  onTrashFolderContents,
+  onArchiveFolder,
+  onUnarchiveFolder,
   onRenameFolder,
   onOpenSettings,
   collapsed,
@@ -624,6 +628,25 @@ export function Sidebar({
                               <Info size={10} />
                             </button>
                           )}
+                          {(folder.status || 'active') !== 'archived' ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onArchiveFolder(folder.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-amber-400"
+                              aria-label={`Archive investigation ${folder.name}`}
+                              title="Archive investigation"
+                            >
+                              <Archive size={10} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onUnarchiveFolder(folder.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-green-400"
+                              aria-label={`Unarchive investigation ${folder.name}`}
+                              title="Unarchive investigation"
+                            >
+                              <RotateCcw size={10} />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
                             className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
@@ -767,15 +790,15 @@ export function Sidebar({
             className="w-full text-left px-4 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
             onClick={() => { if (deletingFolderId) { onDeleteFolder(deletingFolderId); setDeletingFolderId(null); } }}
           >
-            <div className="text-sm font-medium text-gray-200">Keep items</div>
-            <div className="text-xs text-gray-400 mt-0.5">Move them back to All Items</div>
+            <div className="text-sm font-medium text-gray-200">Remove folder only</div>
+            <div className="text-xs text-gray-400 mt-0.5">Items move back to All Items</div>
           </button>
           <button
             className="w-full text-left px-4 py-3 rounded-lg bg-red-600/15 hover:bg-red-600/25 transition-colors"
-            onClick={() => { if (deletingFolderId) { onDeleteFolderWithContents(deletingFolderId); setDeletingFolderId(null); } }}
+            onClick={() => { if (deletingFolderId) { onTrashFolderContents(deletingFolderId); setDeletingFolderId(null); } }}
           >
-            <div className="text-sm font-medium text-red-400">Delete everything</div>
-            <div className="text-xs text-red-400/70 mt-0.5">Permanently delete all items in this investigation</div>
+            <div className="text-sm font-medium text-red-400">Trash all items</div>
+            <div className="text-xs text-red-400/70 mt-0.5">Items go to trash (auto-deleted after 30 days)</div>
           </button>
         </div>
         <div className="flex justify-end mt-4">

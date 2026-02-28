@@ -18,9 +18,6 @@ interface WhiteboardViewProps {
   onCreateTag: (name: string) => Promise<Tag>;
   selectedWhiteboardId?: string | null;
   onWhiteboardSelect?: (id: string | null) => void;
-  showTrash?: boolean;
-  showArchive?: boolean;
-  onEmptyTrash?: () => void;
 }
 
 export function WhiteboardView({
@@ -36,9 +33,6 @@ export function WhiteboardView({
   onCreateTag,
   selectedWhiteboardId = null,
   onWhiteboardSelect,
-  showTrash,
-  showArchive,
-  onEmptyTrash,
 }: WhiteboardViewProps) {
   const selectedWhiteboard = selectedWhiteboardId ? whiteboards.find((w) => w.id === selectedWhiteboardId) : null;
 
@@ -96,9 +90,6 @@ export function WhiteboardView({
         onTrash={onTrashWhiteboard}
         onRestore={onRestoreWhiteboard}
         onToggleArchive={onToggleArchiveWhiteboard}
-        showTrash={showTrash}
-        showArchive={showArchive}
-        onEmptyTrash={onEmptyTrash}
       />
     </div>
   );

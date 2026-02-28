@@ -41,6 +41,7 @@ import { GraphView } from './components/Graph/GraphView';
 import { IOCStatsView } from './components/Analysis/IOCStatsView';
 import { StandaloneIOCForm } from './components/Analysis/StandaloneIOCForm';
 import { StandaloneIOCList } from './components/Analysis/StandaloneIOCList';
+import { TrashArchiveView } from './components/TrashArchive/TrashArchiveView';
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -78,7 +79,7 @@ export default function App() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
-  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents, reload: reloadFolders } = useFolders();
+  const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
 
   const tour = useTour({
@@ -318,16 +319,46 @@ export default function App() {
     activityLog.log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}"`, id, folder?.name);
   }, [deleteFolder, folders, activityLog]);
 
-  const loggedDeleteFolderWithContents = useCallback(async (id: string) => {
+  const loggedTrashFolderContents = useCallback(async (id: string) => {
     const folder = folders.find((f) => f.id === id);
-    await deleteFolderWithContents(id);
-    activityLog.log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}" and all its contents`, id, folder?.name);
+    await trashFolderContents(id);
+    activityLog.log('folder', 'trash', `Trashed contents of investigation "${folder?.name || 'Untitled'}" and removed folder`, id, folder?.name);
     notes.reload();
     tasks.reload();
     timeline.reload();
     reloadWhiteboards();
     standaloneIOCsHook.reload();
-  }, [deleteFolderWithContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
+  }, [trashFolderContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
+
+  const loggedArchiveFolder = useCallback(async (id: string) => {
+    const folder = folders.find((f) => f.id === id);
+    await archiveFolder(id);
+    activityLog.log('folder', 'archive', `Archived investigation "${folder?.name || 'Untitled'}" and all contents`, id, folder?.name);
+    notes.reload();
+    tasks.reload();
+    timeline.reload();
+    reloadWhiteboards();
+    standaloneIOCsHook.reload();
+  }, [archiveFolder, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
+
+  const loggedUnarchiveFolder = useCallback(async (id: string) => {
+    const folder = folders.find((f) => f.id === id);
+    await unarchiveFolder(id);
+    activityLog.log('folder', 'unarchive', `Unarchived investigation "${folder?.name || 'Untitled'}" and all contents`, id, folder?.name);
+    notes.reload();
+    tasks.reload();
+    timeline.reload();
+    reloadWhiteboards();
+    standaloneIOCsHook.reload();
+  }, [unarchiveFolder, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
+
+  const emptyAllTrash = useCallback(async () => {
+    await loggedEmptyTrash();
+    await loggedEmptyTrashTasks();
+    await loggedEmptyTrashEvents();
+    await loggedEmptyTrashWhiteboards();
+    await loggedEmptyTrashIOCs();
+  }, [loggedEmptyTrash, loggedEmptyTrashTasks, loggedEmptyTrashEvents, loggedEmptyTrashWhiteboards, loggedEmptyTrashIOCs]);
 
   const loggedCreateTag = useCallback(async (name: string) => {
     const tag = await createTag(name);
@@ -537,19 +568,19 @@ export default function App() {
     [folders]
   );
 
-  // Filtered notes
+  // Filtered notes (always exclude trashed/archived — TrashArchiveView handles those)
   const filteredNotes = useMemo(
     () =>
       notes.getFilteredNotes({
         folderId: selectedFolderId,
         tag: selectedTag,
-        showTrashed: showTrash,
-        showArchived: showArchive,
+        showTrashed: false,
+        showArchived: false,
         sort,
         iocTypes: selectedIOCTypes.length > 0 ? selectedIOCTypes : undefined,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [notes.getFilteredNotes, selectedFolderId, selectedTag, showTrash, showArchive, sort, selectedIOCTypes]
+    [notes.getFilteredNotes, selectedFolderId, selectedTag, sort, selectedIOCTypes]
   );
 
   // Filtered tasks
@@ -558,11 +589,11 @@ export default function App() {
       tasks.getFilteredTasks({
         folderId: selectedFolderId,
         tag: selectedTag,
-        showTrashed: showTrash,
-        showArchived: showArchive,
+        showTrashed: false,
+        showArchived: false,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks.getFilteredTasks, selectedFolderId, selectedTag, showTrash, showArchive]
+    [tasks.getFilteredTasks, selectedFolderId, selectedTag]
   );
 
   // Filtered timeline events
@@ -572,11 +603,11 @@ export default function App() {
         folderId: selectedFolderId,
         tag: selectedTag,
         timelineId: selectedTimelineId,
-        showTrashed: showTrash,
-        showArchived: showArchive,
+        showTrashed: false,
+        showArchived: false,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId, showTrash, showArchive]
+    [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId]
   );
 
   // Filtered whiteboards
@@ -584,11 +615,10 @@ export default function App() {
     () => getFilteredWhiteboards({
       folderId: selectedFolderId,
       tag: selectedTag,
-      showTrashed: showTrash,
-      showArchived: showArchive,
+      showTrashed: false,
+      showArchived: false,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getFilteredWhiteboards, selectedFolderId, selectedTag, showTrash, showArchive]
+    [getFilteredWhiteboards, selectedFolderId, selectedTag]
   );
 
   // Filtered standalone IOCs
@@ -596,11 +626,11 @@ export default function App() {
     () => standaloneIOCsHook.getFilteredIOCs({
       folderId: selectedFolderId,
       tag: selectedTag,
-      showTrashed: showTrash,
-      showArchived: showArchive,
+      showTrashed: false,
+      showArchived: false,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [standaloneIOCsHook.getFilteredIOCs, selectedFolderId, selectedTag, showTrash, showArchive]
+    [standaloneIOCsHook.getFilteredIOCs, selectedFolderId, selectedTag]
   );
 
   // Screenshare-filtered: folder-filtered arrays (for NoteList, TaskList, TimelineView)
@@ -908,9 +938,7 @@ export default function App() {
 
   // Determine list title
   let listTitle = 'Notes';
-  if (showTrash) listTitle = 'Trash';
-  else if (showArchive) listTitle = 'Archive';
-  else if (selectedFolderId) {
+  if (selectedFolderId) {
     const folder = folders.find((f) => f.id === selectedFolderId);
     listTitle = folder?.name || 'Investigation';
   }
@@ -931,7 +959,9 @@ export default function App() {
     onShowArchive: setShowArchive,
     onCreateFolder: (name: string) => loggedCreateFolder(name),
     onDeleteFolder: (id: string) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
-    onDeleteFolderWithContents: (id: string) => { loggedDeleteFolderWithContents(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
+    onTrashFolderContents: (id: string) => { loggedTrashFolderContents(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
+    onArchiveFolder: (id: string) => { loggedArchiveFolder(id); },
+    onUnarchiveFolder: (id: string) => { loggedUnarchiveFolder(id); },
     onRenameFolder: (id: string, name: string) => updateFolder(id, { name }),
     onOpenSettings: () => { setShowSettings(true); },
     noteCounts: { ...noteCounts, trashed: combinedTrashedCount, archived: combinedArchivedCount },
@@ -958,7 +988,7 @@ export default function App() {
     folderStatusFilter,
     onFolderStatusFilterChange: setFolderStatusFilter,
     investigationScopedCounts,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedDeleteFolderWithContents, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -1035,6 +1065,37 @@ export default function App() {
             onLoadSample={handleLoadSample}
             onDeleteSample={handleDeleteSample}
           />
+        ) : showTrash || showArchive ? (
+          <TrashArchiveView
+            mode={showTrash ? 'trash' : 'archive'}
+            notes={notes.notes}
+            tasks={tasks.tasks}
+            timelineEvents={timeline.events}
+            whiteboards={whiteboards}
+            standaloneIOCs={standaloneIOCsHook.iocs}
+            folders={folders}
+            onRestoreNote={loggedRestoreNote}
+            onDeleteNotePermanently={(id) => { notes.deleteNote(id); activityLog.log('note', 'delete', 'Permanently deleted note', id); }}
+            onTrashNote={loggedTrashNote}
+            onUnarchiveNote={loggedToggleArchive}
+            onRestoreTask={loggedRestoreTask}
+            onDeleteTaskPermanently={loggedDeleteTask}
+            onTrashTask={loggedTrashTask}
+            onUnarchiveTask={loggedToggleArchiveTask}
+            onRestoreEvent={loggedRestoreEvent}
+            onDeleteEventPermanently={loggedDeleteEvent}
+            onTrashEvent={loggedTrashEvent}
+            onUnarchiveEvent={loggedToggleArchiveEvent}
+            onRestoreWhiteboard={loggedRestoreWhiteboard}
+            onDeleteWhiteboardPermanently={loggedDeleteWhiteboard}
+            onTrashWhiteboard={loggedTrashWhiteboard}
+            onUnarchiveWhiteboard={loggedToggleArchiveWhiteboard}
+            onRestoreIOC={loggedRestoreIOC}
+            onDeleteIOCPermanently={loggedDeleteIOC}
+            onTrashIOC={loggedTrashIOC}
+            onUnarchiveIOC={loggedToggleArchiveIOC}
+            onEmptyAllTrash={emptyAllTrash}
+          />
         ) : activeView === 'ioc-stats' ? (
           <div className="flex-1 flex flex-col overflow-y-auto">
             <IOCStatsView
@@ -1061,9 +1122,6 @@ export default function App() {
                 onTrash={loggedTrashIOC}
                 onRestore={loggedRestoreIOC}
                 onToggleArchive={loggedToggleArchiveIOC}
-                showTrash={showTrash}
-                showArchive={showArchive}
-                onEmptyTrash={loggedEmptyTrashIOCs}
                 defaultFolderId={selectedFolderId}
               />
             </div>
@@ -1096,9 +1154,6 @@ export default function App() {
             onEventsReload={timeline.reload}
             scopeLabel={selectedFolder?.name}
             selectedFolderId={selectedFolderId}
-            showTrash={showTrash}
-            showArchive={showArchive}
-            onEmptyTrash={loggedEmptyTrashEvents}
             openNewForm={pendingNewEvent}
             onNewFormOpened={() => setPendingNewEvent(false)}
           />
@@ -1116,9 +1171,6 @@ export default function App() {
             onCreateTag={loggedCreateTag}
             selectedWhiteboardId={selectedWhiteboardId ?? null}
             onWhiteboardSelect={(id) => setSelectedWhiteboardId(id ?? undefined)}
-            showTrash={showTrash}
-            showArchive={showArchive}
-            onEmptyTrash={loggedEmptyTrashWhiteboards}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView
@@ -1140,9 +1192,6 @@ export default function App() {
             allTimelineEvents={screensafeTimelineEvents}
             scopeLabel={selectedFolder?.name}
             selectedFolderId={selectedFolderId}
-            showTrash={showTrash}
-            showArchive={showArchive}
-            onEmptyTrash={loggedEmptyTrashTasks}
             openNewForm={pendingNewTask}
             onNewFormOpened={() => setPendingNewTask(false)}
           />
@@ -1160,8 +1209,6 @@ export default function App() {
                 sort={sort}
                 onSortChange={setSort}
                 title={listTitle}
-                showTrash={showTrash}
-                onEmptyTrash={loggedEmptyTrash}
                 selectedIOCTypes={selectedIOCTypes}
                 onIOCTypesChange={setSelectedIOCTypes}
                 folders={folders}

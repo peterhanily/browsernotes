@@ -31,9 +31,6 @@ interface StandaloneIOCListProps {
   onTrash?: (id: string) => void;
   onRestore?: (id: string) => void;
   onToggleArchive?: (id: string) => void;
-  showTrash?: boolean;
-  showArchive?: boolean;
-  onEmptyTrash?: () => void;
   defaultFolderId?: string;
 }
 
@@ -47,15 +44,11 @@ export function StandaloneIOCList({
   onTrash,
   onRestore,
   onToggleArchive,
-  showTrash,
-  showArchive,
-  onEmptyTrash,
   defaultFolderId,
 }: StandaloneIOCListProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingIOC, setEditingIOC] = useState<StandaloneIOC | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 
   const handleSubmit = async (data: Partial<StandaloneIOC>) => {
     if (editingIOC) {
@@ -66,44 +59,28 @@ export function StandaloneIOCList({
     setEditingIOC(undefined);
   };
 
-  const title = showTrash ? 'Trashed IOCs' : showArchive ? 'Archived IOCs' : 'Standalone IOCs';
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-gray-200">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-200">Standalone IOCs</h2>
           <span className="text-xs text-gray-500 tabular-nums">{iocs.length}</span>
         </div>
-        {showTrash && onEmptyTrash && iocs.length > 0 ? (
-          <button
-            onClick={() => setShowEmptyTrashConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-sm font-medium transition-colors"
-          >
-            <Trash2 size={16} />
-            Empty Trash
-          </button>
-        ) : !showTrash && !showArchive ? (
-          <button
-            onClick={() => { setEditingIOC(undefined); setShowForm(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
-          >
-            <Plus size={16} />
-            New IOC
-          </button>
-        ) : null}
+        <button
+          onClick={() => { setEditingIOC(undefined); setShowForm(true); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
+        >
+          <Plus size={16} />
+          New IOC
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {iocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
             <Shield size={48} className="mb-3" />
-            <p className="text-lg font-medium">
-              {showTrash ? 'Trash is empty' : showArchive ? 'No archived IOCs' : 'No standalone IOCs yet'}
-            </p>
-            {!showTrash && !showArchive && (
-              <p className="text-sm mt-1">Create IOCs to track indicators independently</p>
-            )}
+            <p className="text-lg font-medium">No standalone IOCs yet</p>
+            <p className="text-sm mt-1">Create IOCs to track indicators independently</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -260,15 +237,6 @@ export function StandaloneIOCList({
         danger
       />
 
-      <ConfirmDialog
-        open={showEmptyTrashConfirm}
-        onClose={() => setShowEmptyTrashConfirm(false)}
-        onConfirm={() => { onEmptyTrash?.(); setShowEmptyTrashConfirm(false); }}
-        title="Empty IOC Trash"
-        message={`Permanently delete ${iocs.length} trashed IOC(s)? This cannot be undone.`}
-        confirmLabel="Empty Trash"
-        danger
-      />
     </div>
   );
 }

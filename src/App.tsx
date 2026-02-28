@@ -1056,6 +1056,7 @@ export default function App() {
               <StandaloneIOCList
                 iocs={filteredStandaloneIOCs}
                 folders={folders}
+                allTags={tags}
                 onCreate={loggedCreateIOC}
                 onUpdate={standaloneIOCsHook.updateIOC}
                 onDelete={loggedDeleteIOC}

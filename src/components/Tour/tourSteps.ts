@@ -159,7 +159,7 @@ export const tourSteps: TourStep[] = [
     id: 'demo-data',
     target: '[data-tour="load-sample"]',
     title: 'Sample Investigation',
-    description: 'Load a pre-built APT investigation to explore ThreatCaddy\'s features at scale. Includes notes, tasks, timeline events, IOCs, and a whiteboard. Delete it when done.',
+    description: 'Load Operation DARK GLACIER, a full-scale breach investigation with geolocated events, IOC relationship graphs, 12 analysis notes, and 20 timeline events. Explore every ThreatCaddy feature. Delete it when done.',
     placement: 'bottom',
   },
   {

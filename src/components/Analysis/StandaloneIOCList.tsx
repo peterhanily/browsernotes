@@ -1,14 +1,30 @@
 import { useState } from 'react';
 import { Shield, Plus, Pencil, Trash2, Archive, RotateCcw } from 'lucide-react';
-import type { StandaloneIOC, Folder } from '../../types';
+import type { StandaloneIOC, Folder, Tag } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { StandaloneIOCForm } from './StandaloneIOCForm';
 import { formatDate } from '../../lib/utils';
 
+const STATUS_COLORS: Record<string, string> = {
+  active: '#22c55e',
+  resolved: '#6b7280',
+  'false-positive': '#f97316',
+  'under-investigation': '#3b82f6',
+};
+
+const CLS_COLORS: Record<string, string> = {
+  'TLP:CLEAR': '#ffffff',
+  'TLP:GREEN': '#22c55e',
+  'TLP:AMBER': '#f59e0b',
+  'TLP:AMBER+STRICT': '#f59e0b',
+  'TLP:RED': '#ef4444',
+};
+
 interface StandaloneIOCListProps {
   iocs: StandaloneIOC[];
   folders: Folder[];
+  allTags?: Tag[];
   onCreate: (data: Partial<StandaloneIOC>) => Promise<StandaloneIOC>;
   onUpdate: (id: string, updates: Partial<StandaloneIOC>) => void;
   onDelete: (id: string) => void;
@@ -24,6 +40,7 @@ interface StandaloneIOCListProps {
 export function StandaloneIOCList({
   iocs,
   folders,
+  allTags,
   onCreate,
   onUpdate,
   onDelete,
@@ -96,7 +113,9 @@ export function StandaloneIOCList({
                   <th className="text-left text-gray-500 font-medium py-2 pr-2">Value</th>
                   <th className="text-left text-gray-500 font-medium py-2 px-2">Type</th>
                   <th className="text-left text-gray-500 font-medium py-2 px-2">Confidence</th>
+                  <th className="text-left text-gray-500 font-medium py-2 px-2">Status</th>
                   <th className="text-left text-gray-500 font-medium py-2 px-2">Attribution</th>
+                  <th className="text-left text-gray-500 font-medium py-2 px-2">CLS</th>
                   <th className="text-left text-gray-500 font-medium py-2 px-2">Updated</th>
                   <th className="text-right text-gray-500 font-medium py-2 pl-2">Actions</th>
                 </tr>
@@ -105,6 +124,8 @@ export function StandaloneIOCList({
                 {iocs.map((ioc) => {
                   const typeInfo = IOC_TYPE_LABELS[ioc.type];
                   const confInfo = CONFIDENCE_LEVELS[ioc.confidence];
+                  const statusColor = ioc.iocStatus ? STATUS_COLORS[ioc.iocStatus] || '#6b7280' : undefined;
+                  const clsColor = ioc.clsLevel ? CLS_COLORS[ioc.clsLevel] || '#6b7280' : undefined;
                   return (
                     <tr key={ioc.id} className="border-b border-gray-800/50 group">
                       <td className="py-2 pr-2 text-gray-200 font-mono max-w-[240px] truncate">{ioc.value}</td>
@@ -124,7 +145,31 @@ export function StandaloneIOCList({
                           {confInfo.label}
                         </span>
                       </td>
+                      <td className="py-2 px-2">
+                        {ioc.iocStatus ? (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: statusColor + '22', color: statusColor }}
+                          >
+                            {ioc.iocStatus}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
                       <td className="py-2 px-2 text-gray-400">{ioc.attribution || '—'}</td>
+                      <td className="py-2 px-2">
+                        {ioc.clsLevel ? (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                            style={{ backgroundColor: clsColor + '22', color: clsColor }}
+                          >
+                            {ioc.clsLevel}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
                       <td className="py-2 px-2 text-gray-500">{formatDate(ioc.updatedAt)}</td>
                       <td className="py-2 pl-2">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -202,6 +247,7 @@ export function StandaloneIOCList({
         folders={folders}
         defaultFolderId={defaultFolderId}
         editingIOC={editingIOC}
+        allTags={allTags}
       />
 
       <ConfirmDialog

@@ -24,139 +24,361 @@ export function generateSampleInvestigation(): {
   const now = Date.now();
   const DAY = 86400000;
   const HOUR = 3600000;
+  const MIN = 60000;
 
-  // Base timestamp: 7 days ago
+  // Base timestamp: 7 days ago (start of the 5-day attack window)
   const baseTs = now - 7 * DAY;
 
+  // ─── Tags ──────────────────────────────────────────────────────────
   const tags: Tag[] = [
-    { id: sampleId('tag', 1), name: 'apt-29', color: '#ef4444' },
-    { id: sampleId('tag', 2), name: 'phishing', color: '#f97316' },
-    { id: sampleId('tag', 3), name: 'c2', color: '#3b82f6' },
-    { id: sampleId('tag', 4), name: 'malware', color: '#a855f7' },
-    { id: sampleId('tag', 5), name: 'remediation', color: '#22c55e' },
+    { id: sampleId('tag', 1), name: 'midnight-typhoon', color: '#ef4444' },
+    { id: sampleId('tag', 2), name: 'supply-chain', color: '#f97316' },
+    { id: sampleId('tag', 3), name: 'cloud', color: '#3b82f6' },
+    { id: sampleId('tag', 4), name: 'exfiltration', color: '#a855f7' },
+    { id: sampleId('tag', 5), name: 'legal-data', color: '#ec4899' },
+    { id: sampleId('tag', 6), name: 'persistence', color: '#14b8a6' },
+    { id: sampleId('tag', 7), name: 'initial-access', color: '#f59e0b' },
+    { id: sampleId('tag', 8), name: 'remediation', color: '#22c55e' },
   ];
 
+  // ─── Folder ────────────────────────────────────────────────────────
   const folder: Folder = {
     id: SAMPLE_FOLDER_ID,
-    name: 'Operation STARDUST (Sample)',
-    description: 'A sample APT-29 (Cozy Bear) investigation demonstrating ThreatCaddy features. Delete this investigation when you are done exploring.',
+    name: 'Operation DARK GLACIER — OpenSlaw.ai Compromise (Sample)',
+    description: `# Operation DARK GLACIER
+
+**Victim:** OpenSlaw.ai — AI-powered legal document platform
+**Threat Actor:** Midnight Typhoon (APT, nation-state nexus)
+**Attack Vector:** Supply-chain compromise via poisoned npm package (\`@pdfcore/render\`) + secondary phishing campaign
+**Impact:** Exfiltration of privileged legal documents, cloud infrastructure compromise, credential theft
+
+## Summary
+
+Midnight Typhoon compromised a third-party PDF processing library used by OpenSlaw.ai, injecting a backdoor into the build pipeline. The backdoor established C2 via domain-fronted HTTPS and DNS tunneling. Attackers pivoted through AWS infrastructure, harvested IAM credentials and SSO tokens, and staged 2.3 GB of legal documents for exfiltration to servers in Bucharest and Singapore.
+
+This sample investigation demonstrates every ThreatCaddy feature. **Delete it when done exploring.**`,
     status: 'active',
     clsLevel: 'TLP:AMBER',
+    papLevel: 'PAP:AMBER',
     order: 999,
     createdAt: baseTs,
     updatedAt: now,
     timelineId: SAMPLE_TIMELINE_ID,
-    tags: ['apt-29'],
+    tags: ['midnight-typhoon', 'supply-chain'],
   };
 
+  // ─── Timeline ──────────────────────────────────────────────────────
   const timeline: Timeline = {
     id: SAMPLE_TIMELINE_ID,
-    name: 'STARDUST Incident Timeline',
-    description: 'Timeline of observed attacker and defender activity',
+    name: 'DARK GLACIER Incident Timeline',
+    description: 'Five-day attack window from initial supply-chain compromise through exfiltration and containment',
     color: '#ef4444',
     order: 1,
     createdAt: baseTs,
     updatedAt: now,
   };
 
+  // ─── Notes (12) ────────────────────────────────────────────────────
   const notes: Note[] = [
+    // Note 1: Executive Summary
     {
       id: sampleId('note', 1),
-      title: 'Executive Summary — Operation STARDUST',
-      content: `# Executive Summary\n\nOn ${new Date(baseTs).toLocaleDateString()}, a targeted phishing campaign was detected targeting our finance department. Attribution indicators point to **APT-29 (Cozy Bear)**.\n\n## Key Findings\n\n- Spear-phishing email with malicious attachment delivered to 3 users\n- One user executed the attachment, leading to dropper execution\n- C2 beacon established to \`stardust-update.com\` (45.77.123.45)\n- Credential harvesting via Mimikatz observed\n- Lateral movement to domain controller\n- Data staging on \\\\\\\\DC01\\\\C$\\\\Temp detected before exfiltration\n\n## Current Status\n\nContainment is in progress. Affected endpoints have been isolated. Full remediation pending.`,
+      title: 'Executive Summary — Operation DARK GLACIER',
+      content: `# Executive Summary — Operation DARK GLACIER
+
+## Incident Overview
+
+On ${new Date(baseTs).toLocaleDateString()}, the OpenSlaw.ai security team detected anomalous outbound traffic from production servers. Investigation revealed a sophisticated supply-chain attack through a compromised npm dependency (\`@pdfcore/render v3.2.1\`), attributed to the threat actor **Midnight Typhoon**.
+
+## Key Findings
+
+- **Initial Access:** Backdoored npm package \`@pdfcore/render\` v3.2.1 deployed to OpenSlaw.ai production via routine dependency update
+- **Secondary Vector:** Targeted phishing campaign against 5 OpenSlaw.ai engineers using spoofed DocuSign notifications
+- **C2 Channels:** Domain-fronted HTTPS (cdn-assets-proxy.com → 185.220.101.34) and DNS tunneling (data.update-svc-cdn.net)
+- **Credential Theft:** AWS IAM keys, SSO session tokens, and database credentials harvested
+- **Lateral Movement:** Pivot from build server → production API servers → AWS S3/RDS → backup infrastructure
+- **Exfiltration:** 2.3 GB of privileged legal documents staged in Bucharest (185.156.73.22), landed in Singapore
+- **MITRE ATT&CK:** T1195.002, T1566.001, T1059.001, T1078.004, T1537, T1567.002, T1071.001, T1572
+
+## Impact Assessment
+
+- **Confidential legal documents** from 47 client matters potentially exposed
+- **Attorney-client privileged** communications compromised
+- **Regulatory exposure:** GDPR, SOC 2, attorney-client privilege implications
+- **Estimated remediation cost:** $2.4M
+
+## Related Analysis
+
+See detailed notes on: [Phishing Campaign](#), [Malware Analysis](#), [Cloud Pivot](#), [C2 Infrastructure](#), [Credential Harvesting](#), [Data Exfiltration](#), [Lateral Movement](#), [Threat Actor Profile](#)`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['apt-29'],
+      tags: ['midnight-typhoon'],
       pinned: true,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:AMBER',
+      linkedNoteIds: [sampleId('note', 2), sampleId('note', 3), sampleId('note', 4), sampleId('note', 5), sampleId('note', 6), sampleId('note', 7), sampleId('note', 8), sampleId('note', 9), sampleId('note', 11)],
       iocAnalysis: {
         extractedAt: baseTs + HOUR,
         iocs: [
-          { id: 'sioc1', type: 'domain', value: 'stardust-update.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'APT-29' },
-          { id: 'sioc2', type: 'ipv4', value: '45.77.123.45', confidence: 'high', firstSeen: baseTs, dismissed: false, attribution: 'APT-29' },
+          { id: 'sioc-exec-1', type: 'domain', value: 'cdn-assets-proxy.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: '185.220.101.34', relationshipType: 'resolves-to' }] },
+          { id: 'sioc-exec-2', type: 'ipv4', value: '185.220.101.34', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-exec-3', type: 'domain', value: 'update-svc-cdn.net', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: '91.215.85.17', relationshipType: 'resolves-to' }] },
+          { id: 'sioc-exec-4', type: 'ipv4', value: '185.156.73.22', confidence: 'high', firstSeen: baseTs + 3 * DAY, dismissed: false, attribution: 'Midnight Typhoon' },
         ],
       },
       iocTypes: ['domain', 'ipv4'],
       createdAt: baseTs,
       updatedAt: baseTs + 2 * HOUR,
     },
+    // Note 2: Initial Compromise
     {
       id: sampleId('note', 2),
-      title: 'Phishing Email Analysis',
-      content: `# Phishing Email Analysis\n\n## Headers\n\n- **From:** hr-updates@stardust-portal.com\n- **Subject:** "Quarterly Compensation Review — Action Required"\n- **Date:** ${new Date(baseTs).toISOString()}\n- **X-Mailer:** Microsoft Outlook 16.0\n\n## Attachment\n\n- **Filename:** Q4_Compensation_Review.xlsm\n- **SHA-256:** a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2\n- Contains VBA macro that downloads second-stage payload\n\n## Observations\n\n- Email spoofed internal HR domain\n- Payload URL embedded in macro: \`https://stardust-cdn.com/update.exe\`\n- 3 recipients, 1 execution confirmed (user: jsmith@corp)`,
+      title: 'Initial Compromise — Supply Chain via @pdfcore/render',
+      content: `# Initial Compromise — Supply Chain Attack
+
+## Attack Vector
+
+The threat actor compromised the npm registry account of the maintainer of \`@pdfcore/render\`, a PDF processing library used by OpenSlaw.ai's document ingestion pipeline.
+
+### Timeline
+
+1. **T-14 days:** Midnight Typhoon gains access to maintainer's npm account (credential stuffing, no MFA)
+2. **T-10 days:** Publishes v3.2.1 with backdoor in \`src/renderer/init.js\`
+3. **T-7 days (${new Date(baseTs).toLocaleDateString()}):** OpenSlaw.ai CI/CD pipeline pulls updated dependency during routine build
+4. **T-7 days +2h:** Backdoored build deployed to production
+
+### Backdoor Analysis
+
+The injected code in \`init.js\`:
+- Decodes a base64 payload from a string disguised as a PDF font mapping table
+- Spawns a child process that establishes C2 via HTTPS to \`cdn-assets-proxy.com\`
+- Implements DNS tunneling fallback via \`data.update-svc-cdn.net\`
+- Harvests environment variables (AWS keys, DB connection strings)
+- Beacon interval: 45s with 25% jitter
+
+### MITRE ATT&CK
+- **T1195.002** — Supply Chain Compromise: Compromise Software Supply Chain
+- **T1059.001** — Command and Scripting Interpreter: PowerShell / Node.js`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['phishing', 'apt-29'],
+      tags: ['supply-chain', 'initial-access'],
       pinned: false,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:AMBER',
       iocAnalysis: {
-        extractedAt: baseTs + 2 * HOUR,
+        extractedAt: baseTs + 3 * HOUR,
         iocs: [
-          { id: 'sioc3', type: 'email', value: 'hr-updates@stardust-portal.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
-          { id: 'sioc4', type: 'sha256', value: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
-          { id: 'sioc5', type: 'url', value: 'https://stardust-cdn.com/update.exe', confidence: 'high', firstSeen: baseTs, dismissed: false, attribution: 'APT-29' },
-          { id: 'sioc6', type: 'domain', value: 'stardust-portal.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
+          { id: 'sioc-sc-1', type: 'url', value: 'https://registry.npmjs.org/@pdfcore/render/-/render-3.2.1.tgz', confidence: 'confirmed', firstSeen: baseTs - 10 * DAY, dismissed: false },
+          { id: 'sioc-sc-2', type: 'sha256', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: 'cdn-assets-proxy.com', relationshipType: 'communicates-with' }, { targetIOCId: 'CVE-2024-38856', relationshipType: 'exploits' }] },
+          { id: 'sioc-sc-3', type: 'mitre-attack', value: 'T1195.002', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
         ],
       },
-      iocTypes: ['email', 'sha256', 'url', 'domain'],
+      iocTypes: ['url', 'sha256', 'mitre-attack'],
       createdAt: baseTs + HOUR,
-      updatedAt: baseTs + 3 * HOUR,
+      updatedAt: baseTs + 4 * HOUR,
     },
+    // Note 3: Phishing Campaign
     {
       id: sampleId('note', 3),
-      title: 'Malware Analysis — Dropper',
-      content: `# Malware Analysis: Q4_Compensation_Review.xlsm\n\n## Static Analysis\n\n- **Type:** Office Open XML with VBA macros\n- **SHA-256:** a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2\n- **MD5:** d4e5f6a1b2c3d4e5f6a1b2c3\n- VBA uses PowerShell to download payload from stardust-cdn.com\n\n## Dynamic Analysis (Sandbox)\n\n- Drops \`svchost_update.exe\` in %TEMP%\n- Payload SHA-256: b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3\n- Establishes HTTPS C2 to 45.77.123.45:443\n- Persistence: Registry Run key (HKCU\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run\\\\SvcUpdate)\n- Anti-analysis: checks for VM artifacts, debugger presence\n\n## MITRE ATT&CK\n\n- T1566.001 — Spear-phishing Attachment\n- T1059.001 — PowerShell\n- T1547.001 — Registry Run Keys`,
+      title: 'Phishing Campaign — DocuSign Lure Targeting Engineers',
+      content: `# Phishing Campaign Analysis
+
+## Overview
+
+Concurrent with the supply-chain attack, Midnight Typhoon launched a targeted phishing campaign against 5 OpenSlaw.ai software engineers. The campaign used spoofed DocuSign notifications to harvest SSO credentials.
+
+## Email Details
+
+- **From:** noreply@docusign-notifications.openslaw-legal.com
+- **Subject:** "[DocuSign] OpenSlaw Q4 Equity Vesting — Signature Required"
+- **Sent:** ${new Date(baseTs + 6 * HOUR).toISOString()}
+- **Recipients:** 5 senior engineers (platform, infra, security teams)
+- **2 clicks, 1 credential submission confirmed** (engineer: m.chen@openslaw.ai)
+
+## Phishing Infrastructure
+
+| Component | Value |
+|-----------|-------|
+| Sender domain | docusign-notifications.openslaw-legal.com |
+| Landing page | hxxps://app.docusign-verify.openslaw-legal.com/sign/review |
+| Hosting IP | 89.44.9.241 (Amsterdam, NL) |
+| SSL cert | Let's Encrypt, issued 3 days prior |
+| Registrar | Namecheap, registered 5 days prior |
+
+## Credential Harvesting
+
+The landing page cloned the DocuSign SSO flow and proxied authentication to the real OpenSlaw Okta tenant, capturing session tokens in real-time (Evilginx-style).
+
+### MITRE ATT&CK
+- **T1566.001** — Phishing: Spearphishing Attachment
+- **T1078.004** — Valid Accounts: Cloud Accounts`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['malware', 'apt-29'],
+      tags: ['midnight-typhoon', 'initial-access'],
       pinned: false,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:AMBER',
       iocAnalysis: {
-        extractedAt: baseTs + 4 * HOUR,
+        extractedAt: baseTs + 8 * HOUR,
         iocs: [
-          { id: 'sioc7', type: 'md5', value: 'd4e5f6a1b2c3d4e5f6a1b2c3', confidence: 'confirmed', firstSeen: baseTs + HOUR, dismissed: false },
-          { id: 'sioc8', type: 'sha256', value: 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3', confidence: 'confirmed', firstSeen: baseTs + HOUR, dismissed: false, attribution: 'APT-29' },
-          { id: 'sioc9', type: 'file-path', value: '%TEMP%\\svchost_update.exe', confidence: 'confirmed', firstSeen: baseTs + HOUR, dismissed: false },
-          { id: 'sioc10', type: 'mitre-attack', value: 'T1566.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
-          { id: 'sioc11', type: 'mitre-attack', value: 'T1059.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
-          { id: 'sioc12', type: 'mitre-attack', value: 'T1547.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
+          { id: 'sioc-ph-1', type: 'email', value: 'noreply@docusign-notifications.openslaw-legal.com', confidence: 'confirmed', firstSeen: baseTs + 6 * HOUR, dismissed: false },
+          { id: 'sioc-ph-2', type: 'domain', value: 'openslaw-legal.com', confidence: 'confirmed', firstSeen: baseTs + 6 * HOUR, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: '89.44.9.241', relationshipType: 'resolves-to' }] },
+          { id: 'sioc-ph-3', type: 'url', value: 'https://app.docusign-verify.openslaw-legal.com/sign/review', confidence: 'confirmed', firstSeen: baseTs + 6 * HOUR, dismissed: false, relationships: [{ targetIOCId: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', relationshipType: 'downloads' }] },
+          { id: 'sioc-ph-4', type: 'ipv4', value: '89.44.9.241', confidence: 'confirmed', firstSeen: baseTs + 6 * HOUR, dismissed: false },
+          { id: 'sioc-ph-5', type: 'mitre-attack', value: 'T1566.001', confidence: 'confirmed', firstSeen: baseTs + 6 * HOUR, dismissed: false },
         ],
       },
-      iocTypes: ['md5', 'sha256', 'file-path', 'mitre-attack'],
-      createdAt: baseTs + 3 * HOUR,
-      updatedAt: baseTs + 5 * HOUR,
+      iocTypes: ['email', 'domain', 'url', 'ipv4', 'mitre-attack'],
+      createdAt: baseTs + 7 * HOUR,
+      updatedAt: baseTs + 10 * HOUR,
     },
+    // Note 4: Malware Analysis
     {
       id: sampleId('note', 4),
-      title: 'C2 Infrastructure Analysis',
-      content: `# C2 Infrastructure\n\n## Primary C2\n\n- **Domain:** stardust-update.com\n- **IP:** 45.77.123.45 (Vultr VPS, NL)\n- **Protocol:** HTTPS (port 443)\n- **Beacon interval:** ~60s with 20% jitter\n- **SSL cert:** Let's Encrypt, issued 10 days before incident\n\n## Secondary/Fallback\n\n- **Domain:** stardust-sync.net\n- **IP:** 104.238.167.89 (Vultr VPS, US)\n- Not yet observed in active traffic, found in binary strings\n\n## DNS Resolution History\n\n| Domain | First Seen | IP |\n|--------|-----------|----|\n| stardust-update.com | 10 days ago | 45.77.123.45 |\n| stardust-sync.net | 12 days ago | 104.238.167.89 |\n| stardust-cdn.com | 14 days ago | 45.77.123.45 |`,
+      title: 'Malware Analysis — Backdoored PDF Parser Binary',
+      content: `# Malware Analysis: @pdfcore/render v3.2.1 Backdoor
+
+## Static Analysis
+
+- **Package:** @pdfcore/render v3.2.1
+- **Backdoor location:** \`src/renderer/init.js\` (lines 847-912)
+- **SHA-256 (package tarball):** e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- **SHA-256 (dropped binary):** 7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730
+- **MD5 (dropped binary):** a3f2b8c91e4d57f6a8b3c2d1e0f9a8b7
+
+## Behavioral Analysis
+
+1. On module load, decodes base64 payload hidden in font table constant
+2. Drops native binary \`libpdfmetrics.node\` to \`node_modules/.cache/\`
+3. Binary capabilities:
+   - HTTPS C2 with domain fronting (CloudFront → cdn-assets-proxy.com)
+   - DNS tunneling fallback (TXT records to data.update-svc-cdn.net)
+   - Environment variable harvesting (AWS_*, DATABASE_*, OKTA_*)
+   - File system reconnaissance
+   - Process injection into Node.js worker threads
+4. Anti-analysis: Checks for sandbox artifacts, delays execution by 120s
+
+## Dropped Artifacts
+
+| File | Hash (SHA-256) | Purpose |
+|------|---------------|---------|
+| libpdfmetrics.node | 7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730 | Main implant |
+| .cache/.pdfrc | — | Encrypted config (C2 endpoints, exfil keys) |
+
+## MITRE ATT&CK
+- **T1059.001** — Command and Scripting Interpreter
+- **T1547.001** — Boot or Logon Autostart Execution
+- **T1195.002** — Supply Chain Compromise`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['c2', 'apt-29'],
+      tags: ['midnight-typhoon', 'supply-chain'],
       pinned: false,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:AMBER',
       iocAnalysis: {
-        extractedAt: baseTs + 6 * HOUR,
+        extractedAt: baseTs + DAY,
         iocs: [
-          { id: 'sioc13', type: 'domain', value: 'stardust-sync.net', confidence: 'medium', firstSeen: baseTs + 2 * HOUR, dismissed: false, attribution: 'APT-29' },
-          { id: 'sioc14', type: 'ipv4', value: '104.238.167.89', confidence: 'medium', firstSeen: baseTs + 2 * HOUR, dismissed: false },
-          { id: 'sioc15', type: 'domain', value: 'stardust-cdn.com', confidence: 'high', firstSeen: baseTs, dismissed: false, attribution: 'APT-29' },
+          { id: 'sioc-mal-1', type: 'sha256', value: '7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: 'cdn-assets-proxy.com', relationshipType: 'communicates-with' }, { targetIOCId: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', relationshipType: 'drops' }] },
+          { id: 'sioc-mal-2', type: 'md5', value: 'a3f2b8c91e4d57f6a8b3c2d1e0f9a8b7', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
+          { id: 'sioc-mal-3', type: 'mitre-attack', value: 'T1059.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
+          { id: 'sioc-mal-4', type: 'mitre-attack', value: 'T1547.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
         ],
       },
-      iocTypes: ['domain', 'ipv4'],
-      createdAt: baseTs + 5 * HOUR,
-      updatedAt: baseTs + 7 * HOUR,
+      iocTypes: ['sha256', 'md5', 'mitre-attack'],
+      createdAt: baseTs + 10 * HOUR,
+      updatedAt: baseTs + DAY + 2 * HOUR,
     },
+    // Note 5: Cloud Infrastructure Pivot
     {
       id: sampleId('note', 5),
-      title: 'Lateral Movement Observations',
-      content: `# Lateral Movement\n\n## Credential Access\n\n- Mimikatz executed on WKSTN-042 at ${new Date(baseTs + DAY + 4 * HOUR).toLocaleString()}\n- Obtained domain admin credentials (da_admin)\n- T1003.001 — OS Credential Dumping: LSASS Memory\n\n## Movement\n\n- RDP from WKSTN-042 to DC01 using da_admin at ${new Date(baseTs + DAY + 6 * HOUR).toLocaleString()}\n- SMB file copy to \\\\\\\\DC01\\\\C$\\\\Temp\n- T1021.001 — Remote Desktop Protocol\n- T1021.002 — SMB/Windows Admin Shares\n\n## Affected Systems\n\n| Hostname | Role | Status |\n|----------|------|--------|\n| WKSTN-042 | User workstation | Compromised |\n| DC01 | Domain Controller | Compromised |\n| FS01 | File Server | Under investigation |`,
+      title: 'Cloud Infrastructure Pivot — AWS Lateral Movement',
+      content: `# Cloud Infrastructure Pivot
+
+## Attack Progression
+
+After the backdoored package was deployed to the build server, Midnight Typhoon used harvested environment variables to pivot through OpenSlaw.ai's AWS infrastructure.
+
+### Credential Chain
+
+1. **Build server** → AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (CI role: \`openslaw-ci-deploy\`)
+2. CI role → AssumeRole to \`openslaw-prod-api\` (overprivileged trust policy)
+3. Prod API role → S3 full access, RDS read replicas, SES sending
+4. Stolen Okta SSO token (from phishing) → AWS SSO → \`openslaw-admin\` role
+
+### Observed Actions
+
+| Time | Action | Resource |
+|------|--------|----------|
+| T+4h | ListBuckets | All S3 buckets enumerated |
+| T+6h | GetObject (bulk) | s3://openslaw-legal-docs/* |
+| T+8h | CreateDBSnapshot | RDS \`openslaw-prod-db\` |
+| T+12h | DescribeInstances | Full EC2 inventory |
+| T+18h | AssumeRole | \`openslaw-backup-admin\` |
+| T+24h | GetObject | s3://openslaw-db-backups/* |
+
+### MITRE ATT&CK
+- **T1078.004** — Valid Accounts: Cloud Accounts
+- **T1537** — Transfer Data to Cloud Account
+- **T1580** — Cloud Infrastructure Discovery`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['apt-29'],
+      tags: ['cloud', 'midnight-typhoon'],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      clsLevel: 'TLP:AMBER',
+      iocAnalysis: {
+        extractedAt: baseTs + DAY + 4 * HOUR,
+        iocs: [
+          { id: 'sioc-cloud-1', type: 'mitre-attack', value: 'T1078.004', confidence: 'confirmed', firstSeen: baseTs + 4 * HOUR, dismissed: false },
+          { id: 'sioc-cloud-2', type: 'mitre-attack', value: 'T1537', confidence: 'high', firstSeen: baseTs + DAY, dismissed: false },
+        ],
+      },
+      iocTypes: ['mitre-attack'],
+      createdAt: baseTs + DAY,
+      updatedAt: baseTs + DAY + 6 * HOUR,
+    },
+    // Note 6: C2 Infrastructure
+    {
+      id: sampleId('note', 6),
+      title: 'C2 Infrastructure — Domain Fronting & DNS Tunneling',
+      content: `# C2 Infrastructure
+
+## Primary C2: Domain-Fronted HTTPS
+
+- **Fronting domain:** cdn-assets-proxy.com (behind CloudFront)
+- **True origin IP:** 185.220.101.34 (Moscow, RU — AS50867)
+- **Protocol:** HTTPS/443 with TLS 1.3
+- **Beacon interval:** 45s ± 25% jitter
+- **User-Agent:** Mimics legitimate CloudFront SDK traffic
+- **Data encoding:** Custom binary protocol over HTTP/2 streams
+
+## Secondary C2: DNS Tunneling
+
+- **Domain:** data.update-svc-cdn.net
+- **Authoritative NS IP:** 91.215.85.17 (Shanghai, CN — AS4134)
+- **Protocol:** DNS TXT records, base32-encoded payloads
+- **Used for:** Backup C2, low-bandwidth command relay
+- **Beacon:** Every 300s when primary C2 unavailable
+
+## Exfiltration Endpoints
+
+- **Primary staging:** 185.156.73.22 (Bucharest, RO — AS9009)
+- **Data landing:** 103.253.41.98 (Singapore, SG — AS133618)
+- **Protocol:** HTTPS with client certificate authentication
+
+## Infrastructure Registration
+
+| Domain | Registrar | Created | Nameserver |
+|--------|-----------|---------|------------|
+| cdn-assets-proxy.com | Njalla | T-21 days | ns1.njal.la |
+| update-svc-cdn.net | Porkbun | T-18 days | Custom NS (91.215.85.17) |
+| openslaw-legal.com | Namecheap | T-12 days | Namecheap DNS |
+
+### MITRE ATT&CK
+- **T1071.001** — Application Layer Protocol: Web Protocols
+- **T1572** — Protocol Tunneling`,
+      folderId: SAMPLE_FOLDER_ID,
+      tags: ['midnight-typhoon'],
       pinned: false,
       archived: false,
       trashed: false,
@@ -164,56 +386,230 @@ export function generateSampleInvestigation(): {
       iocAnalysis: {
         extractedAt: baseTs + DAY + 8 * HOUR,
         iocs: [
-          { id: 'sioc16', type: 'mitre-attack', value: 'T1003.001', confidence: 'confirmed', firstSeen: baseTs + DAY, dismissed: false },
-          { id: 'sioc17', type: 'mitre-attack', value: 'T1021.001', confidence: 'confirmed', firstSeen: baseTs + DAY, dismissed: false },
-          { id: 'sioc18', type: 'mitre-attack', value: 'T1021.002', confidence: 'confirmed', firstSeen: baseTs + DAY, dismissed: false },
+          { id: 'sioc-c2-1', type: 'domain', value: 'cdn-assets-proxy.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: '185.220.101.34', relationshipType: 'resolves-to' }] },
+          { id: 'sioc-c2-2', type: 'ipv4', value: '185.220.101.34', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-c2-3', type: 'domain', value: 'update-svc-cdn.net', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon', relationships: [{ targetIOCId: '91.215.85.17', relationshipType: 'resolves-to' }] },
+          { id: 'sioc-c2-4', type: 'ipv4', value: '91.215.85.17', confidence: 'high', firstSeen: baseTs + 2 * HOUR, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-c2-5', type: 'mitre-attack', value: 'T1071.001', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
+          { id: 'sioc-c2-6', type: 'mitre-attack', value: 'T1572', confidence: 'confirmed', firstSeen: baseTs, dismissed: false },
         ],
       },
-      iocTypes: ['mitre-attack'],
-      createdAt: baseTs + DAY + 7 * HOUR,
-      updatedAt: baseTs + DAY + 9 * HOUR,
+      iocTypes: ['domain', 'ipv4', 'mitre-attack'],
+      createdAt: baseTs + DAY + 6 * HOUR,
+      updatedAt: baseTs + DAY + 10 * HOUR,
     },
+    // Note 7: Credential Harvesting
     {
-      id: sampleId('note', 6),
-      title: 'Data Exfiltration Assessment',
-      content: `# Data Exfiltration Assessment\n\n## Staging\n\n- Data staged at \\\\\\\\DC01\\\\C$\\\\Temp\\\\backup.7z\n- Compressed archive (~450MB)\n- Contains files from finance share (Q4 reports, compensation data)\n\n## Exfiltration\n\n- Exfiltrated via HTTPS to C2 at ${new Date(baseTs + 2 * DAY).toLocaleString()}\n- Total data: ~450MB over 2 hours\n- T1041 — Exfiltration Over C2 Channel\n- T1560.001 — Archive Collected Data\n\n## Impact\n\n- **Confidential financial data** potentially exposed\n- Employee compensation records (PII)\n- Q4 earnings projections (material non-public information)`,
+      id: sampleId('note', 7),
+      title: 'Credential Harvesting — Cloud IAM & SSO Tokens',
+      content: `# Credential Harvesting
+
+## Harvested Credentials
+
+### Via Supply-Chain Backdoor (Environment Variables)
+| Credential | Source | Access Level |
+|-----------|--------|-------------|
+| AWS_ACCESS_KEY_ID (AKIA...) | Build server env | CI deploy role |
+| DATABASE_URL | Build server env | RDS read/write |
+| OKTA_API_TOKEN | Build server env | SSO admin read |
+
+### Via Phishing (Evilginx Session Hijack)
+| Credential | Source | Access Level |
+|-----------|--------|-------------|
+| Okta session token (m.chen) | Phishing proxy | Full SSO access |
+| AWS SSO session | Okta → AWS SSO | openslaw-admin role |
+
+### Via Cloud Pivot
+| Credential | Source | Access Level |
+|-----------|--------|-------------|
+| AssumeRole token (prod-api) | CI trust policy | S3, RDS, SES |
+| AssumeRole token (backup-admin) | Prod-api trust | S3 backup access |
+
+## Impact
+
+- 6 distinct credential sets compromised
+- Full access to production data stores
+- Admin-level cloud management access
+- Estimated 47 client matters' data accessible
+
+### MITRE ATT&CK
+- **T1003.006** — OS Credential Dumping: DCSync (cloud equivalent)
+- **T1078.004** — Valid Accounts: Cloud Accounts`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['apt-29'],
+      tags: ['cloud', 'midnight-typhoon'],
       pinned: false,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:RED',
       iocAnalysis: {
-        extractedAt: baseTs + 2 * DAY + 4 * HOUR,
+        extractedAt: baseTs + 2 * DAY,
         iocs: [
-          { id: 'sioc19', type: 'mitre-attack', value: 'T1041', confidence: 'high', firstSeen: baseTs + 2 * DAY, dismissed: false },
-          { id: 'sioc20', type: 'mitre-attack', value: 'T1560.001', confidence: 'high', firstSeen: baseTs + 2 * DAY, dismissed: false },
-          { id: 'sioc21', type: 'file-path', value: '\\\\DC01\\C$\\Temp\\backup.7z', confidence: 'confirmed', firstSeen: baseTs + 2 * DAY, dismissed: false },
+          { id: 'sioc-cred-1', type: 'mitre-attack', value: 'T1003.006', confidence: 'high', firstSeen: baseTs + DAY, dismissed: false },
         ],
       },
-      iocTypes: ['mitre-attack', 'file-path'],
-      createdAt: baseTs + 2 * DAY + 2 * HOUR,
-      updatedAt: baseTs + 2 * DAY + 5 * HOUR,
+      iocTypes: ['mitre-attack'],
+      createdAt: baseTs + DAY + 8 * HOUR,
+      updatedAt: baseTs + 2 * DAY + 4 * HOUR,
     },
+    // Note 8: Data Exfiltration
     {
-      id: sampleId('note', 7),
-      title: 'Remediation Plan',
-      content: `# Remediation Plan\n\n## Immediate (0-24h)\n\n- [x] Isolate WKSTN-042 and DC01\n- [x] Block C2 domains/IPs at firewall\n- [ ] Force password reset for da_admin and all domain admins\n- [ ] Revoke all active sessions\n\n## Short-term (1-7 days)\n\n- [ ] Full EDR scan across all endpoints\n- [ ] Review AD logs for additional lateral movement\n- [ ] Rebuild DC01 from known-good backup\n- [ ] Deploy updated YARA/Sigma rules\n\n## Long-term\n\n- Implement MFA for all privileged accounts\n- Deploy network segmentation for finance segment\n- Enhance email gateway rules for macro-enabled attachments\n- Conduct tabletop exercise for similar scenarios`,
+      id: sampleId('note', 8),
+      title: 'Data Exfiltration — Legal Document Staging & Transfer',
+      content: `# Data Exfiltration
+
+## Staging Phase (Day 3-4)
+
+The attacker used the compromised \`openslaw-prod-api\` role to bulk-download documents from S3:
+
+- **Source:** s3://openslaw-legal-docs/ (47 client matter prefixes)
+- **Volume:** ~2.3 GB across 12,847 documents
+- **Method:** GetObject calls from us-east-1 EC2 instance (attacker-controlled)
+- **Staging server:** 185.156.73.22 (Bucharest, RO)
+
+## Transfer Phase (Day 4)
+
+- **Destination:** 103.253.41.98 (Singapore, SG)
+- **Protocol:** HTTPS with mutual TLS authentication
+- **Duration:** ~6 hours, throttled to avoid bandwidth alerts
+- **Data:** Compressed archives (7z, AES-256 encrypted)
+- **Total exfiltrated:** 2.3 GB
+
+## Document Categories Affected
+
+| Category | Count | Sensitivity |
+|----------|-------|-------------|
+| Merger agreements | 3,200 | Attorney-client privileged |
+| Due diligence reports | 2,100 | Confidential |
+| Litigation documents | 4,500 | Attorney work product |
+| Regulatory filings (draft) | 1,800 | Material non-public |
+| Client communications | 1,247 | Privileged |
+
+### MITRE ATT&CK
+- **T1567.002** — Exfiltration Over Web Service: Exfiltration to Cloud Storage
+- **T1560.001** — Archive Collected Data: Archive via Utility
+- **T1041** — Exfiltration Over C2 Channel`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['remediation'],
+      tags: ['exfiltration', 'legal-data'],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      clsLevel: 'TLP:RED',
+      iocAnalysis: {
+        extractedAt: baseTs + 3 * DAY + 4 * HOUR,
+        iocs: [
+          { id: 'sioc-exfil-1', type: 'ipv4', value: '185.156.73.22', confidence: 'confirmed', firstSeen: baseTs + 3 * DAY, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-exfil-2', type: 'ipv4', value: '103.253.41.98', confidence: 'high', firstSeen: baseTs + 4 * DAY, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-exfil-3', type: 'mitre-attack', value: 'T1567.002', confidence: 'confirmed', firstSeen: baseTs + 3 * DAY, dismissed: false },
+          { id: 'sioc-exfil-4', type: 'mitre-attack', value: 'T1560.001', confidence: 'high', firstSeen: baseTs + 3 * DAY, dismissed: false },
+        ],
+      },
+      iocTypes: ['ipv4', 'mitre-attack'],
+      createdAt: baseTs + 3 * DAY,
+      updatedAt: baseTs + 4 * DAY,
+    },
+    // Note 9: Lateral Movement
+    {
+      id: sampleId('note', 9),
+      title: 'Lateral Movement — Network Mapping & Cloud Pivot',
+      content: `# Lateral Movement Observations
+
+## Build Server → Production
+
+The backdoored \`@pdfcore/render\` ran in the CI/CD pipeline context on the build server. From there:
+
+1. Harvested AWS credentials from environment variables
+2. Used CI deploy role to enumerate AWS resources
+3. Assumed \`openslaw-prod-api\` role via overprivileged trust policy
+4. Accessed production S3 buckets and RDS instances
+
+## Phishing → Cloud Admin
+
+The phished SSO session (m.chen) provided:
+1. Direct access to AWS SSO console
+2. Assumed \`openslaw-admin\` role
+3. Full CloudTrail access (disabled logging for 4 hours)
+4. Created snapshot of production RDS
+5. Launched EC2 instance in us-east-1 for data staging
+
+## Network Mapping
+
+CloudTrail logs show extensive reconnaissance:
+- DescribeInstances, DescribeSubnets, DescribeSecurityGroups
+- ListBuckets, ListUsers, ListRoles
+- GetCallerIdentity from 3 different role contexts
+
+### Affected Systems
+
+| System | Access Level | Evidence |
+|--------|-------------|----------|
+| build-server-01 | Code execution | Backdoored dependency |
+| openslaw-api-prod (3 instances) | API-level | Stolen deploy keys |
+| s3://openslaw-legal-docs | Read | Stolen IAM role |
+| s3://openslaw-db-backups | Read | Role chain |
+| RDS openslaw-prod-db | Snapshot created | Admin SSO |
+| CloudTrail | Disabled 4h | Admin SSO |
+
+### MITRE ATT&CK
+- **T1021.001** — Remote Services: Remote Desktop Protocol (cloud equivalent: SSO)
+- **T1580** — Cloud Infrastructure Discovery`,
+      folderId: SAMPLE_FOLDER_ID,
+      tags: ['cloud', 'midnight-typhoon'],
       pinned: false,
       archived: false,
       trashed: false,
       clsLevel: 'TLP:AMBER',
-      createdAt: baseTs + 3 * DAY,
-      updatedAt: baseTs + 4 * DAY,
+      iocAnalysis: {
+        extractedAt: baseTs + 2 * DAY + 8 * HOUR,
+        iocs: [
+          { id: 'sioc-lat-1', type: 'mitre-attack', value: 'T1021.001', confidence: 'high', firstSeen: baseTs + DAY, dismissed: false },
+        ],
+      },
+      iocTypes: ['mitre-attack'],
+      createdAt: baseTs + 2 * DAY,
+      updatedAt: baseTs + 2 * DAY + 10 * HOUR,
     },
+    // Note 10: Remediation Playbook
     {
-      id: sampleId('note', 8),
-      title: 'IOC Sharing Report Draft',
-      content: `# IOC Sharing Report — Operation STARDUST\n\n**Classification:** TLP:AMBER\n**Date:** ${new Date(now).toLocaleDateString()}\n\n## Network Indicators\n\n| Type | Value | Confidence | Notes |\n|------|-------|------------|-------|\n| Domain | stardust-update.com | Confirmed | Primary C2 |\n| Domain | stardust-cdn.com | High | Payload hosting |\n| Domain | stardust-sync.net | Medium | Fallback C2 |\n| Domain | stardust-portal.com | Confirmed | Phishing sender domain |\n| IP | 45.77.123.45 | High | C2 server (Vultr NL) |\n| IP | 104.238.167.89 | Medium | Fallback C2 (Vultr US) |\n| URL | https://stardust-cdn.com/update.exe | High | Payload URL |\n\n## File Indicators\n\n| Type | Value | Notes |\n|------|-------|-------|\n| SHA-256 | a1b2c3...a1b2 | Dropper (xlsm) |\n| SHA-256 | b2c3d4...b2c3 | Payload (svchost_update.exe) |\n| MD5 | d4e5f6a1b2c3d4e5f6a1b2c3 | Dropper |\n\n## Attribution\n\nIndicators align with known APT-29 (Cozy Bear) TTPs and infrastructure patterns.`,
+      id: sampleId('note', 10),
+      title: 'Remediation Playbook',
+      content: `# Remediation Playbook — Operation DARK GLACIER
+
+## Phase 1: Immediate Containment (0-4h)
+
+- [x] Isolate build server from network
+- [x] Revoke all AWS IAM keys associated with CI pipeline
+- [x] Invalidate all Okta SSO sessions
+- [x] Block C2 domains/IPs at WAF and DNS level
+- [x] Enable CloudTrail logging (was disabled by attacker)
+- [ ] Kill attacker EC2 instance in us-east-1
+
+## Phase 2: Eradication (4-48h)
+
+- [x] Roll back @pdfcore/render to v3.1.9 (last known good)
+- [x] Pin all npm dependencies with integrity hashes
+- [ ] Rotate ALL AWS IAM credentials (including service accounts)
+- [ ] Rotate database passwords and connection strings
+- [ ] Rebuild build server from golden image
+- [ ] Deploy updated WAF rules for domain fronting detection
+
+## Phase 3: Recovery (48h-7d)
+
+- [ ] Rebuild CI/CD pipeline with dependency scanning
+- [ ] Implement npm lockfile integrity verification
+- [ ] Deploy AWS GuardDuty and enable S3 data events
+- [ ] Implement least-privilege IAM policies
+- [ ] Enable MFA on all npm registry accounts (coordinate with vendor)
+- [ ] Conduct tabletop exercise
+
+## Phase 4: Long-term Improvements
+
+- [ ] Implement SCA (Software Composition Analysis) in CI
+- [ ] Deploy runtime application self-protection (RASP)
+- [ ] Segment build infrastructure from production
+- [ ] Implement break-glass procedures for admin roles
+- [ ] Client notification and regulatory reporting`,
       folderId: SAMPLE_FOLDER_ID,
-      tags: ['apt-29'],
+      tags: ['remediation'],
       pinned: false,
       archived: false,
       trashed: false,
@@ -221,119 +617,695 @@ export function generateSampleInvestigation(): {
       createdAt: baseTs + 4 * DAY,
       updatedAt: baseTs + 5 * DAY,
     },
+    // Note 11: Threat Actor Profile
+    {
+      id: sampleId('note', 11),
+      title: 'Threat Actor Profile — Midnight Typhoon TTPs',
+      content: `# Threat Actor Profile: Midnight Typhoon
+
+## Overview
+
+Midnight Typhoon is a sophisticated APT group with suspected nation-state sponsorship. First observed in 2022, the group targets legal tech, financial services, and government contractors, focusing on exfiltrating privileged communications and intellectual property.
+
+## Known TTPs
+
+### Initial Access
+- Supply-chain attacks on npm/PyPI packages (favored)
+- Spear-phishing with Evilginx-style credential proxying
+- Exploitation of cloud misconfigurations
+
+### Execution & Persistence
+- Node.js/Python backdoors disguised as legitimate packages
+- Domain fronting for C2 (CloudFront, Azure CDN)
+- DNS tunneling as backup C2
+
+### Collection & Exfiltration
+- Cloud-native data theft (S3, Azure Blob, GCS)
+- Staged exfil through multiple jurisdictions
+- AES-256 encrypted archives
+- Throttled transfer to avoid DLP alerts
+
+## Infrastructure Preferences
+
+- **Hosting:** Bulletproof providers in Eastern Europe, East Asia
+- **Registration:** Privacy-focused registrars (Njalla, Porkbun)
+- **C2:** Domain fronting through major CDNs
+- **Exfil:** Multi-hop through Romania, Singapore, Hong Kong
+
+## Previous Campaigns (Open Source)
+
+1. **LegalEagle (2023):** Compromised legal document management SaaS
+2. **CloudJack (2024):** Supply-chain attack on Python cloud SDK wrapper
+3. **DarkGlacier (Current):** OpenSlaw.ai via @pdfcore/render
+
+## Diamond Model
+
+- **Adversary:** Midnight Typhoon
+- **Capability:** High (custom tooling, supply-chain expertise, cloud-native)
+- **Infrastructure:** Domain fronting, DNS tunneling, multi-hop exfil
+- **Victim:** OpenSlaw.ai (legal tech, AI document platform)`,
+      folderId: SAMPLE_FOLDER_ID,
+      tags: ['midnight-typhoon'],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      clsLevel: 'TLP:AMBER',
+      createdAt: baseTs + 3 * DAY,
+      updatedAt: baseTs + 4 * DAY + 6 * HOUR,
+    },
+    // Note 12: IOC Sharing Report Draft
+    {
+      id: sampleId('note', 12),
+      title: 'IOC Sharing Report Draft',
+      content: `# IOC Sharing Report — Operation DARK GLACIER
+
+**Classification:** TLP:AMBER
+**Date:** ${new Date(now).toLocaleDateString()}
+**Author:** OpenSlaw.ai Security Team
+
+## Network Indicators
+
+| Type | Value | Confidence | Context |
+|------|-------|------------|---------|
+| Domain | cdn-assets-proxy.com | Confirmed | Primary C2 (domain fronted) |
+| Domain | update-svc-cdn.net | Confirmed | DNS tunnel C2 |
+| Domain | openslaw-legal.com | Confirmed | Phishing infrastructure |
+| IPv4 | 185.220.101.34 | Confirmed | C2 server (Moscow) |
+| IPv4 | 91.215.85.17 | High | DNS tunnel NS (Shanghai) |
+| IPv4 | 89.44.9.241 | Confirmed | Phishing hosting (Amsterdam) |
+| IPv4 | 185.156.73.22 | Confirmed | Exfil staging (Bucharest) |
+| IPv4 | 103.253.41.98 | High | Data landing (Singapore) |
+| URL | hxxps://app.docusign-verify.openslaw-legal.com/sign/review | Confirmed | Phishing landing |
+| Email | noreply@docusign-notifications.openslaw-legal.com | Confirmed | Phishing sender |
+
+## File Indicators
+
+| Type | Value | Context |
+|------|-------|---------|
+| SHA-256 | e3b0c44298fc1c...7852b855 | Backdoored @pdfcore/render v3.2.1 |
+| SHA-256 | 7d865e959b2466...ed97730 | Dropped implant (libpdfmetrics.node) |
+| MD5 | a3f2b8c91e4d57f6a8b3c2d1e0f9a8b7 | Dropped implant |
+| MD5 | c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2 | Encrypted config file |
+
+## Vulnerability Indicators
+
+| CVE | Description | Relevance |
+|-----|------------|-----------|
+| CVE-2024-38856 | npm registry auth bypass | Used for initial package compromise |
+| CVE-2024-21413 | Outlook RCE | Exploited in phishing attachment variant |
+
+## Attribution
+
+Indicators align with known **Midnight Typhoon** infrastructure patterns, tooling, and TTPs. High confidence attribution based on:
+- Overlap with CloudJack (2024) C2 infrastructure
+- Consistent use of domain fronting + DNS tunnel dual-C2
+- Target selection pattern (legal tech sector)
+- Exfil routing through Romania → Singapore pipeline`,
+      folderId: SAMPLE_FOLDER_ID,
+      tags: ['midnight-typhoon'],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      clsLevel: 'TLP:AMBER',
+      iocAnalysis: {
+        extractedAt: baseTs + 5 * DAY,
+        iocs: [
+          { id: 'sioc-rpt-1', type: 'domain', value: 'cdn-assets-proxy.com', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon' },
+          { id: 'sioc-rpt-2', type: 'ipv4', value: '185.220.101.34', confidence: 'confirmed', firstSeen: baseTs, dismissed: false, attribution: 'Midnight Typhoon' },
+        ],
+      },
+      iocTypes: ['domain', 'ipv4'],
+      createdAt: baseTs + 5 * DAY,
+      updatedAt: baseTs + 5 * DAY + 4 * HOUR,
+    },
   ];
 
+  // ─── Tasks (14) ────────────────────────────────────────────────────
   const tasks: Task[] = [
-    {
-      id: sampleId('task', 1), title: 'Analyze phishing email headers', description: 'Extract and analyze full email headers from the spear-phishing email targeting finance dept.', completed: true, priority: 'high', status: 'done', order: 1, folderId: SAMPLE_FOLDER_ID, tags: ['phishing'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + 4 * HOUR, completedAt: baseTs + 4 * HOUR,
-    },
-    {
-      id: sampleId('task', 2), title: 'Submit malware sample to sandbox', description: 'Upload Q4_Compensation_Review.xlsm and svchost_update.exe to sandbox for dynamic analysis.', completed: true, priority: 'high', status: 'done', order: 2, folderId: SAMPLE_FOLDER_ID, tags: ['malware'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 6 * HOUR, completedAt: baseTs + 6 * HOUR,
-    },
-    {
-      id: sampleId('task', 3), title: 'Block C2 domains on firewall', description: 'Add stardust-update.com, stardust-cdn.com, stardust-sync.net, and stardust-portal.com to DNS blackhole and firewall block rules.', completed: false, priority: 'high', status: 'in-progress', order: 3, folderId: SAMPLE_FOLDER_ID, tags: ['c2', 'remediation'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + DAY,
-    },
-    {
-      id: sampleId('task', 4), title: 'Scan all endpoints for persistence artifacts', description: 'Use EDR to scan for Registry Run key (SvcUpdate), svchost_update.exe in %TEMP%, and related indicators.', completed: false, priority: 'high', status: 'todo', order: 4, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * HOUR, updatedAt: baseTs + 4 * HOUR,
-    },
-    {
-      id: sampleId('task', 5), title: 'Review AD logs for lateral movement', description: 'Analyze Active Directory authentication logs for additional compromised accounts and lateral movement beyond WKSTN-042 → DC01.', completed: false, priority: 'medium', status: 'in-progress', order: 5, folderId: SAMPLE_FOLDER_ID, tags: ['apt-29'], trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + DAY + 2 * HOUR,
-    },
-    {
-      id: sampleId('task', 6), title: 'Notify affected users', description: 'Notify the 3 phishing recipients and jsmith (who executed the attachment). Coordinate with HR for credential reset.', completed: false, priority: 'medium', status: 'todo', order: 6, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + DAY,
-    },
-    {
-      id: sampleId('task', 7), title: 'Prepare IOC report for ISAC', description: 'Compile all confirmed IOCs with confidence levels and attribution data for sharing via ISAC channel.', completed: false, priority: 'medium', status: 'todo', order: 7, folderId: SAMPLE_FOLDER_ID, tags: ['apt-29'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs + 2 * DAY, updatedAt: baseTs + 2 * DAY,
-    },
-    {
-      id: sampleId('task', 8), title: 'Rebuild DC01 from backup', description: 'Coordinate with IT to rebuild DC01 from last known-good backup. Verify integrity before rejoining to domain.', completed: false, priority: 'high', status: 'todo', order: 8, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 3 * DAY,
-    },
-    {
-      id: sampleId('task', 9), title: 'Deploy updated detection rules', description: 'Write and deploy YARA rules for the dropper/payload, and Sigma rules for the C2 beacon pattern and persistence mechanism.', completed: false, priority: 'medium', status: 'todo', order: 9, folderId: SAMPLE_FOLDER_ID, tags: ['malware', 'remediation'], trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 3 * DAY,
-    },
-    {
-      id: sampleId('task', 10), title: 'Post-incident review meeting', description: 'Schedule and conduct post-incident review with SOC, IT, and management. Document lessons learned.', completed: false, priority: 'low', status: 'todo', order: 10, folderId: SAMPLE_FOLDER_ID, tags: [], dueDate: new Date(now + 7 * DAY).toISOString().slice(0, 10), trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 4 * DAY,
-    },
+    // Completed (4)
+    { id: sampleId('task', 1), title: 'Analyze backdoored npm package', description: 'Perform static and dynamic analysis of @pdfcore/render v3.2.1 to identify backdoor mechanism, C2 protocol, and dropped artifacts.', completed: true, priority: 'high', status: 'done', order: 1, folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + DAY, completedAt: baseTs + DAY, linkedNoteIds: [sampleId('note', 4)], linkedTimelineEventIds: [sampleId('event', 3)] },
+    { id: sampleId('task', 2), title: 'Block C2 domains and IPs at WAF', description: 'Add cdn-assets-proxy.com, update-svc-cdn.net, openslaw-legal.com, and all associated IPs to WAF block rules and DNS sinkholes.', completed: true, priority: 'high', status: 'done', order: 2, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 4 * DAY + 6 * HOUR, completedAt: baseTs + 4 * DAY + 6 * HOUR, linkedNoteIds: [sampleId('note', 6)], linkedTimelineEventIds: [sampleId('event', 14)] },
+    { id: sampleId('task', 3), title: 'Revoke compromised AWS IAM credentials', description: 'Identify and revoke all IAM access keys, session tokens, and role trust policies associated with the compromised CI pipeline and phished SSO session.', completed: true, priority: 'high', status: 'done', order: 3, folderId: SAMPLE_FOLDER_ID, tags: ['cloud', 'remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * HOUR, updatedAt: baseTs + 4 * DAY + 8 * HOUR, completedAt: baseTs + 4 * DAY + 8 * HOUR, linkedNoteIds: [sampleId('note', 7)], linkedTimelineEventIds: [sampleId('event', 15)] },
+    { id: sampleId('task', 4), title: 'Roll back npm dependency to safe version', description: 'Revert @pdfcore/render to v3.1.9, pin with integrity hash, and redeploy all production services.', completed: true, priority: 'high', status: 'done', order: 4, folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain', 'remediation'], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 4 * DAY + 4 * HOUR, completedAt: baseTs + 4 * DAY + 4 * HOUR, linkedNoteIds: [sampleId('note', 2)], linkedTimelineEventIds: [sampleId('event', 16)] },
+    // In-progress (4)
+    { id: sampleId('task', 5), title: 'Rotate all database credentials', description: 'Rotate RDS master passwords, application connection strings, and Redis auth tokens across all environments.', completed: false, priority: 'high', status: 'in-progress', order: 5, folderId: SAMPLE_FOLDER_ID, tags: ['cloud', 'remediation'], trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + 5 * DAY, linkedNoteIds: [sampleId('note', 7), sampleId('note', 10)] },
+    { id: sampleId('task', 6), title: 'Assess full scope of document exfiltration', description: 'Cross-reference CloudTrail S3 GetObject logs with document inventory to determine exactly which client matters were accessed. Identify all 47 affected client matters.', completed: false, priority: 'high', status: 'in-progress', order: 6, folderId: SAMPLE_FOLDER_ID, tags: ['exfiltration', 'legal-data'], clsLevel: 'TLP:RED', trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 5 * DAY, linkedNoteIds: [sampleId('note', 8)], linkedTimelineEventIds: [sampleId('event', 11), sampleId('event', 12)] },
+    { id: sampleId('task', 7), title: 'Deploy dependency scanning in CI pipeline', description: 'Implement SCA tooling (Snyk/Dependabot) in CI pipeline with lockfile integrity verification and auto-block on high-severity findings.', completed: false, priority: 'medium', status: 'in-progress', order: 7, folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain', 'remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 5 * DAY, linkedNoteIds: [sampleId('note', 10)] },
+    { id: sampleId('task', 8), title: 'Rebuild build server from golden image', description: 'Decommission compromised build server. Provision new build infrastructure from hardened AMI with enhanced monitoring.', completed: false, priority: 'medium', status: 'in-progress', order: 8, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 5 * DAY + 2 * HOUR, linkedNoteIds: [sampleId('note', 10)], linkedTimelineEventIds: [sampleId('event', 17)] },
+    // Todo (6)
+    { id: sampleId('task', 9), title: 'Prepare client notification letters', description: 'Draft notification letters for 47 affected clients under attorney-client privilege breach protocol. Coordinate with legal counsel and compliance.', completed: false, priority: 'high', status: 'todo', order: 9, folderId: SAMPLE_FOLDER_ID, tags: ['legal-data'], clsLevel: 'TLP:RED', trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 4 * DAY, dueDate: new Date(now + 3 * DAY).toISOString().slice(0, 10), linkedNoteIds: [sampleId('note', 8)] },
+    { id: sampleId('task', 10), title: 'Implement least-privilege IAM policies', description: 'Redesign AWS IAM role trust policies to enforce least-privilege. Remove overprivileged trust between CI and production roles.', completed: false, priority: 'medium', status: 'todo', order: 10, folderId: SAMPLE_FOLDER_ID, tags: ['cloud', 'remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 4 * DAY, dueDate: new Date(now + 7 * DAY).toISOString().slice(0, 10), linkedNoteIds: [sampleId('note', 5), sampleId('note', 10)] },
+    { id: sampleId('task', 11), title: 'Enable AWS GuardDuty and S3 data events', description: 'Enable GuardDuty across all regions. Configure S3 data event logging in CloudTrail for openslaw-legal-docs and openslaw-db-backups buckets.', completed: false, priority: 'medium', status: 'todo', order: 11, folderId: SAMPLE_FOLDER_ID, tags: ['cloud', 'remediation'], trashed: false, archived: false, createdAt: baseTs + 4 * DAY + 2 * HOUR, updatedAt: baseTs + 4 * DAY + 2 * HOUR, linkedNoteIds: [sampleId('note', 10)] },
+    { id: sampleId('task', 12), title: 'Compile IOC sharing report for ISAC', description: 'Finalize and distribute IOC sharing report through legal-sector ISAC. Ensure TLP:AMBER classification is applied.', completed: false, priority: 'medium', status: 'todo', order: 12, folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs + 5 * DAY, updatedAt: baseTs + 5 * DAY, dueDate: new Date(now + 5 * DAY).toISOString().slice(0, 10), linkedNoteIds: [sampleId('note', 12)] },
+    { id: sampleId('task', 13), title: 'Conduct post-incident tabletop exercise', description: 'Organize tabletop exercise with engineering, security, legal, and executive teams. Use DARK GLACIER as the scenario basis.', completed: false, priority: 'low', status: 'todo', order: 13, folderId: SAMPLE_FOLDER_ID, tags: ['remediation'], trashed: false, archived: false, createdAt: baseTs + 5 * DAY, updatedAt: baseTs + 5 * DAY, dueDate: new Date(now + 14 * DAY).toISOString().slice(0, 10), linkedNoteIds: [sampleId('note', 10)] },
+    { id: sampleId('task', 14), title: 'File regulatory notifications (GDPR, SOC 2)', description: 'Coordinate with DPO and compliance team to file required regulatory notifications. GDPR 72-hour window applies for EU client data.', completed: false, priority: 'high', status: 'todo', order: 14, folderId: SAMPLE_FOLDER_ID, tags: ['legal-data', 'remediation'], clsLevel: 'TLP:RED', trashed: false, archived: false, createdAt: baseTs + 4 * DAY + 6 * HOUR, updatedAt: baseTs + 4 * DAY + 6 * HOUR, dueDate: new Date(now + 2 * DAY).toISOString().slice(0, 10) },
   ];
 
+  // ─── Timeline Events (20) ─────────────────────────────────────────
   const timelineEvents: TimelineEvent[] = [
+    // Day 0: Supply-chain compromise detected
     {
-      id: sampleId('event', 1), timestamp: baseTs, title: 'Phishing email received', description: 'Spear-phishing email "Quarterly Compensation Review" delivered to 3 finance dept users.', eventType: 'initial-access', source: 'Email Gateway', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 2)], linkedTaskIds: [sampleId('task', 1)], mitreAttackIds: ['T1566.001'], assets: ['EMAIL-GW'], tags: ['phishing'], starred: true, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, clsLevel: 'TLP:AMBER', trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR,
+      id: sampleId('event', 1),
+      timestamp: baseTs,
+      title: 'Backdoored @pdfcore/render v3.2.1 pulled by CI',
+      description: 'OpenSlaw.ai CI/CD pipeline pulled updated npm dependency @pdfcore/render v3.2.1 containing backdoor. Build deployed to production automatically.',
+      eventType: 'initial-access',
+      source: 'CI/CD Pipeline Logs',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 2)],
+      linkedTaskIds: [sampleId('task', 1)],
+      mitreAttackIds: ['T1195.002'],
+      assets: ['build-server-01'],
+      tags: ['supply-chain', 'initial-access'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      clsLevel: 'TLP:AMBER',
+      latitude: 37.7749,
+      longitude: -122.4194,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs,
+      updatedAt: baseTs + HOUR,
     },
     {
-      id: sampleId('event', 2), timestamp: baseTs + 2 * HOUR, title: 'User clicked malicious attachment', description: 'User jsmith opened Q4_Compensation_Review.xlsm and enabled macros.', eventType: 'execution', source: 'EDR', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [], mitreAttackIds: ['T1204.002'], assets: ['WKSTN-042'], tags: ['phishing'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 3 * HOUR,
+      id: sampleId('event', 2),
+      timestamp: baseTs + 45 * MIN,
+      title: 'Backdoor activates — initial C2 beacon',
+      description: 'libpdfmetrics.node implant drops and establishes first HTTPS beacon to cdn-assets-proxy.com via CloudFront domain fronting. Beacon interval: 45s ± 25% jitter.',
+      eventType: 'command-and-control',
+      source: 'Network Flow Analysis',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 4), sampleId('note', 6)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1071.001'],
+      assets: ['build-server-01'],
+      tags: ['midnight-typhoon'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      clsLevel: 'TLP:AMBER',
+      latitude: 55.7558,
+      longitude: 37.6173,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + HOUR,
+      updatedAt: baseTs + 2 * HOUR,
     },
     {
-      id: sampleId('event', 3), timestamp: baseTs + 2 * HOUR + 30 * 60000, title: 'Dropper executed — payload downloaded', description: 'VBA macro launched PowerShell, downloaded svchost_update.exe from stardust-cdn.com.', eventType: 'execution', source: 'EDR', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 3)], linkedTaskIds: [sampleId('task', 2)], mitreAttackIds: ['T1059.001'], assets: ['WKSTN-042'], tags: ['malware'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 3 * HOUR, updatedAt: baseTs + 3 * HOUR,
+      id: sampleId('event', 3),
+      timestamp: baseTs + 2 * HOUR,
+      title: 'Environment variables harvested from build server',
+      description: 'Backdoor exfiltrates AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, DATABASE_URL, and OKTA_API_TOKEN from build server environment. Sent to C2 via encrypted channel.',
+      eventType: 'credential-access',
+      source: 'Malware Analysis',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 4), sampleId('note', 7)],
+      linkedTaskIds: [sampleId('task', 3)],
+      mitreAttackIds: ['T1003.006'],
+      assets: ['build-server-01'],
+      tags: ['cloud'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 3 * HOUR,
+      updatedAt: baseTs + 3 * HOUR,
     },
     {
-      id: sampleId('event', 4), timestamp: baseTs + 3 * HOUR, title: 'C2 beacon established', description: 'svchost_update.exe began beaconing to stardust-update.com (45.77.123.45) over HTTPS every ~60s.', eventType: 'command-and-control', source: 'NGFW', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 4)], linkedTaskIds: [sampleId('task', 3)], mitreAttackIds: ['T1071.001'], assets: ['WKSTN-042'], tags: ['c2'], starred: true, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 3 * HOUR, updatedAt: baseTs + 4 * HOUR,
+      id: sampleId('event', 4),
+      timestamp: baseTs + 4 * HOUR,
+      title: 'DNS tunnel C2 fallback established',
+      description: 'Secondary C2 channel activated via DNS TXT record queries to data.update-svc-cdn.net. Authoritative NS at 91.215.85.17 (Shanghai).',
+      eventType: 'command-and-control',
+      source: 'DNS Logs',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 6)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1572'],
+      assets: ['build-server-01'],
+      tags: ['midnight-typhoon'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 31.2304,
+      longitude: 121.4737,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 5 * HOUR,
+      updatedAt: baseTs + 5 * HOUR,
+    },
+    // Day 0: Phishing campaign
+    {
+      id: sampleId('event', 5),
+      timestamp: baseTs + 6 * HOUR,
+      title: 'Phishing emails sent to 5 OpenSlaw engineers',
+      description: 'DocuSign-themed phishing emails sent from noreply@docusign-notifications.openslaw-legal.com targeting platform, infra, and security team engineers.',
+      eventType: 'initial-access',
+      source: 'Email Gateway',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 3)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1566.001'],
+      assets: ['email-gateway'],
+      tags: ['midnight-typhoon', 'initial-access'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 52.3676,
+      longitude: 4.9041,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 7 * HOUR,
+      updatedAt: baseTs + 7 * HOUR,
     },
     {
-      id: sampleId('event', 5), timestamp: baseTs + 3 * HOUR + 15 * 60000, title: 'Persistence established', description: 'Registry Run key created at HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\SvcUpdate.', eventType: 'persistence', source: 'EDR', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [], mitreAttackIds: ['T1547.001'], assets: ['WKSTN-042'], tags: ['malware'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 4 * HOUR, updatedAt: baseTs + 4 * HOUR,
+      id: sampleId('event', 6),
+      timestamp: baseTs + 8 * HOUR,
+      title: 'Engineer m.chen submits SSO credentials via phishing page',
+      description: 'Senior engineer m.chen clicks phishing link and authenticates through Evilginx-proxied SSO flow. Okta session token captured by attacker.',
+      eventType: 'credential-access',
+      source: 'Okta Logs',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 3), sampleId('note', 7)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1078.004'],
+      assets: ['okta-sso'],
+      tags: ['midnight-typhoon'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 9 * HOUR,
+      updatedAt: baseTs + 9 * HOUR,
+    },
+    // Day 1: Cloud pivot
+    {
+      id: sampleId('event', 7),
+      timestamp: baseTs + DAY,
+      title: 'CI role used to enumerate AWS resources',
+      description: 'Stolen CI IAM credentials used to call ListBuckets, DescribeInstances, ListRoles from external IP. Full AWS resource inventory obtained.',
+      eventType: 'discovery',
+      source: 'AWS CloudTrail',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 5), sampleId('note', 9)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1580'],
+      actor: 'Midnight Typhoon',
+      assets: ['aws-account'],
+      tags: ['cloud'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 39.0438,
+      longitude: -77.4874,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + DAY + HOUR,
+      updatedAt: baseTs + DAY + HOUR,
     },
     {
-      id: sampleId('event', 6), timestamp: baseTs + DAY + 4 * HOUR, title: 'Credential harvesting via Mimikatz', description: 'Mimikatz sekurlsa::logonpasswords executed on WKSTN-042. Domain admin credentials (da_admin) obtained.', eventType: 'credential-access', source: 'EDR', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 5)], linkedTaskIds: [], mitreAttackIds: ['T1003.001'], assets: ['WKSTN-042'], tags: ['apt-29'], starred: true, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + DAY + 5 * HOUR, updatedAt: baseTs + DAY + 5 * HOUR,
+      id: sampleId('event', 8),
+      timestamp: baseTs + DAY + 4 * HOUR,
+      title: 'AssumeRole to openslaw-prod-api via trust policy',
+      description: 'CI deploy role assumes openslaw-prod-api role using overprivileged trust policy. Attacker now has S3, RDS, and SES access in production context.',
+      eventType: 'privilege-escalation',
+      source: 'AWS CloudTrail',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 5)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1078.004'],
+      actor: 'Midnight Typhoon',
+      assets: ['aws-account'],
+      tags: ['cloud', 'midnight-typhoon'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + DAY + 5 * HOUR,
+      updatedAt: baseTs + DAY + 5 * HOUR,
+    },
+    // Day 2: SSO → Admin pivot
+    {
+      id: sampleId('event', 9),
+      timestamp: baseTs + 2 * DAY,
+      title: 'Phished SSO session used to access AWS console',
+      description: 'Attacker uses stolen m.chen Okta session to SSO into AWS console. Assumes openslaw-admin role with full administrative privileges.',
+      eventType: 'lateral-movement',
+      source: 'AWS CloudTrail / Okta',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 7), sampleId('note', 9)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1021.001'],
+      actor: 'Midnight Typhoon',
+      assets: ['aws-account', 'okta-sso'],
+      tags: ['cloud', 'midnight-typhoon'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 2 * DAY + HOUR,
+      updatedAt: baseTs + 2 * DAY + HOUR,
     },
     {
-      id: sampleId('event', 7), timestamp: baseTs + DAY + 6 * HOUR, title: 'Lateral movement to domain controller', description: 'RDP session from WKSTN-042 to DC01 using da_admin credentials.', eventType: 'lateral-movement', source: 'Windows Event Log', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 5)], linkedTaskIds: [sampleId('task', 5)], mitreAttackIds: ['T1021.001'], assets: ['WKSTN-042', 'DC01'], tags: ['apt-29'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + DAY + 7 * HOUR, updatedAt: baseTs + DAY + 7 * HOUR,
+      id: sampleId('event', 10),
+      timestamp: baseTs + 2 * DAY + 2 * HOUR,
+      title: 'CloudTrail logging disabled by attacker',
+      description: 'Attacker uses admin role to stop CloudTrail logging in us-east-1. Logging gap lasts approximately 4 hours.',
+      eventType: 'defense-evasion',
+      source: 'AWS CloudTrail (StopLogging event)',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 9)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1562.008'],
+      actor: 'Midnight Typhoon',
+      assets: ['aws-account'],
+      tags: ['cloud'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 2 * DAY + 3 * HOUR,
+      updatedAt: baseTs + 2 * DAY + 3 * HOUR,
+    },
+    // Day 3: Data exfiltration begins
+    {
+      id: sampleId('event', 11),
+      timestamp: baseTs + 3 * DAY,
+      title: 'Bulk S3 GetObject — legal document download begins',
+      description: 'Attacker begins bulk download of s3://openslaw-legal-docs/ using prod-api role. 12,847 objects across 47 client matter prefixes. Launched from attacker-controlled EC2 in us-east-1.',
+      eventType: 'collection',
+      source: 'S3 Access Logs',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 8)],
+      linkedTaskIds: [sampleId('task', 6)],
+      mitreAttackIds: ['T1530'],
+      actor: 'Midnight Typhoon',
+      assets: ['s3-legal-docs'],
+      tags: ['exfiltration', 'legal-data'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 39.0438,
+      longitude: -77.4874,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 3 * DAY + HOUR,
+      updatedAt: baseTs + 3 * DAY + HOUR,
     },
     {
-      id: sampleId('event', 8), timestamp: baseTs + DAY + 20 * HOUR, title: 'Data staging on DC01', description: 'Files from finance share compressed to \\\\DC01\\C$\\Temp\\backup.7z (~450MB).', eventType: 'collection', source: 'File Integrity Monitoring', confidence: 'high', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 6)], linkedTaskIds: [], mitreAttackIds: ['T1560.001'], assets: ['DC01', 'FS01'], tags: ['apt-29'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 2 * DAY, updatedAt: baseTs + 2 * DAY,
+      id: sampleId('event', 12),
+      timestamp: baseTs + 3 * DAY + 8 * HOUR,
+      title: 'Data staged to Bucharest server',
+      description: '2.3 GB of compressed legal documents transferred to exfiltration staging server at 185.156.73.22 (Bucharest, Romania). AES-256 encrypted 7z archives.',
+      eventType: 'exfiltration',
+      source: 'Network Flow Analysis',
+      confidence: 'high',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 8)],
+      linkedTaskIds: [sampleId('task', 6)],
+      mitreAttackIds: ['T1567.002', 'T1560.001'],
+      actor: 'Midnight Typhoon',
+      assets: ['s3-legal-docs'],
+      tags: ['exfiltration'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 44.4268,
+      longitude: 26.1025,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 3 * DAY + 9 * HOUR,
+      updatedAt: baseTs + 3 * DAY + 9 * HOUR,
+    },
+    // Day 4: Exfiltration continues, detection
+    {
+      id: sampleId('event', 13),
+      timestamp: baseTs + 4 * DAY,
+      title: 'Data lands at Singapore endpoint',
+      description: 'Final destination: 103.253.41.98 (Singapore). Data transferred from Bucharest staging over mutual-TLS HTTPS. Throttled transfer over 6 hours.',
+      eventType: 'exfiltration',
+      source: 'Threat Intelligence',
+      confidence: 'high',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 8)],
+      linkedTaskIds: [],
+      mitreAttackIds: ['T1041'],
+      actor: 'Midnight Typhoon',
+      assets: [],
+      tags: ['exfiltration'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 1.3521,
+      longitude: 103.8198,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 4 * DAY + HOUR,
+      updatedAt: baseTs + 4 * DAY + HOUR,
     },
     {
-      id: sampleId('event', 9), timestamp: baseTs + 2 * DAY, title: 'Data exfiltration detected', description: '~450MB exfiltrated via HTTPS to C2 over 2 hours. Detected by anomalous outbound traffic volume.', eventType: 'exfiltration', source: 'NGFW / NetFlow', confidence: 'high', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 6)], linkedTaskIds: [], mitreAttackIds: ['T1041'], assets: ['DC01'], tags: ['apt-29'], starred: true, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 2 * DAY + HOUR, updatedAt: baseTs + 2 * DAY + HOUR,
+      id: sampleId('event', 14),
+      timestamp: baseTs + 4 * DAY + 4 * HOUR,
+      title: 'Anomalous outbound traffic detected — SOC alert',
+      description: 'SOC analyst identifies anomalous outbound data volume from production API servers. Correlation with domain-fronted HTTPS traffic triggers investigation.',
+      eventType: 'detection',
+      source: 'SIEM / SOC',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 1)],
+      linkedTaskIds: [sampleId('task', 2)],
+      mitreAttackIds: [],
+      assets: ['openslaw-api-prod'],
+      tags: ['midnight-typhoon'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 4 * DAY + 5 * HOUR,
+      updatedAt: baseTs + 4 * DAY + 5 * HOUR,
     },
     {
-      id: sampleId('event', 10), timestamp: baseTs + 2 * DAY + 4 * HOUR, title: 'Containment initiated', description: 'WKSTN-042 and DC01 isolated from network. C2 domains/IPs blocked at firewall.', eventType: 'containment', source: 'SOC', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [sampleId('task', 3)], mitreAttackIds: [], assets: ['WKSTN-042', 'DC01'], tags: ['remediation'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 2 * DAY + 5 * HOUR, updatedAt: baseTs + 2 * DAY + 5 * HOUR,
+      id: sampleId('event', 15),
+      timestamp: baseTs + 4 * DAY + 6 * HOUR,
+      title: 'Containment — C2 domains blocked, IAM keys revoked',
+      description: 'C2 domains/IPs blocked at WAF. All compromised IAM credentials revoked. Okta sessions invalidated. Build server isolated.',
+      eventType: 'containment',
+      source: 'SOC',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 10)],
+      linkedTaskIds: [sampleId('task', 2), sampleId('task', 3)],
+      mitreAttackIds: [],
+      assets: ['build-server-01', 'aws-account', 'okta-sso'],
+      tags: ['remediation'],
+      starred: true,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 4 * DAY + 7 * HOUR,
+      updatedAt: baseTs + 4 * DAY + 7 * HOUR,
     },
     {
-      id: sampleId('event', 11), timestamp: baseTs + 3 * DAY, title: 'Remediation started', description: 'Credential resets initiated. Endpoint scanning underway across all systems.', eventType: 'eradication', source: 'SOC', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [sampleId('note', 7)], linkedTaskIds: [sampleId('task', 4), sampleId('task', 8)], mitreAttackIds: [], assets: [], tags: ['remediation'], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 3 * DAY,
+      id: sampleId('event', 16),
+      timestamp: baseTs + 4 * DAY + 8 * HOUR,
+      title: 'npm dependency rolled back to v3.1.9',
+      description: '@pdfcore/render pinned to v3.1.9 with integrity hash. All production services redeployed with clean dependency tree.',
+      eventType: 'eradication',
+      source: 'Engineering',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 2), sampleId('note', 10)],
+      linkedTaskIds: [sampleId('task', 4)],
+      mitreAttackIds: [],
+      assets: ['build-server-01', 'openslaw-api-prod'],
+      tags: ['supply-chain', 'remediation'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 4 * DAY + 9 * HOUR,
+      updatedAt: baseTs + 4 * DAY + 9 * HOUR,
+    },
+    // Day 5: Recovery
+    {
+      id: sampleId('event', 17),
+      timestamp: baseTs + 5 * DAY,
+      title: 'Build server rebuild initiated from golden image',
+      description: 'Compromised build server decommissioned. New build infrastructure provisioned from hardened AMI with enhanced monitoring and network isolation.',
+      eventType: 'recovery',
+      source: 'Infrastructure',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 10)],
+      linkedTaskIds: [sampleId('task', 8)],
+      mitreAttackIds: [],
+      assets: ['build-server-01'],
+      tags: ['remediation'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 5 * DAY,
+      updatedAt: baseTs + 5 * DAY,
     },
     {
-      id: sampleId('event', 12), timestamp: now + 7 * DAY, title: 'Post-incident review scheduled', description: 'Review meeting with SOC, IT, and management to document lessons learned.', eventType: 'recovery', source: 'SOC', confidence: 'confirmed', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [sampleId('task', 10)], mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: SAMPLE_FOLDER_ID, timelineId: SAMPLE_TIMELINE_ID, trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 4 * DAY,
+      id: sampleId('event', 18),
+      timestamp: baseTs + 5 * DAY + 4 * HOUR,
+      title: 'CloudTrail re-enabled with S3 data events',
+      description: 'CloudTrail logging restored in all regions. S3 data event logging enabled for sensitive buckets. GuardDuty activation in progress.',
+      eventType: 'recovery',
+      source: 'Cloud Security',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 10)],
+      linkedTaskIds: [sampleId('task', 11)],
+      mitreAttackIds: [],
+      assets: ['aws-account'],
+      tags: ['cloud', 'remediation'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 5 * DAY + 4 * HOUR,
+      updatedAt: baseTs + 5 * DAY + 4 * HOUR,
+    },
+    {
+      id: sampleId('event', 19),
+      timestamp: baseTs + 5 * DAY + 8 * HOUR,
+      title: 'Forensic imaging of compromised systems completed',
+      description: 'Full disk images captured from build-server-01 and attacker EC2 instance. Memory dumps preserved. Chain of custody documented.',
+      eventType: 'evidence',
+      source: 'DFIR',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [],
+      linkedTaskIds: [],
+      mitreAttackIds: [],
+      assets: ['build-server-01'],
+      tags: ['remediation'],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 5 * DAY + 9 * HOUR,
+      updatedAt: baseTs + 5 * DAY + 9 * HOUR,
+    },
+    {
+      id: sampleId('event', 20),
+      timestamp: now + 14 * DAY,
+      title: 'Post-incident review and tabletop exercise scheduled',
+      description: 'Full post-incident review with engineering, security, legal, and executive teams. Tabletop exercise using DARK GLACIER scenario.',
+      eventType: 'communication',
+      source: 'SOC',
+      confidence: 'confirmed',
+      linkedIOCIds: [],
+      linkedNoteIds: [sampleId('note', 10)],
+      linkedTaskIds: [sampleId('task', 13)],
+      mitreAttackIds: [],
+      assets: [],
+      tags: [],
+      starred: false,
+      folderId: SAMPLE_FOLDER_ID,
+      timelineId: SAMPLE_TIMELINE_ID,
+      trashed: false,
+      archived: false,
+      createdAt: baseTs + 5 * DAY + 10 * HOUR,
+      updatedAt: baseTs + 5 * DAY + 10 * HOUR,
     },
   ];
 
+  // ─── Standalone IOCs (25) ─────────────────────────────────────────
   const standaloneIOCs: StandaloneIOC[] = [
-    { id: sampleId('ioc', 1), type: 'ipv4', value: '45.77.123.45', confidence: 'confirmed', attribution: 'APT-29', analystNotes: 'Primary C2 server. Vultr VPS in Netherlands.', folderId: SAMPLE_FOLDER_ID, tags: ['c2', 'apt-29'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
-    { id: sampleId('ioc', 2), type: 'ipv4', value: '104.238.167.89', confidence: 'medium', attribution: 'APT-29', analystNotes: 'Fallback C2. Found in binary strings, not yet active.', folderId: SAMPLE_FOLDER_ID, tags: ['c2', 'apt-29'], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 3), type: 'domain', value: 'stardust-update.com', confidence: 'confirmed', attribution: 'APT-29', analystNotes: 'Primary C2 domain.', folderId: SAMPLE_FOLDER_ID, tags: ['c2', 'apt-29'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
-    { id: sampleId('ioc', 4), type: 'domain', value: 'stardust-cdn.com', confidence: 'high', attribution: 'APT-29', analystNotes: 'Payload hosting domain.', folderId: SAMPLE_FOLDER_ID, tags: ['apt-29', 'malware'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
-    { id: sampleId('ioc', 5), type: 'domain', value: 'stardust-sync.net', confidence: 'medium', attribution: 'APT-29', analystNotes: 'Fallback C2 domain. Not yet observed in live traffic.', folderId: SAMPLE_FOLDER_ID, tags: ['c2', 'apt-29'], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 6), type: 'domain', value: 'stardust-portal.com', confidence: 'confirmed', analystNotes: 'Phishing sender domain. Spoofed internal HR.', folderId: SAMPLE_FOLDER_ID, tags: ['phishing'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
-    { id: sampleId('ioc', 7), type: 'sha256', value: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2', confidence: 'confirmed', analystNotes: 'Dropper: Q4_Compensation_Review.xlsm', folderId: SAMPLE_FOLDER_ID, tags: ['malware'], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 8), type: 'sha256', value: 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3', confidence: 'confirmed', attribution: 'APT-29', analystNotes: 'Payload: svchost_update.exe', folderId: SAMPLE_FOLDER_ID, tags: ['malware', 'apt-29'], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 3 * HOUR },
-    { id: sampleId('ioc', 9), type: 'md5', value: 'd4e5f6a1b2c3d4e5f6a1b2c3', confidence: 'confirmed', analystNotes: 'MD5 of dropper xlsm', folderId: SAMPLE_FOLDER_ID, tags: ['malware'], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 10), type: 'url', value: 'https://stardust-cdn.com/update.exe', confidence: 'high', attribution: 'APT-29', analystNotes: 'Payload download URL triggered by VBA macro.', folderId: SAMPLE_FOLDER_ID, tags: ['malware', 'apt-29'], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 11), type: 'email', value: 'hr-updates@stardust-portal.com', confidence: 'confirmed', analystNotes: 'Phishing sender address.', folderId: SAMPLE_FOLDER_ID, tags: ['phishing'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
-    { id: sampleId('ioc', 12), type: 'cve', value: 'CVE-2024-21413', confidence: 'medium', analystNotes: 'Outlook vulnerability exploited for initial execution (under investigation).', folderId: SAMPLE_FOLDER_ID, tags: ['apt-29'], trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + DAY },
-    { id: sampleId('ioc', 13), type: 'mitre-attack', value: 'T1566.001', confidence: 'confirmed', analystNotes: 'Spear-phishing Attachment', folderId: SAMPLE_FOLDER_ID, tags: ['apt-29'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
-    { id: sampleId('ioc', 14), type: 'mitre-attack', value: 'T1059.001', confidence: 'confirmed', analystNotes: 'PowerShell used for payload download', folderId: SAMPLE_FOLDER_ID, tags: ['apt-29'], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 2 * HOUR },
-    { id: sampleId('ioc', 15), type: 'file-path', value: '%TEMP%\\svchost_update.exe', confidence: 'confirmed', analystNotes: 'Payload drop location on victim workstation.', folderId: SAMPLE_FOLDER_ID, tags: ['malware'], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 2 * HOUR },
+    // IPv4 (4)
+    { id: sampleId('ioc', 1), type: 'ipv4', value: '185.220.101.34', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Primary C2 server. Moscow, RU (AS50867). Domain-fronted via CloudFront.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'C2', relationships: [{ targetIOCId: 'cdn-assets-proxy.com', relationshipType: 'hosts' }], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
+    { id: sampleId('ioc', 2), type: 'ipv4', value: '91.215.85.17', confidence: 'high', attribution: 'Midnight Typhoon', analystNotes: 'DNS tunnel authoritative nameserver. Shanghai, CN (AS4134).', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'C2', trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + 2 * HOUR },
+    { id: sampleId('ioc', 3), type: 'ipv4', value: '185.156.73.22', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Exfiltration staging server. Bucharest, RO (AS9009).', folderId: SAMPLE_FOLDER_ID, tags: ['exfiltration'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'exfil-staging', trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 3 * DAY + HOUR },
+    { id: sampleId('ioc', 4), type: 'ipv4', value: '103.253.41.98', confidence: 'high', attribution: 'Midnight Typhoon', analystNotes: 'Final data landing server. Singapore (AS133618).', folderId: SAMPLE_FOLDER_ID, tags: ['exfiltration'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'exfil-landing', trashed: false, archived: false, createdAt: baseTs + 4 * DAY, updatedAt: baseTs + 4 * DAY + HOUR },
+    // Domains (5)
+    { id: sampleId('ioc', 5), type: 'domain', value: 'cdn-assets-proxy.com', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Primary C2 domain. Domain-fronted behind CloudFront. Registered via Njalla.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'C2', relationships: [{ targetIOCId: '185.220.101.34', relationshipType: 'resolves-to' }], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
+    { id: sampleId('ioc', 6), type: 'domain', value: 'update-svc-cdn.net', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'DNS tunneling C2 domain. TXT record-based exfil. Registered via Porkbun.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'C2-DNS', relationships: [{ targetIOCId: '91.215.85.17', relationshipType: 'resolves-to' }], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
+    { id: sampleId('ioc', 7), type: 'domain', value: 'openslaw-legal.com', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Phishing infrastructure domain. Spoofed OpenSlaw.ai branding.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon', 'initial-access'], clsLevel: 'TLP:AMBER', iocStatus: 'active', iocSubtype: 'phishing', relationships: [{ targetIOCId: '89.44.9.241', relationshipType: 'resolves-to' }], trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 7 * HOUR },
+    { id: sampleId('ioc', 8), type: 'domain', value: 'docusign-verify.openslaw-legal.com', confidence: 'confirmed', analystNotes: 'Phishing landing page subdomain. Evilginx-style credential proxy.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], iocStatus: 'resolved', iocSubtype: 'phishing', trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 4 * DAY + 8 * HOUR },
+    { id: sampleId('ioc', 9), type: 'domain', value: 'docusign-notifications.openslaw-legal.com', confidence: 'confirmed', analystNotes: 'Phishing email sender subdomain.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], iocStatus: 'resolved', iocSubtype: 'phishing', trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 4 * DAY + 8 * HOUR },
+    // SHA-256 (3)
+    { id: sampleId('ioc', 10), type: 'sha256', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Backdoored @pdfcore/render v3.2.1 npm package tarball.', folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain'], clsLevel: 'TLP:AMBER', iocStatus: 'active', relationships: [{ targetIOCId: 'cdn-assets-proxy.com', relationshipType: 'communicates-with' }, { targetIOCId: 'CVE-2024-38856', relationshipType: 'exploits' }], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + DAY },
+    { id: sampleId('ioc', 11), type: 'sha256', value: '7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'Dropped implant binary: libpdfmetrics.node', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', relationships: [{ targetIOCId: 'cdn-assets-proxy.com', relationshipType: 'communicates-with' }, { targetIOCId: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', relationshipType: 'drops' }], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + DAY },
+    { id: sampleId('ioc', 12), type: 'sha256', value: 'f4a8b3c7d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5', confidence: 'high', attribution: 'Midnight Typhoon', analystNotes: 'Encrypted config file (.pdfrc) containing C2 endpoints and exfil encryption keys.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], iocStatus: 'under-investigation', trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + DAY + 4 * HOUR },
+    // MD5 (2)
+    { id: sampleId('ioc', 13), type: 'md5', value: 'a3f2b8c91e4d57f6a8b3c2d1e0f9a8b7', confidence: 'confirmed', analystNotes: 'MD5 of dropped implant binary (libpdfmetrics.node).', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], trashed: false, archived: false, createdAt: baseTs + 2 * HOUR, updatedAt: baseTs + 2 * HOUR },
+    { id: sampleId('ioc', 14), type: 'md5', value: 'c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2', confidence: 'high', analystNotes: 'MD5 of encrypted config file (.pdfrc).', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + DAY },
+    // URLs (3)
+    { id: sampleId('ioc', 15), type: 'url', value: 'https://registry.npmjs.org/@pdfcore/render/-/render-3.2.1.tgz', confidence: 'confirmed', analystNotes: 'Backdoored npm package download URL.', folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain'], iocStatus: 'resolved', trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + 4 * DAY + 4 * HOUR, relationships: [{ targetIOCId: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', relationshipType: 'downloads' }] },
+    { id: sampleId('ioc', 16), type: 'url', value: 'https://app.docusign-verify.openslaw-legal.com/sign/review', confidence: 'confirmed', analystNotes: 'Phishing landing page URL. Evilginx proxy to real Okta SSO.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], iocStatus: 'resolved', trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 4 * DAY + 8 * HOUR },
+    { id: sampleId('ioc', 17), type: 'url', value: 'https://cdn-assets-proxy.com/api/v2/telemetry', confidence: 'confirmed', attribution: 'Midnight Typhoon', analystNotes: 'C2 beacon endpoint. Disguised as CloudFront telemetry API.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], clsLevel: 'TLP:AMBER', iocStatus: 'active', relationships: [{ targetIOCId: '7d865e959b2466918c9863afca942d0fb89d7c9ac0c99bafc3749504ded97730', relationshipType: 'downloads' }], trashed: false, archived: false, createdAt: baseTs + HOUR, updatedAt: baseTs + HOUR },
+    // Email (2)
+    { id: sampleId('ioc', 18), type: 'email', value: 'noreply@docusign-notifications.openslaw-legal.com', confidence: 'confirmed', analystNotes: 'Phishing sender address. Spoofed DocuSign notification.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], iocStatus: 'resolved', trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 4 * DAY + 8 * HOUR },
+    { id: sampleId('ioc', 19), type: 'email', value: 'support@openslaw-legal.com', confidence: 'medium', analystNotes: 'Secondary phishing address found in email headers. May be used in follow-up campaigns.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], iocStatus: 'under-investigation', trashed: false, archived: false, createdAt: baseTs + 8 * HOUR, updatedAt: baseTs + DAY },
+    // CVE (2)
+    { id: sampleId('ioc', 20), type: 'cve', value: 'CVE-2024-38856', confidence: 'high', analystNotes: 'npm registry authentication bypass used by Midnight Typhoon to compromise @pdfcore/render maintainer account.', folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain'], iocSubtype: 'auth-bypass', iocStatus: 'active', trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs + HOUR },
+    { id: sampleId('ioc', 21), type: 'cve', value: 'CVE-2024-21413', confidence: 'medium', analystNotes: 'Outlook RCE — secondary exploitation vector observed in phishing attachment variant (under investigation).', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], iocSubtype: 'RCE', iocStatus: 'under-investigation', trashed: false, archived: false, createdAt: baseTs + DAY, updatedAt: baseTs + DAY },
+    // MITRE ATT&CK (4)
+    { id: sampleId('ioc', 22), type: 'mitre-attack', value: 'T1195.002', confidence: 'confirmed', analystNotes: 'Supply Chain Compromise: Compromise Software Supply Chain — primary initial access vector.', folderId: SAMPLE_FOLDER_ID, tags: ['supply-chain'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
+    { id: sampleId('ioc', 23), type: 'mitre-attack', value: 'T1566.001', confidence: 'confirmed', analystNotes: 'Phishing: Spearphishing Attachment — secondary access vector targeting engineers.', folderId: SAMPLE_FOLDER_ID, tags: ['initial-access'], trashed: false, archived: false, createdAt: baseTs + 6 * HOUR, updatedAt: baseTs + 6 * HOUR },
+    { id: sampleId('ioc', 24), type: 'mitre-attack', value: 'T1567.002', confidence: 'high', analystNotes: 'Exfiltration Over Web Service: Exfiltration to Cloud Storage — data theft to external servers.', folderId: SAMPLE_FOLDER_ID, tags: ['exfiltration'], trashed: false, archived: false, createdAt: baseTs + 3 * DAY, updatedAt: baseTs + 3 * DAY },
+    { id: sampleId('ioc', 25), type: 'mitre-attack', value: 'T1071.001', confidence: 'confirmed', analystNotes: 'Application Layer Protocol: Web Protocols — C2 via HTTPS with domain fronting.', folderId: SAMPLE_FOLDER_ID, tags: ['midnight-typhoon'], trashed: false, archived: false, createdAt: baseTs, updatedAt: baseTs },
   ];
 
-  // Simple whiteboard with a JSON representation of an attack flow diagram
+  // ─── Whiteboard ────────────────────────────────────────────────────
   const whiteboardElements = JSON.stringify([
-    { type: 'rectangle', id: 'wb-el-1', x: 50, y: 200, width: 160, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Phishing Email' } },
-    { type: 'rectangle', id: 'wb-el-2', x: 280, y: 200, width: 160, height: 60, strokeColor: '#f97316', backgroundColor: '#f9731622', fillStyle: 'solid', label: { text: 'Macro Execution' } },
-    { type: 'rectangle', id: 'wb-el-3', x: 510, y: 200, width: 160, height: 60, strokeColor: '#3b82f6', backgroundColor: '#3b82f622', fillStyle: 'solid', label: { text: 'C2 Established' } },
-    { type: 'rectangle', id: 'wb-el-4', x: 510, y: 340, width: 160, height: 60, strokeColor: '#a855f7', backgroundColor: '#a855f722', fillStyle: 'solid', label: { text: 'Credential Theft' } },
-    { type: 'rectangle', id: 'wb-el-5', x: 280, y: 340, width: 160, height: 60, strokeColor: '#06b6d4', backgroundColor: '#06b6d422', fillStyle: 'solid', label: { text: 'Lateral Movement' } },
-    { type: 'rectangle', id: 'wb-el-6', x: 50, y: 340, width: 160, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Data Exfiltration' } },
+    // Attack flow boxes
+    { type: 'rectangle', id: 'wb-el-1', x: 50, y: 80, width: 180, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Supply Chain\n(@pdfcore/render)' } },
+    { type: 'rectangle', id: 'wb-el-2', x: 50, y: 200, width: 180, height: 60, strokeColor: '#f97316', backgroundColor: '#f9731622', fillStyle: 'solid', label: { text: 'Phishing Campaign\n(DocuSign Lure)' } },
+    { type: 'rectangle', id: 'wb-el-3', x: 310, y: 80, width: 180, height: 60, strokeColor: '#a855f7', backgroundColor: '#a855f722', fillStyle: 'solid', label: { text: 'Backdoor Activation\n(libpdfmetrics.node)' } },
+    { type: 'rectangle', id: 'wb-el-4', x: 310, y: 200, width: 180, height: 60, strokeColor: '#ec4899', backgroundColor: '#ec489922', fillStyle: 'solid', label: { text: 'SSO Token Stolen\n(Evilginx)' } },
+    { type: 'rectangle', id: 'wb-el-5', x: 570, y: 80, width: 180, height: 60, strokeColor: '#3b82f6', backgroundColor: '#3b82f622', fillStyle: 'solid', label: { text: 'C2 Established\n(Domain Fronting)' } },
+    { type: 'rectangle', id: 'wb-el-6', x: 570, y: 200, width: 180, height: 60, strokeColor: '#06b6d4', backgroundColor: '#06b6d422', fillStyle: 'solid', label: { text: 'AWS Credential Theft\n(IAM + SSO)' } },
+    { type: 'rectangle', id: 'wb-el-7', x: 830, y: 140, width: 180, height: 60, strokeColor: '#14b8a6', backgroundColor: '#14b8a622', fillStyle: 'solid', label: { text: 'Cloud Lateral Movement\n(S3, RDS, EC2)' } },
+    { type: 'rectangle', id: 'wb-el-8', x: 1090, y: 140, width: 180, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Data Exfiltration\n(2.3 GB Legal Docs)' } },
+    // Location annotations
+    { type: 'text', id: 'wb-el-9', x: 570, y: 30, width: 180, height: 30, text: 'Moscow → Shanghai', fontSize: 12, strokeColor: '#6b7280' },
+    { type: 'text', id: 'wb-el-10', x: 1090, y: 210, width: 180, height: 30, text: 'Bucharest → Singapore', fontSize: 12, strokeColor: '#6b7280' },
+    { type: 'text', id: 'wb-el-11', x: 830, y: 210, width: 180, height: 30, text: 'AWS us-east-1 (Virginia)', fontSize: 12, strokeColor: '#6b7280' },
   ]);
 
   const whiteboard: Whiteboard = {
     id: sampleId('whiteboard', 1),
-    name: 'STARDUST Attack Flow',
+    name: 'DARK GLACIER Attack Flow',
     elements: whiteboardElements,
     folderId: SAMPLE_FOLDER_ID,
-    tags: ['apt-29'],
+    tags: ['midnight-typhoon'],
     order: 1,
     trashed: false,
     archived: false,
-    createdAt: baseTs + 2 * DAY,
-    updatedAt: baseTs + 3 * DAY,
+    createdAt: baseTs + 3 * DAY,
+    updatedAt: baseTs + 5 * DAY,
   };
 
   return { folder, notes, tasks, timelineEvents, timeline, standaloneIOCs, whiteboard, tags };

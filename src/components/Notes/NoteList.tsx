@@ -134,7 +134,7 @@ export function NoteList({ notes, selectedId, onSelect, sort, onSortChange, titl
         </div>
       </div>
 
-      {notesWithIOCs.length > 0 && selectedIOCTypes && onIOCTypesChange && (
+      {(notesWithIOCs.length > 0 || (selectedIOCTypes && selectedIOCTypes.length > 0)) && selectedIOCTypes && onIOCTypesChange && (
         <IOCFilterBar selectedTypes={selectedIOCTypes} onChange={onIOCTypesChange} />
       )}
 

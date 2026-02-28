@@ -119,24 +119,29 @@ export function SearchOverlay({
     return () => { workerRef.current?.terminate(); };
   }, []);
 
-  // Post to worker when query changes
+  // Send data to worker when arrays change (heavy clone happens only on data change, not per keystroke)
+  useEffect(() => {
+    if (!workerRef.current || !workerSupported.current) return;
+    workerRef.current.postMessage({
+      type: 'data',
+      notes: effectiveNotes,
+      tasks: effectiveTasks,
+      clipsFolderId,
+      timelineEvents: effectiveEvents,
+      whiteboards: effectiveWhiteboards,
+    });
+  }, [effectiveNotes, effectiveTasks, clipsFolderId, effectiveEvents, effectiveWhiteboards]);
+
+  // Post lightweight query to worker when search changes
   useEffect(() => {
     if (!debouncedQuery.trim()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: syncing search results from worker/fallback
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clearing results when query is empty
       setSearchResult({ results: [] });
       return;
     }
     const id = ++requestIdRef.current;
     if (workerRef.current && workerSupported.current) {
-      workerRef.current.postMessage({
-        id,
-        notes: effectiveNotes,
-        tasks: effectiveTasks,
-        clipsFolderId,
-        query: { mode, raw: debouncedQuery },
-        timelineEvents: effectiveEvents,
-        whiteboards: effectiveWhiteboards,
-      });
+      workerRef.current.postMessage({ type: 'query', id, query: { mode, raw: debouncedQuery } });
     } else {
       // Fallback: direct call (standalone/CSP issues)
       setSearchResult(unifiedSearch(effectiveNotes, effectiveTasks, clipsFolderId, { mode, raw: debouncedQuery }, effectiveEvents, effectiveWhiteboards));

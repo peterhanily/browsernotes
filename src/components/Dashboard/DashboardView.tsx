@@ -43,6 +43,10 @@ export function DashboardView({ links, onUpdateLinks }: DashboardViewProps) {
   };
 
   const handlePanelClick = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+    } catch { return; }
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

@@ -488,7 +488,9 @@ function AppInner() {
         let lastFolderId: string | undefined;
         const entityTypesUsed = new Set<string>();
 
+        let failedClips = 0;
         for (const clip of clips) {
+          try {
           // Sanitize clip fields — only accept expected string/number types
           const rawContent = typeof clip.content === 'string' ? clip.content : '';
           const sourceUrl = typeof clip.sourceUrl === 'string' ? clip.sourceUrl : '';
@@ -556,6 +558,13 @@ function AppInner() {
             });
             if (!firstEntityId) { firstEntityId = note.id; firstEntityType = 'note'; }
           }
+          } catch (clipErr) {
+            console.error('Failed to import clip:', clipErr);
+            failedClips++;
+          }
+        }
+        if (failedClips > 0) {
+          addToast('warning', `Imported with ${failedClips} failed clip${failedClips > 1 ? 's' : ''}`);
         }
 
         // Navigate to the appropriate view
@@ -653,21 +662,7 @@ function AppInner() {
     [standaloneIOCsHook.getFilteredIOCs, selectedFolderId, selectedTag]
   );
 
-  // Screenshare-filtered: folder-filtered arrays (for NoteList, TaskList, TimelineView)
-  const ssFilteredNotes = useMemo(
-    () => screenshareMaxLevel ? filteredNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredNotes,
-    [filteredNotes, screenshareMaxLevel, effectiveClsLevels]
-  );
-  const ssFilteredTasks = useMemo(
-    () => screenshareMaxLevel ? filteredTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTasks,
-    [filteredTasks, screenshareMaxLevel, effectiveClsLevels]
-  );
-  const ssFilteredTimelineEvents = useMemo(
-    () => screenshareMaxLevel ? filteredTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTimelineEvents,
-    [filteredTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
-  );
-
-  // Screenshare-filtered: unfiltered-by-folder arrays (for GraphView, IOCStatsView, SearchOverlay, NoteEditor, TaskListView)
+  // Screenshare-safe: filter once on full arrays, derive folder-scoped and investigation-scoped from these
   const screensafeNotes = useMemo(
     () => screenshareMaxLevel ? notes.notes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : notes.notes,
     [notes.notes, screenshareMaxLevel, effectiveClsLevels]
@@ -681,7 +676,22 @@ function AppInner() {
     [timeline.events, screenshareMaxLevel, effectiveClsLevels]
   );
 
-  // Investigation-scoped arrays (for graph, IOC stats, search)
+  // Folder-filtered + screenshare-safe (for NoteList, TaskList, TimelineView)
+  // Derive from screensafe arrays instead of re-filtering with isAboveClsThreshold
+  const ssFilteredNotes = useMemo(
+    () => screenshareMaxLevel ? filteredNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredNotes,
+    [filteredNotes, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredTasks = useMemo(
+    () => screenshareMaxLevel ? filteredTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTasks,
+    [filteredTasks, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredTimelineEvents = useMemo(
+    () => screenshareMaxLevel ? filteredTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTimelineEvents,
+    [filteredTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
+  );
+
+  // Investigation-scoped arrays (for graph, IOC stats, search) — derive from screensafe
   const investigationNotes = useMemo(
     () => selectedFolderId ? screensafeNotes.filter((n) => n.folderId === selectedFolderId) : screensafeNotes,
     [screensafeNotes, selectedFolderId]
@@ -973,8 +983,12 @@ function AppInner() {
 
   const handleSearchNavigateToTimeline = useCallback((id: string) => {
     const ev = timeline.events.find((e) => e.id === id);
-    if (ev) setSelectedTimelineId(ev.timelineId);
-    navigateTo('timeline', { selectedTimelineId: ev?.timelineId });
+    if (ev) {
+      setSelectedTimelineId(ev.timelineId);
+      navigateTo('timeline', { selectedTimelineId: ev.timelineId });
+    } else {
+      navigateTo('timeline');
+    }
   }, [timeline.events, navigateTo]);
 
   const handleSearchNavigateToWhiteboard = useCallback((id: string) => {
@@ -1337,7 +1351,7 @@ function AppInner() {
             selectedFolderName={selectedFolder?.name}
             onNavigateToNote={(id) => { setSelectedNoteId(id); setSelectedFolderId(undefined); setSelectedTag(undefined); setShowTrash(false); setShowArchive(false); navigateTo('notes', { selectedNoteId: id }); }}
             onNavigateToTask={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); navigateTo('tasks'); }}
-            onNavigateToTimelineEvent={(id) => { const ev = timeline.events.find((e) => e.id === id); if (ev) setSelectedTimelineId(ev.timelineId); navigateTo('timeline', { selectedTimelineId: ev?.timelineId }); }}
+            onNavigateToTimelineEvent={(id) => { const ev = timeline.events.find((e) => e.id === id); if (ev) { setSelectedTimelineId(ev.timelineId); navigateTo('timeline', { selectedTimelineId: ev.timelineId }); } else { navigateTo('timeline'); } }}
             onUpdateNote={notes.updateNote}
             onUpdateTask={tasks.updateTask}
             onUpdateEvent={timeline.updateEvent}
@@ -1462,7 +1476,9 @@ function AppInner() {
             const folderIOCs = standaloneIOCsHook.iocs.filter((i) => i.folderId === folderId && !i.trashed && !i.archived);
             const html = generateInvestigationReport({ folder, notes: folderNotes, tasks: folderTasks, events: folderEvents, standaloneIOCs: folderIOCs });
             const blob = new Blob([html], { type: 'text/html' });
-            window.open(URL.createObjectURL(blob));
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
             activityLog.log('data', 'export', `Generated report for "${folder.name}"`, folderId, folder.name);
             addToast('success', `Report generated for "${folder.name}"`);
           }}

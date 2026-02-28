@@ -51,6 +51,8 @@ import { useTour } from './hooks/useTour';
 import { TourOverlay } from './components/Tour/TourOverlay';
 import { TourTooltip } from './components/Tour/TourTooltip';
 import { DemoWelcomeModal } from './components/Common/DemoWelcomeModal';
+import { DataImportModal } from './components/Import/DataImportModal';
+import type { ImportResult } from './lib/data-import';
 
 // Parse hash deep-link on initial load: #entity=note:xxx, #entity=task:xxx, #entity=event:xxx
 function parseEntityHash(): { type: 'note' | 'task' | 'event'; id: string } | null {
@@ -800,6 +802,29 @@ export default function App() {
     setShowIOCForm(true);
   }, []);
 
+  const [showDataImport, setShowDataImport] = useState(false);
+
+  const handleDataImportComplete = useCallback((result: ImportResult) => {
+    activityLog.log(
+      'data',
+      'import',
+      `Data import: ${result.timelineEventsCreated} events, ${result.iocsExtracted} IOCs`,
+    );
+    // Reload all hooks to pick up new entities
+    notes.reload();
+    timeline.reload();
+    standaloneIOCsHook.reload();
+    reloadTimelines();
+    reloadTags();
+    // Navigate based on what was imported
+    if (result.timelineEventsCreated > 0) {
+      navigateTo('timeline');
+    } else if (result.iocsExtracted > 0) {
+      navigateTo('ioc-stats');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityLog, notes.reload, timeline.reload, standaloneIOCsHook.reload, reloadTimelines, reloadTags, navigateTo]);
+
   const handleQuickCapture = useCallback(async (data: Partial<Note>) => {
     const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
     const note = await loggedCreateNote({
@@ -1050,6 +1075,7 @@ export default function App() {
             onNewTimelineEvent={handleNewTimelineEvent}
             onNewWhiteboard={handleNewWhiteboard}
             onNewIOC={handleNewIOC}
+            onImportData={() => setShowDataImport(true)}
             onToggleSidebar={() => updateSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}
             onMobileMenuToggle={() => setMobileSidebarOpen((prev) => !prev)}
             sidebarCollapsed={settings.sidebarCollapsed}
@@ -1334,6 +1360,15 @@ export default function App() {
         }}
         folders={folders}
         defaultFolderId={selectedFolderId}
+      />
+
+      <DataImportModal
+        open={showDataImport}
+        onClose={() => setShowDataImport(false)}
+        folders={folders}
+        timelines={timelines}
+        defaultFolderId={selectedFolderId}
+        onImportComplete={handleDataImportComplete}
       />
 
       <ConfirmDialog

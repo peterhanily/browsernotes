@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, ChevronDown, FileText, ListChecks, Clock, PenTool, Shield } from 'lucide-react';
+import { Plus, ChevronDown, FileText, ListChecks, Clock, PenTool, Shield, Database } from 'lucide-react';
 
 interface CreateDropdownProps {
   onNewNote: () => void;
@@ -7,9 +7,10 @@ interface CreateDropdownProps {
   onNewTimelineEvent: () => void;
   onNewWhiteboard: () => void;
   onNewIOC?: () => void;
+  onImportData?: () => void;
 }
 
-export function CreateDropdown({ onNewNote, onNewTask, onNewTimelineEvent, onNewWhiteboard, onNewIOC }: CreateDropdownProps) {
+export function CreateDropdown({ onNewNote, onNewTask, onNewTimelineEvent, onNewWhiteboard, onNewIOC, onImportData }: CreateDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -28,6 +29,7 @@ export function CreateDropdown({ onNewNote, onNewTask, onNewTimelineEvent, onNew
     { icon: Clock, label: 'Timeline Event', action: onNewTimelineEvent },
     { icon: PenTool, label: 'Whiteboard', action: onNewWhiteboard },
     ...(onNewIOC ? [{ icon: Shield, label: 'IOC', action: onNewIOC }] : []),
+    ...(onImportData ? [{ icon: Database, label: 'Import Data', action: onImportData }] : []),
   ];
 
   return (

@@ -16,6 +16,7 @@ interface HeaderProps {
   onNewTimelineEvent: () => void;
   onNewWhiteboard: () => void;
   onNewIOC?: () => void;
+  onImportData?: () => void;
   onToggleSidebar: () => void;
   onMobileMenuToggle: () => void;
   sidebarCollapsed: boolean;
@@ -37,6 +38,7 @@ export function Header({
   onNewTimelineEvent,
   onNewWhiteboard,
   onNewIOC,
+  onImportData,
   onToggleSidebar,
   onMobileMenuToggle,
   sidebarCollapsed,
@@ -150,6 +152,7 @@ export function Header({
           onNewTimelineEvent={onNewTimelineEvent}
           onNewWhiteboard={onNewWhiteboard}
           onNewIOC={onNewIOC}
+          onImportData={onImportData}
         />
         <button
           data-tour="backup"

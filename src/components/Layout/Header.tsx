@@ -1,9 +1,9 @@
-import { Plus, Menu, ListChecks, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle } from 'lucide-react';
+import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle } from 'lucide-react';
 import { useRef } from 'react';
 import { ThemeToggle } from '../Common/ThemeToggle';
 import { ScreenshareToggle } from '../Common/ScreenshareToggle';
+import { CreateDropdown } from '../Common/CreateDropdown';
 import { cn } from '../../lib/utils';
-import type { ViewMode } from '../../types';
 import logoSvgRaw from '/logo.svg?raw';
 const logoSvg = `data:image/svg+xml,${encodeURIComponent(logoSvgRaw)}`;
 
@@ -13,12 +13,14 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onNewNote: () => void;
   onNewTask: () => void;
+  onNewTimelineEvent: () => void;
+  onNewWhiteboard: () => void;
+  onNewIOC?: () => void;
   onToggleSidebar: () => void;
   onMobileMenuToggle: () => void;
   sidebarCollapsed: boolean;
   onQuickSave: () => void;
   onQuickLoad: (file: File) => void;
-  activeView: ViewMode;
   onStartTour?: () => void;
   screenshareMaxLevel: string | null;
   onScreenshareChange: (level: string | null) => void;
@@ -32,12 +34,14 @@ export function Header({
   onToggleTheme,
   onNewNote,
   onNewTask,
+  onNewTimelineEvent,
+  onNewWhiteboard,
+  onNewIOC,
   onToggleSidebar,
   onMobileMenuToggle,
   sidebarCollapsed,
   onQuickSave,
   onQuickLoad,
-  activeView,
   onStartTour,
   screenshareMaxLevel,
   onScreenshareChange,
@@ -135,35 +139,13 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-1 ml-auto">
-        <button
-          data-tour="new-note"
-          onClick={onNewNote}
-          className={cn(
-            'flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeView === 'notes'
-              ? 'bg-accent hover:bg-accent-hover text-white'
-              : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-          )}
-          title="New Note (Ctrl+N)"
-          aria-label="New note"
-        >
-          <Plus size={16} />
-          <span className="hidden sm:inline">Note</span>
-        </button>
-        <button
-          onClick={onNewTask}
-          className={cn(
-            'flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeView === 'tasks'
-              ? 'bg-accent hover:bg-accent-hover text-white'
-              : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-          )}
-          title="New Task (Ctrl+Shift+T)"
-          aria-label="New task"
-        >
-          <ListChecks size={16} />
-          <span className="hidden sm:inline">Task</span>
-        </button>
+        <CreateDropdown
+          onNewNote={onNewNote}
+          onNewTask={onNewTask}
+          onNewTimelineEvent={onNewTimelineEvent}
+          onNewWhiteboard={onNewWhiteboard}
+          onNewIOC={onNewIOC}
+        />
         <button
           data-tour="backup"
           onClick={onQuickSave}

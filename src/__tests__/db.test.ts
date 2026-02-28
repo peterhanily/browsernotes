@@ -11,6 +11,7 @@ beforeEach(async () => {
   await db.timelines.clear();
   await db.whiteboards.clear();
   await db.activityLog.clear();
+  await db.standaloneIOCs.clear();
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -26,7 +27,8 @@ function makeNote(overrides: Partial<Parameters<typeof db.notes.add>[0]> & { id:
 function makeTask(overrides: Partial<Parameters<typeof db.tasks.add>[0]> & { id: string }) {
   return {
     title: 'Task', completed: false, priority: 'none' as const, tags: [],
-    status: 'todo' as const, order: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    status: 'todo' as const, order: 0, trashed: false, archived: false,
+    createdAt: Date.now(), updatedAt: Date.now(),
     ...overrides,
   };
 }
@@ -36,7 +38,7 @@ function makeTimelineEvent(overrides: Partial<Parameters<typeof db.timelineEvent
     timestamp: Date.now(), title: 'Event', eventType: 'other' as const,
     source: 'test', confidence: 'medium' as const, linkedIOCIds: [],
     linkedNoteIds: [], linkedTaskIds: [], mitreAttackIds: [], assets: [],
-    tags: [], starred: false, timelineId: 'tl1',
+    tags: [], starred: false, timelineId: 'tl1', trashed: false, archived: false,
     createdAt: Date.now(), updatedAt: Date.now(),
     ...overrides,
   };
@@ -45,7 +47,7 @@ function makeTimelineEvent(overrides: Partial<Parameters<typeof db.timelineEvent
 // ── Schema: all tables exist ────────────────────────────────────────
 
 describe('Database schema', () => {
-  it('exposes all 8 tables', () => {
+  it('exposes all 9 tables', () => {
     expect(db.notes).toBeDefined();
     expect(db.tasks).toBeDefined();
     expect(db.folders).toBeDefined();
@@ -54,10 +56,11 @@ describe('Database schema', () => {
     expect(db.timelines).toBeDefined();
     expect(db.whiteboards).toBeDefined();
     expect(db.activityLog).toBeDefined();
+    expect(db.standaloneIOCs).toBeDefined();
   });
 
-  it('is at version 12', () => {
-    expect(db.verno).toBe(12);
+  it('is at version 14', () => {
+    expect(db.verno).toBe(14);
   });
 });
 

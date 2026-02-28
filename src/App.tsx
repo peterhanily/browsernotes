@@ -15,6 +15,7 @@ import { useTasks } from './hooks/useTasks';
 import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
 import { useWhiteboards } from './hooks/useWhiteboards';
+import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
@@ -23,19 +24,22 @@ import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
-import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType } from './types';
+import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType, StandaloneIOC } from './types';
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile, exportInvestigationJSON } from './lib/export';
 import { ConfirmDialog } from './components/Common/ConfirmDialog';
 import { SearchOverlay } from './components/Search/SearchOverlay';
 import { extractIOCs, mergeIOCAnalysis } from './lib/ioc-extractor';
+import { generateSampleInvestigation, isSampleEntity } from './lib/sample-investigation';
+import { db } from './db';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
 import { InvestigationDetailPanel } from './components/Investigation/InvestigationDetailPanel';
 import type { InvestigationStatus } from './types';
 import { GraphView } from './components/Graph/GraphView';
 import { IOCStatsView } from './components/Analysis/IOCStatsView';
+import { StandaloneIOCForm } from './components/Analysis/StandaloneIOCForm';
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -71,7 +75,8 @@ export default function App() {
   const tasks = useTasks();
   const timeline = useTimeline();
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
-  const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, reload: reloadWhiteboards } = useWhiteboards();
+  const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
+  const standaloneIOCsHook = useStandaloneIOCs();
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, deleteFolderWithContents } = useFolders();
   const { tags, createTag, updateTag, deleteTag } = useTags();
 
@@ -183,6 +188,122 @@ export default function App() {
     activityLog.log('whiteboard', 'delete', `Deleted whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
   }, [deleteWhiteboard, whiteboards, activityLog]);
 
+  // Task trash/archive wrappers
+  const loggedTrashTask = useCallback(async (id: string) => {
+    const task = tasks.tasks.find((t) => t.id === id);
+    await tasks.trashTask(id);
+    activityLog.log('task', 'trash', `Trashed task "${task?.title || 'Untitled'}"`, id, task?.title);
+  }, [tasks, activityLog]);
+
+  const loggedRestoreTask = useCallback(async (id: string) => {
+    const task = tasks.tasks.find((t) => t.id === id);
+    await tasks.restoreTask(id);
+    activityLog.log('task', 'restore', `Restored task "${task?.title || 'Untitled'}"`, id, task?.title);
+  }, [tasks, activityLog]);
+
+  const loggedToggleArchiveTask = useCallback(async (id: string) => {
+    const task = tasks.tasks.find((t) => t.id === id);
+    await tasks.toggleArchiveTask(id);
+    const action = task?.archived ? 'unarchive' : 'archive';
+    activityLog.log('task', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} task "${task?.title || 'Untitled'}"`, id, task?.title);
+  }, [tasks, activityLog]);
+
+  const loggedEmptyTrashTasks = useCallback(async () => {
+    const count = tasks.tasks.filter((t) => t.trashed).length;
+    await tasks.emptyTrashTasks();
+    activityLog.log('task', 'empty-trash', `Emptied task trash (${count} tasks)`);
+  }, [tasks, activityLog]);
+
+  // Timeline event trash/archive wrappers
+  const loggedTrashEvent = useCallback(async (id: string) => {
+    const event = timeline.events.find((e) => e.id === id);
+    await timeline.trashEvent(id);
+    activityLog.log('timeline', 'trash', `Trashed event "${event?.title || 'Untitled'}"`, id, event?.title);
+  }, [timeline, activityLog]);
+
+  const loggedRestoreEvent = useCallback(async (id: string) => {
+    const event = timeline.events.find((e) => e.id === id);
+    await timeline.restoreEvent(id);
+    activityLog.log('timeline', 'restore', `Restored event "${event?.title || 'Untitled'}"`, id, event?.title);
+  }, [timeline, activityLog]);
+
+  const loggedToggleArchiveEvent = useCallback(async (id: string) => {
+    const event = timeline.events.find((e) => e.id === id);
+    await timeline.toggleArchiveEvent(id);
+    const action = event?.archived ? 'unarchive' : 'archive';
+    activityLog.log('timeline', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} event "${event?.title || 'Untitled'}"`, id, event?.title);
+  }, [timeline, activityLog]);
+
+  const loggedEmptyTrashEvents = useCallback(async () => {
+    const count = timeline.events.filter((e) => e.trashed).length;
+    await timeline.emptyTrashEvents();
+    activityLog.log('timeline', 'empty-trash', `Emptied event trash (${count} events)`);
+  }, [timeline, activityLog]);
+
+  // Whiteboard trash/archive wrappers
+  const loggedTrashWhiteboard = useCallback(async (id: string) => {
+    const wb = whiteboards.find((w) => w.id === id);
+    await trashWhiteboard(id);
+    activityLog.log('whiteboard', 'trash', `Trashed whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
+  }, [trashWhiteboard, whiteboards, activityLog]);
+
+  const loggedRestoreWhiteboard = useCallback(async (id: string) => {
+    const wb = whiteboards.find((w) => w.id === id);
+    await restoreWhiteboard(id);
+    activityLog.log('whiteboard', 'restore', `Restored whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
+  }, [restoreWhiteboard, whiteboards, activityLog]);
+
+  const loggedToggleArchiveWhiteboard = useCallback(async (id: string) => {
+    const wb = whiteboards.find((w) => w.id === id);
+    await toggleArchiveWhiteboard(id);
+    const action = wb?.archived ? 'unarchive' : 'archive';
+    activityLog.log('whiteboard', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
+  }, [toggleArchiveWhiteboard, whiteboards, activityLog]);
+
+  const loggedEmptyTrashWhiteboards = useCallback(async () => {
+    const count = whiteboards.filter((w) => w.trashed).length;
+    await emptyTrashWhiteboards();
+    activityLog.log('whiteboard', 'empty-trash', `Emptied whiteboard trash (${count} whiteboards)`);
+  }, [emptyTrashWhiteboards, whiteboards, activityLog]);
+
+  // Standalone IOC wrappers
+  const loggedCreateIOC = useCallback(async (partial?: Partial<StandaloneIOC>) => {
+    const ioc = await standaloneIOCsHook.createIOC(partial);
+    activityLog.log('ioc', 'create', `Created standalone IOC "${ioc.value}"`, ioc.id, ioc.value);
+    return ioc;
+  }, [standaloneIOCsHook, activityLog]);
+
+  const loggedTrashIOC = useCallback(async (id: string) => {
+    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
+    await standaloneIOCsHook.trashIOC(id);
+    activityLog.log('ioc', 'trash', `Trashed IOC "${ioc?.value || ''}"`, id, ioc?.value);
+  }, [standaloneIOCsHook, activityLog]);
+
+  const loggedRestoreIOC = useCallback(async (id: string) => {
+    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
+    await standaloneIOCsHook.restoreIOC(id);
+    activityLog.log('ioc', 'restore', `Restored IOC "${ioc?.value || ''}"`, id, ioc?.value);
+  }, [standaloneIOCsHook, activityLog]);
+
+  const loggedToggleArchiveIOC = useCallback(async (id: string) => {
+    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
+    await standaloneIOCsHook.toggleArchiveIOC(id);
+    const action = ioc?.archived ? 'unarchive' : 'archive';
+    activityLog.log('ioc', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} IOC "${ioc?.value || ''}"`, id, ioc?.value);
+  }, [standaloneIOCsHook, activityLog]);
+
+  const loggedDeleteIOC = useCallback(async (id: string) => {
+    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
+    await standaloneIOCsHook.deleteIOC(id);
+    activityLog.log('ioc', 'delete', `Deleted IOC "${ioc?.value || ''}"`, id, ioc?.value);
+  }, [standaloneIOCsHook, activityLog]);
+
+  const loggedEmptyTrashIOCs = useCallback(async () => {
+    const count = standaloneIOCsHook.iocs.filter((i) => i.trashed).length;
+    await standaloneIOCsHook.emptyTrashIOCs();
+    activityLog.log('ioc', 'empty-trash', `Emptied IOC trash (${count} IOCs)`);
+  }, [standaloneIOCsHook, activityLog]);
+
   const loggedCreateFolder = useCallback(async (name: string) => {
     const folder = await createFolder(name);
     activityLog.log('folder', 'create', `Created investigation "${name}"`, folder.id, name);
@@ -203,7 +324,8 @@ export default function App() {
     tasks.reload();
     timeline.reload();
     reloadWhiteboards();
-  }, [deleteFolderWithContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards]);
+    standaloneIOCsHook.reload();
+  }, [deleteFolderWithContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
 
   const loggedCreateTag = useCallback(async (name: string) => {
     const tag = await createTag(name);
@@ -434,9 +556,11 @@ export default function App() {
       tasks.getFilteredTasks({
         folderId: selectedFolderId,
         tag: selectedTag,
+        showTrashed: showTrash,
+        showArchived: showArchive,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks.getFilteredTasks, selectedFolderId, selectedTag]
+    [tasks.getFilteredTasks, selectedFolderId, selectedTag, showTrash, showArchive]
   );
 
   // Filtered timeline events
@@ -446,20 +570,35 @@ export default function App() {
         folderId: selectedFolderId,
         tag: selectedTag,
         timelineId: selectedTimelineId,
+        showTrashed: showTrash,
+        showArchived: showArchive,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId]
+    [timeline.getFilteredEvents, selectedFolderId, selectedTag, selectedTimelineId, showTrash, showArchive]
   );
 
   // Filtered whiteboards
   const filteredWhiteboards = useMemo(
-    () => {
-      let wbs = whiteboards;
-      if (selectedFolderId) wbs = wbs.filter((w) => w.folderId === selectedFolderId);
-      if (selectedTag) wbs = wbs.filter((w) => w.tags.includes(selectedTag));
-      return wbs;
-    },
-    [whiteboards, selectedFolderId, selectedTag]
+    () => getFilteredWhiteboards({
+      folderId: selectedFolderId,
+      tag: selectedTag,
+      showTrashed: showTrash,
+      showArchived: showArchive,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getFilteredWhiteboards, selectedFolderId, selectedTag, showTrash, showArchive]
+  );
+
+  // Filtered standalone IOCs
+  const filteredStandaloneIOCs = useMemo(
+    () => standaloneIOCsHook.getFilteredIOCs({
+      folderId: selectedFolderId,
+      tag: selectedTag,
+      showTrashed: showTrash,
+      showArchived: showArchive,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [standaloneIOCsHook.getFilteredIOCs, selectedFolderId, selectedTag, showTrash, showArchive]
   );
 
   // Screenshare-filtered: folder-filtered arrays (for NoteList, TaskList, TimelineView)
@@ -507,6 +646,10 @@ export default function App() {
     () => selectedFolderId ? whiteboards.filter((w) => w.folderId === selectedFolderId) : whiteboards,
     [whiteboards, selectedFolderId]
   );
+  const investigationStandaloneIOCs = useMemo(
+    () => selectedFolderId ? standaloneIOCsHook.iocs.filter((i) => i.folderId === selectedFolderId) : standaloneIOCsHook.iocs,
+    [standaloneIOCsHook.iocs, selectedFolderId]
+  );
 
   const investigationScopedCounts = useMemo(() => {
     if (!selectedFolderId) return null;
@@ -516,13 +659,13 @@ export default function App() {
       for (const i of a.iocs) if (!i.dismissed) iocKeys.add(`${i.type}:${i.value.toLowerCase()}`);
     };
     for (const n of investigationNotes) if (!n.trashed && !n.archived) collect(n.iocAnalysis);
-    for (const t of investigationTasks) collect(t.iocAnalysis);
-    for (const e of investigationTimelineEvents) collect(e.iocAnalysis);
+    for (const t of investigationTasks) if (!t.trashed && !t.archived) collect(t.iocAnalysis);
+    for (const e of investigationTimelineEvents) if (!e.trashed && !e.archived) collect(e.iocAnalysis);
     return {
       notes: investigationNotes.filter(n => !n.trashed && !n.archived).length,
-      tasks: investigationTasks.length,
-      events: investigationTimelineEvents.length,
-      whiteboards: investigationWhiteboards.length,
+      tasks: investigationTasks.filter(t => !t.trashed && !t.archived).length,
+      events: investigationTimelineEvents.filter(e => !e.trashed && !e.archived).length,
+      whiteboards: investigationWhiteboards.filter(w => !w.trashed && !w.archived).length,
       iocs: iocKeys.size,
     };
   }, [selectedFolderId, investigationNotes, investigationTasks, investigationTimelineEvents, investigationWhiteboards]);
@@ -563,6 +706,16 @@ export default function App() {
     archived: notes.notes.filter((n) => n.archived && !n.trashed).length,
   }), [notes.notes]);
 
+  // Combined trash/archive counts across all entity types
+  const combinedTrashedCount = useMemo(() =>
+    noteCounts.trashed + tasks.taskCounts.trashed + timeline.eventCounts.trashed + whiteboardCounts.trashed + standaloneIOCsHook.iocCounts.trashed,
+    [noteCounts.trashed, tasks.taskCounts.trashed, timeline.eventCounts.trashed, whiteboardCounts.trashed, standaloneIOCsHook.iocCounts.trashed]
+  );
+  const combinedArchivedCount = useMemo(() =>
+    noteCounts.archived + tasks.taskCounts.archived + timeline.eventCounts.archived + whiteboardCounts.archived + standaloneIOCsHook.iocCounts.archived,
+    [noteCounts.archived, tasks.taskCounts.archived, timeline.eventCounts.archived, whiteboardCounts.archived, standaloneIOCsHook.iocCounts.archived]
+  );
+
   const handleMoveNoteToFolder = useCallback((noteId: string, folderId: string) => {
     notes.updateNote(noteId, { folderId });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -585,6 +738,22 @@ export default function App() {
     navigateTo('tasks');
   }, [navigateTo]);
 
+  const handleNewTimelineEvent = useCallback(() => {
+    navigateTo('timeline');
+  }, [navigateTo]);
+
+  const handleNewWhiteboard = useCallback(async () => {
+    const wb = await loggedCreateWhiteboard(undefined, selectedFolderId);
+    setSelectedWhiteboardId(wb.id);
+    navigateTo('whiteboard', { selectedWhiteboardId: wb.id });
+  }, [loggedCreateWhiteboard, selectedFolderId, navigateTo]);
+
+  const [showIOCForm, setShowIOCForm] = useState(false);
+
+  const handleNewIOC = useCallback(() => {
+    setShowIOCForm(true);
+  }, []);
+
   const handleQuickCapture = useCallback(async (data: Partial<Note>) => {
     const folder = selectedFolderId ? folders.find((f) => f.id === selectedFolderId) : undefined;
     const note = await loggedCreateNote({
@@ -602,8 +771,9 @@ export default function App() {
     timeline.reload();
     reloadTimelines();
     reloadWhiteboards();
+    standaloneIOCsHook.reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
+  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {
@@ -635,6 +805,54 @@ export default function App() {
     reloadWhiteboards();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingImportFile, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards]);
+
+  // Sample investigation
+  const sampleLoaded = useMemo(() => folders.some((f) => f.id === 'sample-investigation'), [folders]);
+
+  const handleLoadSample = useCallback(async () => {
+    const data = generateSampleInvestigation();
+    // Write all entities to DB
+    await db.folders.put(data.folder);
+    await db.timelines.put(data.timeline);
+    await db.tags.bulkPut(data.tags);
+    await db.notes.bulkPut(data.notes);
+    await db.tasks.bulkPut(data.tasks);
+    await db.timelineEvents.bulkPut(data.timelineEvents);
+    await db.standaloneIOCs.bulkPut(data.standaloneIOCs);
+    await db.whiteboards.bulkPut([data.whiteboard]);
+    // Reload all hooks
+    handleImportComplete();
+    // Navigate to sample
+    setSelectedFolderId('sample-investigation');
+    navigateTo('notes');
+    activityLog.log('data', 'import', 'Loaded sample investigation "Operation STARDUST"');
+  }, [handleImportComplete, navigateTo, activityLog]);
+
+  const handleDeleteSample = useCallback(async () => {
+    // Delete all entities with sample- prefix
+    const allNotes = await db.notes.toArray();
+    const allTasks = await db.tasks.toArray();
+    const allEvents = await db.timelineEvents.toArray();
+    const allIOCs = await db.standaloneIOCs.toArray();
+    const allWB = await db.whiteboards.toArray();
+    const allTimelines = await db.timelines.toArray();
+    const allTags = await db.tags.toArray();
+
+    await db.notes.bulkDelete(allNotes.filter((n) => isSampleEntity(n.id)).map((n) => n.id));
+    await db.tasks.bulkDelete(allTasks.filter((t) => isSampleEntity(t.id)).map((t) => t.id));
+    await db.timelineEvents.bulkDelete(allEvents.filter((e) => isSampleEntity(e.id)).map((e) => e.id));
+    await db.standaloneIOCs.bulkDelete(allIOCs.filter((i) => isSampleEntity(i.id)).map((i) => i.id));
+    await db.whiteboards.bulkDelete(allWB.filter((w) => isSampleEntity(w.id)).map((w) => w.id));
+    await db.timelines.bulkDelete(allTimelines.filter((t) => isSampleEntity(t.id)).map((t) => t.id));
+    await db.tags.bulkDelete(allTags.filter((t) => isSampleEntity(t.id)).map((t) => t.id));
+    await db.folders.delete('sample-investigation');
+
+    handleImportComplete();
+    if (selectedFolderId === 'sample-investigation') {
+      setSelectedFolderId(undefined);
+    }
+    activityLog.log('data', 'delete', 'Removed sample investigation "Operation STARDUST"');
+  }, [handleImportComplete, selectedFolderId, activityLog]);
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
@@ -708,7 +926,7 @@ export default function App() {
     onDeleteFolderWithContents: (id: string) => { loggedDeleteFolderWithContents(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
     onRenameFolder: (id: string, name: string) => updateFolder(id, { name }),
     onOpenSettings: () => { setShowSettings(true); },
-    noteCounts,
+    noteCounts: { ...noteCounts, trashed: combinedTrashedCount, archived: combinedArchivedCount },
     taskCounts: tasks.taskCounts,
     timelineCounts: timeline.eventCounts,
     timelines,
@@ -724,7 +942,7 @@ export default function App() {
     onCreateWhiteboard: (name?: string) => loggedCreateWhiteboard(name, selectedFolderId),
     onDeleteWhiteboard: (id: string) => { loggedDeleteWhiteboard(id); if (selectedWhiteboardId === id) setSelectedWhiteboardId(undefined); },
     onRenameWhiteboard: (id: string, name: string) => updateWhiteboard(id, { name }),
-    whiteboardCount: whiteboards.length,
+    whiteboardCount: whiteboardCounts.total,
     onMoveNoteToFolder: handleMoveNoteToFolder,
     onRenameTag: (id: string, name: string) => updateTag(id, { name }),
     onDeleteTag: loggedDeleteTag,
@@ -732,7 +950,7 @@ export default function App() {
     folderStatusFilter,
     onFolderStatusFilterChange: setFolderStatusFilter,
     investigationScopedCounts,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedDeleteFolderWithContents, updateFolder, noteCounts, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedDeleteFolderWithContents, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -741,9 +959,9 @@ export default function App() {
     if (!editingFolderId) return { notes: 0, tasks: 0, events: 0, whiteboards: 0 };
     return {
       notes: notes.notes.filter((n) => n.folderId === editingFolderId && !n.trashed).length,
-      tasks: tasks.tasks.filter((t) => t.folderId === editingFolderId).length,
-      events: timeline.events.filter((e) => e.folderId === editingFolderId).length,
-      whiteboards: whiteboards.filter((w) => w.folderId === editingFolderId).length,
+      tasks: tasks.tasks.filter((t) => t.folderId === editingFolderId && !t.trashed).length,
+      events: timeline.events.filter((e) => e.folderId === editingFolderId && !e.trashed).length,
+      whiteboards: whiteboards.filter((w) => w.folderId === editingFolderId && !w.trashed).length,
     };
   }, [editingFolderId, notes.notes, tasks.tasks, timeline.events, whiteboards]);
 
@@ -772,12 +990,14 @@ export default function App() {
             onToggleTheme={toggleTheme}
             onNewNote={() => setShowQuickCapture(true)}
             onNewTask={handleNewTask}
+            onNewTimelineEvent={handleNewTimelineEvent}
+            onNewWhiteboard={handleNewWhiteboard}
+            onNewIOC={handleNewIOC}
             onToggleSidebar={() => updateSettings({ sidebarCollapsed: !settings.sidebarCollapsed })}
             onMobileMenuToggle={() => setMobileSidebarOpen((prev) => !prev)}
             sidebarCollapsed={settings.sidebarCollapsed}
             onQuickSave={handleQuickSave}
             onQuickLoad={handleQuickLoad}
-            activeView={activeView}
             onStartTour={() => tour.start(activeView)}
             selectedFolderName={selectedFolder?.name}
             screenshareMaxLevel={screenshareMaxLevel}
@@ -803,16 +1023,21 @@ export default function App() {
             onUpdateSettings={updateSettings}
             notes={notes.notes}
             onImportComplete={handleImportComplete}
+            sampleLoaded={sampleLoaded}
+            onLoadSample={handleLoadSample}
+            onDeleteSample={handleDeleteSample}
           />
         ) : activeView === 'ioc-stats' ? (
           <IOCStatsView
             notes={screensafeNotes}
             tasks={screensafeTasks}
             timelineEvents={screensafeTimelineEvents}
+            standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
             settings={settings}
             scopedNotes={investigationNotes}
             scopedTasks={investigationTasks}
             scopedTimelineEvents={investigationTimelineEvents}
+            scopedStandaloneIOCs={investigationStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
             selectedFolderId={selectedFolderId}
             selectedFolderName={selectedFolder?.name}
           />
@@ -833,6 +1058,9 @@ export default function App() {
             onCreateEvent={(data) => loggedCreateEvent({ ...data, folderId: data.folderId ?? selectedFolderId, clsLevel: data.clsLevel ?? selectedFolder?.clsLevel, timelineId: selectedTimelineId || timelines[0]?.id || '' })}
             onUpdateEvent={timeline.updateEvent}
             onDeleteEvent={loggedDeleteEvent}
+            onTrashEvent={loggedTrashEvent}
+            onRestoreEvent={loggedRestoreEvent}
+            onToggleArchiveEvent={loggedToggleArchiveEvent}
             onToggleStar={loggedToggleStar}
             getFilteredEvents={timeline.getFilteredEvents}
             timelines={timelines}
@@ -841,6 +1069,9 @@ export default function App() {
             onEventsReload={timeline.reload}
             scopeLabel={selectedFolder?.name}
             selectedFolderId={selectedFolderId}
+            showTrash={showTrash}
+            showArchive={showArchive}
+            onEmptyTrash={loggedEmptyTrashEvents}
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
@@ -850,9 +1081,15 @@ export default function App() {
             onCreateWhiteboard={(name?: string) => loggedCreateWhiteboard(name, selectedFolderId)}
             onUpdateWhiteboard={updateWhiteboard}
             onDeleteWhiteboard={loggedDeleteWhiteboard}
+            onTrashWhiteboard={loggedTrashWhiteboard}
+            onRestoreWhiteboard={loggedRestoreWhiteboard}
+            onToggleArchiveWhiteboard={loggedToggleArchiveWhiteboard}
             onCreateTag={loggedCreateTag}
             selectedWhiteboardId={selectedWhiteboardId ?? null}
             onWhiteboardSelect={(id) => setSelectedWhiteboardId(id ?? undefined)}
+            showTrash={showTrash}
+            showArchive={showArchive}
+            onEmptyTrash={loggedEmptyTrashWhiteboards}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView
@@ -863,6 +1100,9 @@ export default function App() {
             onToggleComplete={loggedToggleComplete}
             onUpdateTask={tasks.updateTask}
             onDeleteTask={loggedDeleteTask}
+            onTrashTask={loggedTrashTask}
+            onRestoreTask={loggedRestoreTask}
+            onToggleArchiveTask={loggedToggleArchiveTask}
             onCreateTask={(data) => loggedCreateTask({ ...data, folderId: data.folderId ?? selectedFolderId, clsLevel: data.clsLevel ?? selectedFolder?.clsLevel })}
             viewMode={taskViewMode}
             onViewModeChange={setTaskViewMode}
@@ -871,6 +1111,9 @@ export default function App() {
             allTimelineEvents={screensafeTimelineEvents}
             scopeLabel={selectedFolder?.name}
             selectedFolderId={selectedFolderId}
+            showTrash={showTrash}
+            showArchive={showArchive}
+            onEmptyTrash={loggedEmptyTrashTasks}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */
@@ -975,6 +1218,19 @@ export default function App() {
         open={showQuickCapture}
         onClose={() => setShowQuickCapture(false)}
         onCapture={handleQuickCapture}
+        folders={folders}
+        defaultFolderId={selectedFolderId}
+      />
+
+      <StandaloneIOCForm
+        open={showIOCForm}
+        onClose={() => setShowIOCForm(false)}
+        onSubmit={async (data) => {
+          await loggedCreateIOC(data);
+          navigateTo('ioc-stats');
+        }}
+        folders={folders}
+        defaultFolderId={selectedFolderId}
       />
 
       <ConfirmDialog

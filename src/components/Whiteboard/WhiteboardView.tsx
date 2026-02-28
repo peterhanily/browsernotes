@@ -12,9 +12,15 @@ interface WhiteboardViewProps {
   onCreateWhiteboard: (name?: string) => Promise<Whiteboard>;
   onUpdateWhiteboard: (id: string, updates: Partial<Whiteboard>) => void;
   onDeleteWhiteboard: (id: string) => void;
+  onTrashWhiteboard?: (id: string) => void;
+  onRestoreWhiteboard?: (id: string) => void;
+  onToggleArchiveWhiteboard?: (id: string) => void;
   onCreateTag: (name: string) => Promise<Tag>;
   selectedWhiteboardId?: string | null;
   onWhiteboardSelect?: (id: string | null) => void;
+  showTrash?: boolean;
+  showArchive?: boolean;
+  onEmptyTrash?: () => void;
 }
 
 export function WhiteboardView({
@@ -24,9 +30,15 @@ export function WhiteboardView({
   onCreateWhiteboard,
   onUpdateWhiteboard,
   onDeleteWhiteboard,
+  onTrashWhiteboard,
+  onRestoreWhiteboard,
+  onToggleArchiveWhiteboard,
   onCreateTag,
   selectedWhiteboardId = null,
   onWhiteboardSelect,
+  showTrash,
+  showArchive,
+  onEmptyTrash,
 }: WhiteboardViewProps) {
   const selectedWhiteboard = selectedWhiteboardId ? whiteboards.find((w) => w.id === selectedWhiteboardId) : null;
 
@@ -81,6 +93,12 @@ export function WhiteboardView({
         onCreate={handleCreate}
         onDelete={handleDelete}
         onRename={(id, name) => onUpdateWhiteboard(id, { name })}
+        onTrash={onTrashWhiteboard}
+        onRestore={onRestoreWhiteboard}
+        onToggleArchive={onToggleArchiveWhiteboard}
+        showTrash={showTrash}
+        showArchive={showArchive}
+        onEmptyTrash={onEmptyTrash}
       />
     </div>
   );

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../db';
 import type { Whiteboard } from '../types';
 import { nanoid } from 'nanoid';
+
+const TRASH_PURGE_DAYS = 30;
 
 export function useWhiteboards() {
   const [whiteboards, setWhiteboards] = useState<Whiteboard[]>([]);
@@ -9,7 +11,15 @@ export function useWhiteboards() {
 
   const loadWhiteboards = useCallback(async () => {
     const all = await db.whiteboards.toArray();
-    setWhiteboards(all.sort((a, b) => a.order - b.order));
+    // Auto-purge old trash
+    const now = Date.now();
+    const purgeThreshold = now - TRASH_PURGE_DAYS * 86400000;
+    const toPurge = all.filter((w) => w.trashed && w.trashedAt && w.trashedAt < purgeThreshold);
+    if (toPurge.length > 0) {
+      await db.whiteboards.bulkDelete(toPurge.map((w) => w.id));
+    }
+    const remaining = all.filter((w) => !toPurge.some((p) => p.id === w.id));
+    setWhiteboards(remaining.sort((a, b) => a.order - b.order));
     setLoading(false);
   }, []);
 
@@ -27,6 +37,8 @@ export function useWhiteboards() {
       elements: '[]',
       tags: [],
       order: maxOrder + 1,
+      trashed: false,
+      archived: false,
       createdAt: now,
       updatedAt: now,
       ...(folderId ? { folderId } : {}),
@@ -49,12 +61,68 @@ export function useWhiteboards() {
     setWhiteboards((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
+  const trashWhiteboard = useCallback(async (id: string) => {
+    await updateWhiteboard(id, { trashed: true, trashedAt: Date.now() });
+  }, [updateWhiteboard]);
+
+  const restoreWhiteboard = useCallback(async (id: string) => {
+    await updateWhiteboard(id, { trashed: false, trashedAt: undefined });
+  }, [updateWhiteboard]);
+
+  const toggleArchiveWhiteboard = useCallback(async (id: string) => {
+    const wb = whiteboards.find((w) => w.id === id);
+    if (wb) await updateWhiteboard(id, { archived: !wb.archived });
+  }, [whiteboards, updateWhiteboard]);
+
+  const emptyTrashWhiteboards = useCallback(async () => {
+    const trashedIds = whiteboards.filter((w) => w.trashed).map((w) => w.id);
+    if (trashedIds.length === 0) return;
+    await db.whiteboards.bulkDelete(trashedIds);
+    setWhiteboards((prev) => prev.filter((w) => !w.trashed));
+  }, [whiteboards]);
+
+  const getFilteredWhiteboards = useCallback(
+    (opts: { folderId?: string; tag?: string; showTrashed?: boolean; showArchived?: boolean }) => {
+      let filtered = whiteboards;
+
+      if (opts.showTrashed) {
+        filtered = filtered.filter((w) => w.trashed);
+      } else if (opts.showArchived) {
+        filtered = filtered.filter((w) => w.archived && !w.trashed);
+      } else {
+        filtered = filtered.filter((w) => !w.trashed && !w.archived);
+      }
+
+      if (opts.folderId) {
+        filtered = filtered.filter((w) => w.folderId === opts.folderId);
+      }
+      if (opts.tag) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        filtered = filtered.filter((w) => w.tags.includes(opts.tag!));
+      }
+      return filtered;
+    },
+    [whiteboards]
+  );
+
+  const whiteboardCounts = useMemo(() => ({
+    total: whiteboards.filter((w) => !w.trashed && !w.archived).length,
+    trashed: whiteboards.filter((w) => w.trashed).length,
+    archived: whiteboards.filter((w) => w.archived && !w.trashed).length,
+  }), [whiteboards]);
+
   return {
     whiteboards,
     loading,
     createWhiteboard,
     updateWhiteboard,
     deleteWhiteboard,
+    trashWhiteboard,
+    restoreWhiteboard,
+    toggleArchiveWhiteboard,
+    emptyTrashWhiteboards,
+    getFilteredWhiteboards,
+    whiteboardCounts,
     reload: loadWhiteboards,
   };
 }

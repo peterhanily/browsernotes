@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PenTool, Plus, Pencil, Trash2 } from 'lucide-react';
+import { PenTool, Plus, Pencil, Trash2, Archive, RotateCcw } from 'lucide-react';
 import type { Whiteboard, Folder } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { formatDate, cn } from '../../lib/utils';
@@ -11,12 +11,19 @@ interface WhiteboardListProps {
   onCreate: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  onTrash?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onToggleArchive?: (id: string) => void;
+  showTrash?: boolean;
+  showArchive?: boolean;
+  onEmptyTrash?: () => void;
 }
 
-export function WhiteboardList({ whiteboards, folders, onSelect, onCreate, onDelete, onRename }: WhiteboardListProps) {
+export function WhiteboardList({ whiteboards, folders, onSelect, onCreate, onDelete, onRename, onTrash, onRestore, onToggleArchive, showTrash, showArchive, onEmptyTrash }: WhiteboardListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 
   const startRename = (wb: Whiteboard) => {
     setEditingId(wb.id);
@@ -48,24 +55,36 @@ export function WhiteboardList({ whiteboards, folders, onSelect, onCreate, onDel
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-gray-200">Whiteboards</h2>
+          <h2 className="text-lg font-semibold text-gray-200">
+            {showTrash ? 'Trashed Whiteboards' : showArchive ? 'Archived Whiteboards' : 'Whiteboards'}
+          </h2>
           <span className="text-xs text-gray-500 tabular-nums">{whiteboards.length}</span>
         </div>
-        <button
-          onClick={onCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          New
-        </button>
+        {showTrash && onEmptyTrash && whiteboards.length > 0 ? (
+          <button
+            onClick={() => setShowEmptyTrashConfirm(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 text-sm font-medium transition-colors"
+          >
+            <Trash2 size={16} />
+            Empty Trash
+          </button>
+        ) : !showTrash && !showArchive ? (
+          <button
+            onClick={onCreate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            New
+          </button>
+        ) : null}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {whiteboards.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
             <PenTool size={48} className="mb-3" />
-            <p className="text-lg font-medium">No whiteboards yet</p>
-            <p className="text-sm mt-1">Create one to start drawing</p>
+            <p className="text-lg font-medium">{showTrash ? 'Trash is empty' : showArchive ? 'No archived whiteboards' : 'No whiteboards yet'}</p>
+            {!showTrash && !showArchive && <p className="text-sm mt-1">Create one to start drawing</p>}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -96,20 +115,62 @@ export function WhiteboardList({ whiteboards, folders, onSelect, onCreate, onDel
                     <h3 className="text-sm font-medium text-gray-200 truncate">{wb.name}</h3>
                   )}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startRename(wb); }}
-                      className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                      title="Rename"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeletingId(wb.id); }}
-                      className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {wb.trashed ? (
+                      <>
+                        {onRestore && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onRestore(wb.id); }}
+                            className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-green-400"
+                            title="Restore"
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingId(wb.id); }}
+                          className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                          title="Delete permanently"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startRename(wb); }}
+                          className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                          title="Rename"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        {onToggleArchive && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onToggleArchive(wb.id); }}
+                            className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                            title={wb.archived ? 'Unarchive' : 'Archive'}
+                          >
+                            <Archive size={14} />
+                          </button>
+                        )}
+                        {onTrash ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onTrash(wb.id); }}
+                            className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                            title="Move to trash"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingId(wb.id); }}
+                            className="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -139,6 +200,16 @@ export function WhiteboardList({ whiteboards, folders, onSelect, onCreate, onDel
         title="Delete Whiteboard"
         message="This whiteboard will be permanently deleted. This cannot be undone."
         confirmLabel="Delete Whiteboard"
+        danger
+      />
+
+      <ConfirmDialog
+        open={showEmptyTrashConfirm}
+        onClose={() => setShowEmptyTrashConfirm(false)}
+        onConfirm={() => { onEmptyTrash?.(); setShowEmptyTrashConfirm(false); }}
+        title="Empty Whiteboard Trash"
+        message={`Permanently delete ${whiteboards.length} trashed whiteboard(s)? This cannot be undone.`}
+        confirmLabel="Empty Trash"
         danger
       />
     </div>

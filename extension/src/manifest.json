@@ -43,7 +43,7 @@
         "default": "Ctrl+Shift+N",
         "mac": "Command+Shift+N"
       },
-      "description": "Capture selected text as a note"
+      "description": "Capture selected text or full page"
     }
   }
 }

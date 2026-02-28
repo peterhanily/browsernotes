@@ -58,6 +58,9 @@ export interface Task {
   linkedNoteIds?: string[];
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -260,6 +263,9 @@ export interface TimelineEvent {
   iocTypes?: IOCType[];
   latitude?: number;   // WGS84 (-90 to 90)
   longitude?: number;  // WGS84 (-180 to 180)
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -282,6 +288,32 @@ export interface Whiteboard {
   folderId?: string;
   tags: string[];
   order: number;
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StandaloneIOC {
+  id: string;
+  type: IOCType;
+  value: string;
+  confidence: ConfidenceLevel;
+  analystNotes?: string;
+  attribution?: string;
+  iocSubtype?: string;
+  iocStatus?: string;
+  clsLevel?: string;
+  folderId?: string;
+  tags: string[];
+  relationships?: IOCRelationship[];
+  linkedNoteIds?: string[];
+  linkedTaskIds?: string[];
+  linkedTimelineEventIds?: string[];
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
 }

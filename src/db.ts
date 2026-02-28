@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC } from './types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
 const db = new Dexie('ThreatCaddyDB') as Dexie & {
@@ -11,6 +11,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   timelines: EntityTable<Timeline, 'id'>;
   whiteboards: EntityTable<Whiteboard, 'id'>;
   activityLog: EntityTable<ActivityLogEntry, 'id'>;
+  standaloneIOCs: EntityTable<StandaloneIOC, 'id'>;
 };
 
 db.version(1).stores({
@@ -90,6 +91,22 @@ db.version(11).stores({});
 
 // Version 12: Geolocation fields on timeline events (optional, not indexed)
 db.version(12).stores({});
+
+// Version 13: trash/archive for tasks, timeline events, whiteboards
+db.version(13).stores({
+  tasks: 'id, title, folderId, status, priority, completed, trashed, archived, order, createdAt, updatedAt, *tags, *iocTypes',
+  timelineEvents: 'id, timestamp, eventType, source, starred, trashed, archived, folderId, timelineId, createdAt, updatedAt, *tags, *iocTypes',
+  whiteboards: 'id, name, folderId, trashed, archived, order, createdAt, updatedAt, *tags',
+}).upgrade(tx => {
+  tx.table('tasks').toCollection().modify(t => { if (t.trashed === undefined) { t.trashed = false; t.archived = false; } });
+  tx.table('timelineEvents').toCollection().modify(e => { if (e.trashed === undefined) { e.trashed = false; e.archived = false; } });
+  tx.table('whiteboards').toCollection().modify(w => { if (w.trashed === undefined) { w.trashed = false; w.archived = false; } });
+});
+
+// Version 14: standalone IOCs table
+db.version(14).stores({
+  standaloneIOCs: 'id, type, value, folderId, trashed, archived, createdAt, updatedAt, *tags',
+});
 
 // Encryption-at-rest middleware (transparent to all CRUD hooks)
 installEncryptionMiddleware(db);

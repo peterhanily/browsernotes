@@ -706,14 +706,14 @@ export function Sidebar({
             label="Archive"
             count={noteCounts.archived}
             active={showArchive}
-            onClick={() => nav(() => { onShowArchive(!showArchive); onShowTrash(false); onFolderSelect(undefined); onTagSelect(undefined); onViewChange('notes'); })}
+            onClick={() => nav(() => { onShowArchive(!showArchive); onShowTrash(false); onFolderSelect(undefined); onTagSelect(undefined); })}
           />
           <SidebarItem
             icon={<Trash2 size={16} />}
             label="Trash"
             count={noteCounts.trashed}
             active={showTrash}
-            onClick={() => nav(() => { onShowTrash(!showTrash); onShowArchive(false); onFolderSelect(undefined); onTagSelect(undefined); onViewChange('notes'); })}
+            onClick={() => nav(() => { onShowTrash(!showTrash); onShowArchive(false); onFolderSelect(undefined); onTagSelect(undefined); })}
           />
         </div>
       </nav>

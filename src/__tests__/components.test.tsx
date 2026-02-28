@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Modal } from '../components/Common/Modal';
 import { ConfirmDialog } from '../components/Common/ConfirmDialog';
@@ -179,6 +179,8 @@ describe('Header', () => {
     onToggleTheme: () => {},
     onNewNote: () => {},
     onNewTask: () => {},
+    onNewTimelineEvent: () => {},
+    onNewWhiteboard: () => {},
     onToggleSidebar: () => {},
     onMobileMenuToggle: () => {},
     sidebarCollapsed: false,
@@ -189,29 +191,35 @@ describe('Header', () => {
     effectiveClsLevels: ['TLP:CLEAR', 'TLP:GREEN', 'TLP:AMBER', 'TLP:AMBER+STRICT', 'TLP:RED'],
   };
 
-  it('highlights Note button when activeView is notes', () => {
-    render(<Header {...defaultProps} activeView="notes" />);
-    const noteBtn = screen.getByTitle('New Note (Ctrl+N)');
-    expect(noteBtn.className).toContain('bg-accent');
+  it('renders Create dropdown button with "New" label', () => {
+    render(<Header {...defaultProps} />);
+    const btn = screen.getByTitle('Create new...');
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toContain('New');
   });
 
-  it('does not highlight Note button when activeView is tasks', () => {
-    render(<Header {...defaultProps} activeView="tasks" />);
-    const noteBtn = screen.getByTitle('New Note (Ctrl+N)');
-    expect(noteBtn.className).toContain('bg-gray-700');
-    expect(noteBtn.className).not.toContain('bg-accent');
+  it('shows 4 items when Create dropdown is opened', () => {
+    render(<Header {...defaultProps} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+    expect(screen.getByText('Note')).toBeTruthy();
+    expect(screen.getByText('Task')).toBeTruthy();
+    expect(screen.getByText('Timeline Event')).toBeTruthy();
+    expect(screen.getByText('Whiteboard')).toBeTruthy();
   });
 
-  it('highlights Task button when activeView is tasks', () => {
-    render(<Header {...defaultProps} activeView="tasks" />);
-    const taskBtn = screen.getByTitle('New Task (Ctrl+Shift+T)');
-    expect(taskBtn.className).toContain('bg-accent');
+  it('calls onNewNote when Note item is clicked', () => {
+    const onNewNote = vi.fn();
+    render(<Header {...defaultProps} onNewNote={onNewNote} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+    fireEvent.click(screen.getByText('Note'));
+    expect(onNewNote).toHaveBeenCalledOnce();
   });
 
-  it('does not highlight Task button when activeView is notes', () => {
-    render(<Header {...defaultProps} activeView="notes" />);
-    const taskBtn = screen.getByTitle('New Task (Ctrl+Shift+T)');
-    expect(taskBtn.className).toContain('bg-gray-700');
-    expect(taskBtn.className).not.toContain('bg-accent');
+  it('closes dropdown after clicking an item', () => {
+    render(<Header {...defaultProps} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+    expect(screen.getByText('Timeline Event')).toBeTruthy();
+    fireEvent.click(screen.getByText('Task'));
+    expect(screen.queryByText('Timeline Event')).toBeNull();
   });
 });

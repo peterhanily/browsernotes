@@ -1,4 +1,4 @@
-import { Github, Download } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2 } from 'lucide-react';
 import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
@@ -11,9 +11,12 @@ interface SettingsPanelProps {
   onUpdateSettings: (updates: Partial<Settings>) => void;
   notes: Note[];
   onImportComplete: () => void;
+  sampleLoaded?: boolean;
+  onLoadSample?: () => void;
+  onDeleteSample?: () => void;
 }
 
-export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample }: SettingsPanelProps) {
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
 
@@ -84,6 +87,37 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       <KeyboardShortcuts />
 
       <hr className="border-gray-800" />
+
+      {(onLoadSample || onDeleteSample) && (
+        <>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-300">Sample Data</h3>
+            <p className="text-xs text-gray-500">
+              Load a pre-built APT investigation (Operation STARDUST) to explore ThreatCaddy's features. Includes notes, tasks, timeline events, IOCs, and a whiteboard.
+            </p>
+            {sampleLoaded ? (
+              <button
+                data-tour="load-sample"
+                onClick={onDeleteSample}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/15 text-red-400 hover:bg-red-600/25 text-sm font-medium transition-colors"
+              >
+                <Trash2 size={16} />
+                Remove Sample Investigation
+              </button>
+            ) : (
+              <button
+                data-tour="load-sample"
+                onClick={onLoadSample}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 text-sm font-medium transition-colors"
+              >
+                <FlaskConical size={16} />
+                Load Sample Investigation
+              </button>
+            )}
+          </div>
+          <hr className="border-gray-800" />
+        </>
+      )}
 
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-gray-300">About</h3>

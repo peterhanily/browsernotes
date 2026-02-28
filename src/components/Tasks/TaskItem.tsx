@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, Shield, MessageSquare } from 'lucide-react';
+import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, Shield, MessageSquare, Archive, RotateCcw } from 'lucide-react';
 import type { Task, Priority } from '../../types';
 import { PRIORITY_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -11,6 +11,9 @@ interface TaskItemProps {
   onToggleComplete: (id: string) => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onTrash?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onToggleArchive?: (id: string) => void;
   active?: boolean;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
@@ -23,7 +26,7 @@ const priorityLabels: Record<Priority, string> = {
   high: 'High',
 };
 
-export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, active, draggable, onDragStart }: TaskItemProps) {
+export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, onTrash, onRestore, onToggleArchive, active, draggable, onDragStart }: TaskItemProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const overdue = isOverdue(task.dueDate) && !task.completed;
 
@@ -93,13 +96,55 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
             {tag}
           </span>
         ))}
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
-          title="Delete task"
-        >
-          <Trash2 size={12} />
-        </button>
+        {task.trashed ? (
+          <>
+            {onRestore && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRestore(task.id); }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-green-400"
+                title="Restore task"
+              >
+                <RotateCcw size={12} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
+              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+              title="Delete permanently"
+            >
+              <Trash2 size={12} />
+            </button>
+          </>
+        ) : (
+          <>
+            {onToggleArchive && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleArchive(task.id); }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                title={task.archived ? 'Unarchive' : 'Archive'}
+              >
+                <Archive size={12} />
+              </button>
+            )}
+            {onTrash ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onTrash(task.id); }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                title="Move to trash"
+              >
+                <Trash2 size={12} />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-red-400"
+                title="Delete task"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       <ConfirmDialog

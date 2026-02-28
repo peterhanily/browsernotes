@@ -174,6 +174,8 @@ describe('useTasks', () => {
         'in-progress': 1,
         done: 1,
         total: 4,
+        trashed: 0,
+        archived: 0,
       });
     });
   });

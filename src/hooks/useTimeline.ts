@@ -3,13 +3,23 @@ import { db } from '../db';
 import type { TimelineEvent, TimelineEventType } from '../types';
 import { nanoid } from 'nanoid';
 
+const TRASH_PURGE_DAYS = 30;
+
 export function useTimeline() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadEvents = useCallback(async () => {
     const all = await db.timelineEvents.toArray();
-    setEvents(all);
+    // Auto-purge old trash
+    const now = Date.now();
+    const purgeThreshold = now - TRASH_PURGE_DAYS * 86400000;
+    const toPurge = all.filter((e) => e.trashed && e.trashedAt && e.trashedAt < purgeThreshold);
+    if (toPurge.length > 0) {
+      await db.timelineEvents.bulkDelete(toPurge.map((e) => e.id));
+    }
+    const remaining = all.filter((e) => !toPurge.some((p) => p.id === e.id));
+    setEvents(remaining);
     setLoading(false);
   }, []);
 
@@ -34,6 +44,8 @@ export function useTimeline() {
       tags: [],
       starred: false,
       timelineId: '',
+      trashed: false,
+      archived: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       ...partial,
@@ -76,6 +88,38 @@ export function useTimeline() {
     setEvents((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
+  const trashEvent = useCallback(async (id: string) => {
+    await updateEvent(id, { trashed: true, trashedAt: Date.now() });
+  }, [updateEvent]);
+
+  const restoreEvent = useCallback(async (id: string) => {
+    await updateEvent(id, { trashed: false, trashedAt: undefined });
+  }, [updateEvent]);
+
+  const toggleArchiveEvent = useCallback(async (id: string) => {
+    const event = events.find((e) => e.id === id);
+    if (event) await updateEvent(id, { archived: !event.archived });
+  }, [events, updateEvent]);
+
+  const emptyTrashEvents = useCallback(async () => {
+    const trashedIds = events.filter((e) => e.trashed).map((e) => e.id);
+    if (trashedIds.length === 0) return;
+    try {
+      await db.timelineEvents.bulkDelete(trashedIds);
+      const idSet = new Set(trashedIds);
+      await db.notes.filter(n => n.linkedTimelineEventIds?.some(eid => idSet.has(eid)) ?? false).modify(n => {
+        n.linkedTimelineEventIds = (n.linkedTimelineEventIds ?? []).filter(eid => !idSet.has(eid));
+      });
+      await db.tasks.filter(t => t.linkedTimelineEventIds?.some(eid => idSet.has(eid)) ?? false).modify(t => {
+        t.linkedTimelineEventIds = (t.linkedTimelineEventIds ?? []).filter(eid => !idSet.has(eid));
+      });
+    } catch (err) {
+      console.error('Failed to empty event trash:', err);
+      throw err;
+    }
+    setEvents((prev) => prev.filter((e) => !e.trashed));
+  }, [events]);
+
   const toggleStar = useCallback(async (id: string) => {
     const event = events.find((e) => e.id === id);
     if (event) await updateEvent(id, { starred: !event.starred });
@@ -93,8 +137,18 @@ export function useTimeline() {
       dateEnd?: number;
       search?: string;
       sortDir?: 'asc' | 'desc';
+      showTrashed?: boolean;
+      showArchived?: boolean;
     }) => {
       let filtered = events;
+
+      if (opts.showTrashed) {
+        filtered = filtered.filter((e) => e.trashed);
+      } else if (opts.showArchived) {
+        filtered = filtered.filter((e) => e.archived && !e.trashed);
+      } else {
+        filtered = filtered.filter((e) => !e.trashed && !e.archived);
+      }
 
       if (opts.timelineId) {
         filtered = filtered.filter((e) => e.timelineId === opts.timelineId);
@@ -154,10 +208,15 @@ export function useTimeline() {
     [events]
   );
 
-  const eventCounts = useMemo(() => ({
-    total: events.length,
-    starred: events.filter((e) => e.starred).length,
-  }), [events]);
+  const eventCounts = useMemo(() => {
+    const active = events.filter((e) => !e.trashed && !e.archived);
+    return {
+      total: active.length,
+      starred: active.filter((e) => e.starred).length,
+      trashed: events.filter((e) => e.trashed).length,
+      archived: events.filter((e) => e.archived && !e.trashed).length,
+    };
+  }, [events]);
 
   return {
     events,
@@ -165,6 +224,10 @@ export function useTimeline() {
     createEvent,
     updateEvent,
     deleteEvent,
+    trashEvent,
+    restoreEvent,
+    toggleArchiveEvent,
+    emptyTrashEvents,
     toggleStar,
     getFilteredEvents,
     eventCounts,

@@ -37,8 +37,8 @@ export const tourSteps: TourStep[] = [
   {
     id: 'new-note',
     target: '[data-tour="new-note"]',
-    title: 'Quick Capture',
-    description: 'Click here or press Ctrl+N to quickly capture a new note. Supports Markdown with live preview.',
+    title: 'Create New',
+    description: 'Click here to create notes, tasks, timeline events, whiteboards, or standalone IOCs from a single dropdown. Press Ctrl+N for quick note capture.',
     placement: 'bottom',
   },
   {
@@ -87,6 +87,14 @@ export const tourSteps: TourStep[] = [
     view: 'ioc-stats',
   },
   {
+    id: 'standalone-iocs',
+    target: '[data-tour="ioc-stats-header"]',
+    title: 'Standalone IOCs',
+    description: 'Create and manage IOCs as independent entities via the "New" dropdown. They appear in the IOC Statistics aggregation alongside IOCs extracted from notes, tasks, and events.',
+    placement: 'bottom',
+    view: 'ioc-stats',
+  },
+  {
     id: 'whiteboards',
     target: '[data-tour="whiteboards"]',
     title: 'Whiteboards',
@@ -99,6 +107,14 @@ export const tourSteps: TourStep[] = [
     target: '[data-tour="activity"]',
     title: 'Activity Log',
     description: 'Track every action in your workspace — note edits, task updates, IOC pushes, and more. Filter by category and search the audit trail.',
+    placement: 'right',
+    view: 'notes',
+  },
+  {
+    id: 'archive-trash',
+    target: '[data-tour="sidebar-nav"]',
+    title: 'Archive & Trash',
+    description: 'Archive or trash any entity — notes, tasks, timeline events, whiteboards, and IOCs. Trashed items auto-purge after 30 days. View totals in the sidebar.',
     placement: 'right',
     view: 'notes',
   },
@@ -129,7 +145,7 @@ export const tourSteps: TourStep[] = [
     id: 'shortcuts',
     target: '[data-tour="theme-toggle"]',
     title: 'Theme & Shortcuts',
-    description: 'Toggle between dark and light mode. Key shortcuts: Ctrl+K (search), Ctrl+N (new note), Ctrl+S (backup), Ctrl+1-4 (switch views).',
+    description: 'Toggle between dark and light mode. Key shortcuts: Ctrl+K (search), Ctrl+N (new note), Ctrl+S (backup), Ctrl+1-7 (switch views). Create standalone IOCs from the "New" dropdown.',
     placement: 'bottom',
   },
   {
@@ -140,10 +156,17 @@ export const tourSteps: TourStep[] = [
     placement: 'bottom',
   },
   {
+    id: 'demo-data',
+    target: '[data-tour="load-sample"]',
+    title: 'Sample Investigation',
+    description: 'Load a pre-built APT investigation to explore ThreatCaddy\'s features at scale. Includes notes, tasks, timeline events, IOCs, and a whiteboard. Delete it when done.',
+    placement: 'bottom',
+  },
+  {
     id: 'extension',
     target: '[data-tour="extension"]',
     title: 'Browser Extension',
-    description: 'Clip web pages, text selections, and links directly into ThreatCaddy with the Chrome extension.',
+    description: 'Clip web pages, text selections, and links directly into ThreatCaddy with the Chrome extension. Use Ctrl+Shift+N to clip selected text, or the full page if nothing is selected.',
     placement: 'bottom',
   },
 ];

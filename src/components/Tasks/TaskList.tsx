@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ListChecks, LayoutGrid, Plus, Filter } from 'lucide-react';
+import { ListChecks, LayoutGrid, Plus, Filter, Trash2 } from 'lucide-react';
 import type { Task, Note, TimelineEvent, TaskStatus, TaskViewMode, Tag, Folder } from '../../types';
 import { TaskItem } from './TaskItem';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
 import { Modal } from '../Common/Modal';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { cn } from '../../lib/utils';
 
 interface TaskListProps {
@@ -15,6 +16,9 @@ interface TaskListProps {
   onToggleComplete: (id: string) => void;
   onUpdateTask: (id: string, updates: Partial<Task>) => void;
   onDeleteTask: (id: string) => void;
+  onTrashTask?: (id: string) => void;
+  onRestoreTask?: (id: string) => void;
+  onToggleArchiveTask?: (id: string) => void;
   onCreateTask: (data: Partial<Task>) => void;
   viewMode: TaskViewMode;
   onViewModeChange: (mode: TaskViewMode) => void;
@@ -23,6 +27,9 @@ interface TaskListProps {
   allTimelineEvents?: TimelineEvent[];
   scopeLabel?: string;
   selectedFolderId?: string;
+  showTrash?: boolean;
+  showArchive?: boolean;
+  onEmptyTrash?: () => void;
 }
 
 export function TaskListView({
@@ -33,6 +40,9 @@ export function TaskListView({
   onToggleComplete,
   onUpdateTask,
   onDeleteTask,
+  onTrashTask,
+  onRestoreTask,
+  onToggleArchiveTask,
   onCreateTask,
   viewMode,
   onViewModeChange,
@@ -41,10 +51,14 @@ export function TaskListView({
   allTimelineEvents,
   scopeLabel,
   selectedFolderId,
+  showTrash,
+  showArchive,
+  onEmptyTrash,
 }: TaskListProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
+  const [showEmptyTrashConfirm, setShowEmptyTrashConfirm] = useState(false);
 
   const filteredTasks = statusFilter
     ? tasks.filter((t) => t.status === statusFilter)
@@ -72,7 +86,7 @@ export function TaskListView({
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-800 shrink-0">
         <span className="text-sm font-medium text-gray-300 hidden sm:inline">
-          {scopeLabel ? `Tasks \u2014 ${scopeLabel} (${tasks.length})` : `Tasks (${tasks.length})`}
+          {showTrash ? `Trashed Tasks (${tasks.length})` : showArchive ? `Archived Tasks (${tasks.length})` : scopeLabel ? `Tasks \u2014 ${scopeLabel} (${tasks.length})` : `Tasks (${tasks.length})`}
         </span>
         <span className="text-sm font-medium text-gray-300 sm:hidden">{tasks.length}</span>
 
@@ -112,14 +126,25 @@ export function TaskListView({
           </div>
         )}
 
-        <button
-          onClick={() => setShowNewTask(true)}
-          className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
-          aria-label="New task"
-        >
-          <Plus size={14} />
-          <span className="hidden sm:inline">New Task</span>
-        </button>
+        {showTrash && onEmptyTrash && tasks.length > 0 ? (
+          <button
+            onClick={() => setShowEmptyTrashConfirm(true)}
+            className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-medium transition-colors"
+            aria-label="Empty trash"
+          >
+            <Trash2 size={14} />
+            <span className="hidden sm:inline">Empty Trash</span>
+          </button>
+        ) : !showTrash && !showArchive ? (
+          <button
+            onClick={() => setShowNewTask(true)}
+            className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
+            aria-label="New task"
+          >
+            <Plus size={14} />
+            <span className="hidden sm:inline">New Task</span>
+          </button>
+        ) : null}
       </div>
 
       {/* Content */}
@@ -140,6 +165,9 @@ export function TaskListView({
                   onToggleComplete={onToggleComplete}
                   onSelect={handleSelect}
                   onDelete={onDeleteTask}
+                  onTrash={onTrashTask}
+                  onRestore={onRestoreTask}
+                  onToggleArchive={onToggleArchiveTask}
                 />
               ))
             )}
@@ -187,6 +215,16 @@ export function TaskListView({
           defaultFolderId={selectedFolderId}
         />
       </Modal>
+
+      <ConfirmDialog
+        open={showEmptyTrashConfirm}
+        onClose={() => setShowEmptyTrashConfirm(false)}
+        onConfirm={() => { onEmptyTrash?.(); setShowEmptyTrashConfirm(false); }}
+        title="Empty Task Trash"
+        message={`Permanently delete ${tasks.length} trashed task(s)? This cannot be undone.`}
+        confirmLabel="Empty Trash"
+        danger
+      />
     </div>
   );
 }

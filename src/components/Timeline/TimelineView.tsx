@@ -27,6 +27,9 @@ interface TimelineViewProps {
   onCreateEvent: (data: Partial<TimelineEvent>) => void;
   onUpdateEvent: (id: string, updates: Partial<TimelineEvent>) => void;
   onDeleteEvent: (id: string) => void;
+  onTrashEvent?: (id: string) => void;
+  onRestoreEvent?: (id: string) => void;
+  onToggleArchiveEvent?: (id: string) => void;
   onToggleStar: (id: string) => void;
   getFilteredEvents: (opts: {
     eventTypes?: TimelineEventType[];
@@ -43,6 +46,9 @@ interface TimelineViewProps {
   onEventsReload?: () => void;
   scopeLabel?: string;
   selectedFolderId?: string;
+  showTrash?: boolean;
+  showArchive?: boolean;
+  onEmptyTrash?: () => void;
 }
 
 function ExportDropdown({ events, selectedTimelineId, timelines, onImportClick }: { events: TimelineEvent[]; selectedTimelineId?: string; timelines: Timeline[]; onImportClick: () => void }) {
@@ -144,6 +150,9 @@ export function TimelineView({
   onCreateEvent,
   onUpdateEvent,
   onDeleteEvent,
+  onTrashEvent,
+  onRestoreEvent,
+  onToggleArchiveEvent,
   onToggleStar,
   getFilteredEvents,
   timelines = [],
@@ -152,6 +161,9 @@ export function TimelineView({
   onEventsReload,
   scopeLabel,
   selectedFolderId,
+  showTrash,
+  showArchive,
+  onEmptyTrash,
 }: TimelineViewProps) {
   const [editingEvent, setEditingEvent] = useState<TimelineEvent | null>(null);
   const [showNewEvent, setShowNewEvent] = useState(false);
@@ -211,6 +223,11 @@ export function TimelineView({
   };
 
   const handleConfirmDelete = () => {
+    if (deletingEventId === '__empty_trash__') {
+      onEmptyTrash?.();
+      setDeletingEventId(null);
+      return;
+    }
     if (deletingEventId) {
       onDeleteEvent(deletingEventId);
       setDeletingEventId(null);
@@ -229,7 +246,7 @@ export function TimelineView({
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-800 shrink-0">
         <span className="text-sm font-medium text-gray-300 hidden sm:inline">
-          {scopeLabel ? `Timeline \u2014 ${scopeLabel} (${events.length})` : `Timeline (${events.length})`}
+          {showTrash ? `Trashed Events (${events.length})` : showArchive ? `Archived Events (${events.length})` : scopeLabel ? `Timeline \u2014 ${scopeLabel} (${events.length})` : `Timeline (${events.length})`}
         </span>
         <span className="text-sm font-medium text-gray-300 sm:hidden">{events.length}</span>
 
@@ -332,14 +349,25 @@ export function TimelineView({
           onImportClick={() => setShowImportModal(true)}
         />
 
-        <button
-          onClick={() => setShowNewEvent(true)}
-          className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
-          aria-label="New event"
-        >
-          <Plus size={14} />
-          <span className="hidden sm:inline">New Event</span>
-        </button>
+        {showTrash && onEmptyTrash && events.length > 0 ? (
+          <button
+            onClick={() => setDeletingEventId('__empty_trash__')}
+            className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 text-sm font-medium transition-colors"
+            aria-label="Empty trash"
+          >
+            <Trash2 size={14} />
+            <span className="hidden sm:inline">Empty Trash</span>
+          </button>
+        ) : !showTrash && !showArchive ? (
+          <button
+            onClick={() => setShowNewEvent(true)}
+            className="ml-auto flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors"
+            aria-label="New event"
+          >
+            <Plus size={14} />
+            <span className="hidden sm:inline">New Event</span>
+          </button>
+        ) : null}
       </div>
 
       {/* Event Type Filter Bar */}
@@ -412,16 +440,37 @@ export function TimelineView({
               onCancel={() => setEditingEvent(null)}
               onUpdateEvent={onUpdateEvent}
             />
-            <div className="mt-3 pt-3 border-t border-gray-700">
-              <button
-                type="button"
-                onClick={() => setDeletingEventId(editingEvent.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 hover:text-red-400 hover:bg-gray-800 text-sm transition-colors"
-                title="Delete event"
-                aria-label="Delete event"
-              >
-                <Trash2 size={16} />
-              </button>
+            <div className="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2">
+              {onTrashEvent && !editingEvent.trashed ? (
+                <button
+                  type="button"
+                  onClick={() => { onTrashEvent(editingEvent.id); setEditingEvent(null); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 hover:text-red-400 hover:bg-gray-800 text-sm transition-colors"
+                  title="Move to trash"
+                >
+                  <Trash2 size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeletingEventId(editingEvent.id)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 hover:text-red-400 hover:bg-gray-800 text-sm transition-colors"
+                  title="Delete event"
+                  aria-label="Delete event"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+              {onToggleArchiveEvent && !editingEvent.trashed && (
+                <button
+                  type="button"
+                  onClick={() => { onToggleArchiveEvent(editingEvent.id); setEditingEvent(null); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 text-sm transition-colors"
+                  title={editingEvent.archived ? 'Unarchive' : 'Archive'}
+                >
+                  {editingEvent.archived ? 'Unarchive' : 'Archive'}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -474,9 +523,9 @@ export function TimelineView({
         open={deletingEventId !== null}
         onClose={() => setDeletingEventId(null)}
         onConfirm={handleConfirmDelete}
-        title="Delete Event"
-        message="This timeline event will be permanently deleted. This cannot be undone."
-        confirmLabel="Delete Event"
+        title={deletingEventId === '__empty_trash__' ? 'Empty Event Trash' : 'Delete Event'}
+        message={deletingEventId === '__empty_trash__' ? `Permanently delete ${events.length} trashed event(s)? This cannot be undone.` : 'This timeline event will be permanently deleted. This cannot be undone.'}
+        confirmLabel={deletingEventId === '__empty_trash__' ? 'Empty Trash' : 'Delete Event'}
         danger
       />
 

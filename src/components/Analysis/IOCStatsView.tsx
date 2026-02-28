@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
-import type { Note, Task, TimelineEvent, Settings, IOCEntry, IOCType, ConfidenceLevel } from '../../types';
+import type { Note, Task, TimelineEvent, StandaloneIOC, Settings, IOCEntry, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 
 interface IOCStatsViewProps {
   notes: Note[];
   tasks: Task[];
   timelineEvents: TimelineEvent[];
+  standaloneIOCs?: StandaloneIOC[];
   settings: Settings;
   scopedNotes?: Note[];
   scopedTasks?: Task[];
   scopedTimelineEvents?: TimelineEvent[];
+  scopedStandaloneIOCs?: StandaloneIOC[];
   selectedFolderId?: string;
   selectedFolderName?: string;
 }
@@ -22,10 +24,10 @@ interface UniqueIOC {
   attribution?: string;
   firstSeen: number;
   entityCount: number;
-  sourceTypes: Set<'note' | 'task' | 'event'>;
+  sourceTypes: Set<'note' | 'task' | 'event' | 'standalone'>;
 }
 
-export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scopedTasks, scopedTimelineEvents, selectedFolderId, selectedFolderName }: IOCStatsViewProps) {
+export function IOCStatsView({ notes, tasks, timelineEvents, standaloneIOCs = [], scopedNotes, scopedTasks, scopedTimelineEvents, scopedStandaloneIOCs, selectedFolderId, selectedFolderName }: IOCStatsViewProps) {
   const [actorsExpanded, setActorsExpanded] = useState(false);
   const [scopeMode, setScopeMode] = useState<'investigation' | 'global'>('investigation');
 
@@ -37,12 +39,13 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
   const effectiveNotes = selectedFolderId && scopeMode === 'investigation' && scopedNotes ? scopedNotes : notes;
   const effectiveTasks = selectedFolderId && scopeMode === 'investigation' && scopedTasks ? scopedTasks : tasks;
   const effectiveEvents = selectedFolderId && scopeMode === 'investigation' && scopedTimelineEvents ? scopedTimelineEvents : timelineEvents;
+  const effectiveStandaloneIOCs = selectedFolderId && scopeMode === 'investigation' && scopedStandaloneIOCs ? scopedStandaloneIOCs : standaloneIOCs;
 
   const { uniqueIOCs, entitiesWithIOCs } = useMemo(() => {
     const iocMap = new Map<string, UniqueIOC>();
     const entityIds = new Set<string>();
 
-    const processIOCs = (iocs: IOCEntry[], entityId: string, sourceType: 'note' | 'task' | 'event') => {
+    const processIOCs = (iocs: IOCEntry[], entityId: string, sourceType: 'note' | 'task' | 'event' | 'standalone') => {
       let hasActiveIOC = false;
       for (const ioc of iocs) {
         if (ioc.dismissed) continue;
@@ -84,9 +87,23 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
     for (const event of effectiveEvents) {
       if (event.iocAnalysis?.iocs) processIOCs(event.iocAnalysis.iocs, event.id, 'event');
     }
+    // Standalone IOCs — treat each as a single-IOC entity
+    for (const si of effectiveStandaloneIOCs) {
+      if (si.trashed) continue;
+      const syntheticEntry: IOCEntry = {
+        id: si.id,
+        type: si.type,
+        value: si.value,
+        confidence: si.confidence,
+        attribution: si.attribution,
+        firstSeen: si.createdAt,
+        dismissed: false,
+      };
+      processIOCs([syntheticEntry], si.id, 'standalone');
+    }
 
     return { uniqueIOCs: Array.from(iocMap.values()), entitiesWithIOCs: entityIds.size };
-  }, [effectiveNotes, effectiveTasks, effectiveEvents]);
+  }, [effectiveNotes, effectiveTasks, effectiveEvents, effectiveStandaloneIOCs]);
 
   // IOCs by type
   const byType = useMemo(() => {
@@ -164,13 +181,14 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
 
   // Source distribution
   const sourceDist = useMemo(() => {
-    let fromNotes = 0, fromTasks = 0, fromEvents = 0;
+    let fromNotes = 0, fromTasks = 0, fromEvents = 0, fromStandalone = 0;
     for (const ioc of uniqueIOCs) {
       if (ioc.sourceTypes.has('note')) fromNotes++;
       if (ioc.sourceTypes.has('task')) fromTasks++;
       if (ioc.sourceTypes.has('event')) fromEvents++;
+      if (ioc.sourceTypes.has('standalone')) fromStandalone++;
     }
-    return { notes: fromNotes, tasks: fromTasks, events: fromEvents };
+    return { notes: fromNotes, tasks: fromTasks, events: fromEvents, standalone: fromStandalone };
   }, [uniqueIOCs]);
 
   // Summary cards
@@ -367,7 +385,7 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
 
         {/* Source Distribution */}
         <Section title="Source Distribution">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-gray-800/50 rounded-lg p-3 text-center">
               <div className="text-xl font-bold text-blue-400 tabular-nums">{sourceDist.notes}</div>
               <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">From Notes</div>
@@ -379,6 +397,10 @@ export function IOCStatsView({ notes, tasks, timelineEvents, scopedNotes, scoped
             <div className="bg-gray-800/50 rounded-lg p-3 text-center">
               <div className="text-xl font-bold text-indigo-400 tabular-nums">{sourceDist.events}</div>
               <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">From Events</div>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+              <div className="text-xl font-bold text-amber-400 tabular-nums">{sourceDist.standalone}</div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">Standalone</div>
             </div>
           </div>
         </Section>

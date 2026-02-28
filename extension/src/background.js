@@ -149,6 +149,72 @@ async function getSelectionAsMarkdown() {
   return md || sel.toString();
 }
 
+// Injected into the page to capture the full page body as markdown
+async function getPageAsMarkdown() {
+  const MAX_OUTPUT = 50000; // 50KB text limit
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'svg') return '';
+
+    const inner = Array.from(node.childNodes).map(c => walk(c)).join('');
+
+    switch (tag) {
+      case 'a': {
+        const href = node.getAttribute('href') || '';
+        return inner.trim() ? `[${inner.trim()}](${href})` : '';
+      }
+      case 'strong': case 'b':
+        return inner.trim() ? `**${inner.trim()}**` : '';
+      case 'em': case 'i':
+        return inner.trim() ? `*${inner.trim()}*` : '';
+      case 'h1': return `\n\n# ${inner.trim()}\n\n`;
+      case 'h2': return `\n\n## ${inner.trim()}\n\n`;
+      case 'h3': return `\n\n### ${inner.trim()}\n\n`;
+      case 'h4': return `\n\n#### ${inner.trim()}\n\n`;
+      case 'h5': return `\n\n##### ${inner.trim()}\n\n`;
+      case 'h6': return `\n\n###### ${inner.trim()}\n\n`;
+      case 'p': return `\n\n${inner.trim()}\n\n`;
+      case 'br': return '\n';
+      case 'hr': return '\n\n---\n\n';
+      case 'pre': {
+        const code = node.querySelector('code');
+        const text = code ? code.textContent : node.textContent;
+        return `\n\n\`\`\`\n${text}\n\`\`\`\n\n`;
+      }
+      case 'code':
+        if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') return inner;
+        return `\`${inner}\``;
+      case 'blockquote':
+        return '\n\n' + inner.trim().split('\n').map(l => `> ${l}`).join('\n') + '\n\n';
+      case 'ul': case 'ol':
+        return `\n\n${inner}\n\n`;
+      case 'li': {
+        const parent = node.parentElement;
+        const ordered = parent && parent.tagName.toLowerCase() === 'ol';
+        const idx = ordered ? Array.from(parent.children).indexOf(node) + 1 : 0;
+        const prefix = ordered ? `${idx}. ` : '- ';
+        return `${prefix}${inner.trim()}\n`;
+      }
+      case 'img': {
+        const alt = node.getAttribute('alt') || '';
+        const src = node.getAttribute('src') || '';
+        return `![${alt}](${src})`;
+      }
+      default:
+        return inner;
+    }
+  }
+
+  let md = `# ${document.title}\n\n` + walk(document.body);
+  md = md.replace(/\n{3,}/g, '\n\n').trim();
+  if (md.length > MAX_OUTPUT) md = md.substring(0, MAX_OUTPUT) + '\n\n...(truncated)';
+  return md;
+}
+
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -175,14 +241,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-// Handle keyboard shortcut
+// Handle keyboard shortcut — capture selection if any, otherwise capture full page
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'capture-selection') {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
 
-    // Get selected text as markdown from the active tab
     try {
+      // Try selection first
       const [result] = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: getSelectionAsMarkdown
@@ -190,9 +256,20 @@ chrome.commands.onCommand.addListener(async (command) => {
 
       if (result && result.result) {
         await captureAndSave(result.result, tab);
+        return;
+      }
+
+      // No selection — capture full page
+      const [pageResult] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: getPageAsMarkdown
+      });
+
+      if (pageResult && pageResult.result) {
+        await captureAndSave(pageResult.result, tab);
       }
     } catch (error) {
-      console.error('Failed to get selection:', error);
+      console.error('Failed to capture:', error);
     }
   }
 });

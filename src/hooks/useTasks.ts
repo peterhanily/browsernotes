@@ -3,13 +3,23 @@ import { db } from '../db';
 import type { Task, TaskStatus } from '../types';
 import { nanoid } from 'nanoid';
 
+const TRASH_PURGE_DAYS = 30;
+
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadTasks = useCallback(async () => {
     const allTasks = await db.tasks.toArray();
-    setTasks(allTasks);
+    // Auto-purge old trash
+    const now = Date.now();
+    const purgeThreshold = now - TRASH_PURGE_DAYS * 86400000;
+    const toPurge = allTasks.filter((t) => t.trashed && t.trashedAt && t.trashedAt < purgeThreshold);
+    if (toPurge.length > 0) {
+      await db.tasks.bulkDelete(toPurge.map((t) => t.id));
+    }
+    const remaining = allTasks.filter((t) => !toPurge.some((p) => p.id === t.id));
+    setTasks(remaining);
     setLoading(false);
   }, []);
 
@@ -28,6 +38,8 @@ export function useTasks() {
       tags: [],
       status: 'todo',
       order: maxOrder + 1,
+      trashed: false,
+      archived: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       ...partial,
@@ -81,6 +93,38 @@ export function useTasks() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const trashTask = useCallback(async (id: string) => {
+    await updateTask(id, { trashed: true, trashedAt: Date.now() });
+  }, [updateTask]);
+
+  const restoreTask = useCallback(async (id: string) => {
+    await updateTask(id, { trashed: false, trashedAt: undefined });
+  }, [updateTask]);
+
+  const toggleArchiveTask = useCallback(async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task) await updateTask(id, { archived: !task.archived });
+  }, [tasks, updateTask]);
+
+  const emptyTrashTasks = useCallback(async () => {
+    const trashedIds = tasks.filter((t) => t.trashed).map((t) => t.id);
+    if (trashedIds.length === 0) return;
+    try {
+      await db.tasks.bulkDelete(trashedIds);
+      const idSet = new Set(trashedIds);
+      await db.notes.filter(n => n.linkedTaskIds?.some(tid => idSet.has(tid)) ?? false).modify(n => {
+        n.linkedTaskIds = (n.linkedTaskIds ?? []).filter(tid => !idSet.has(tid));
+      });
+      await db.timelineEvents.filter(e => e.linkedTaskIds.some(tid => idSet.has(tid))).modify(e => {
+        e.linkedTaskIds = e.linkedTaskIds.filter(tid => !idSet.has(tid));
+      });
+    } catch (err) {
+      console.error('Failed to empty task trash:', err);
+      throw err;
+    }
+    setTasks((prev) => prev.filter((t) => !t.trashed));
+  }, [tasks]);
+
   const toggleComplete = useCallback(async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
@@ -98,8 +142,18 @@ export function useTasks() {
       tag?: string;
       status?: TaskStatus;
       search?: string;
+      showTrashed?: boolean;
+      showArchived?: boolean;
     }) => {
       let filtered = tasks;
+
+      if (opts.showTrashed) {
+        filtered = filtered.filter((t) => t.trashed);
+      } else if (opts.showArchived) {
+        filtered = filtered.filter((t) => t.archived && !t.trashed);
+      } else {
+        filtered = filtered.filter((t) => !t.trashed && !t.archived);
+      }
 
       if (opts.folderId) {
         filtered = filtered.filter((t) => t.folderId === opts.folderId);
@@ -131,18 +185,23 @@ export function useTasks() {
   const getTasksByStatus = useCallback(
     (status: TaskStatus, folderId?: string) => {
       return tasks
-        .filter((t) => t.status === status && (!folderId || t.folderId === folderId))
+        .filter((t) => t.status === status && !t.trashed && !t.archived && (!folderId || t.folderId === folderId))
         .sort((a, b) => a.order - b.order);
     },
     [tasks]
   );
 
-  const taskCounts = useMemo(() => ({
-    todo: tasks.filter((t) => t.status === 'todo').length,
-    'in-progress': tasks.filter((t) => t.status === 'in-progress').length,
-    done: tasks.filter((t) => t.status === 'done').length,
-    total: tasks.length,
-  }), [tasks]);
+  const taskCounts = useMemo(() => {
+    const active = tasks.filter((t) => !t.trashed && !t.archived);
+    return {
+      todo: active.filter((t) => t.status === 'todo').length,
+      'in-progress': active.filter((t) => t.status === 'in-progress').length,
+      done: active.filter((t) => t.status === 'done').length,
+      total: active.length,
+      trashed: tasks.filter((t) => t.trashed).length,
+      archived: tasks.filter((t) => t.archived && !t.trashed).length,
+    };
+  }, [tasks]);
 
   return {
     tasks,
@@ -150,6 +209,10 @@ export function useTasks() {
     createTask,
     updateTask,
     deleteTask,
+    trashTask,
+    restoreTask,
+    toggleArchiveTask,
+    emptyTrashTasks,
     toggleComplete,
     getFilteredTasks,
     getTasksByStatus,

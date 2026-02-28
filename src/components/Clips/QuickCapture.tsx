@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { Modal } from '../Common/Modal';
 import { CLIP_TEMPLATES } from './ClipTemplates';
-import type { Note } from '../../types';
+import type { Note, Folder } from '../../types';
 
 interface QuickCaptureProps {
   open: boolean;
   onClose: () => void;
   onCapture: (data: Partial<Note>) => void;
+  folders?: Folder[];
+  defaultFolderId?: string;
 }
 
-export function QuickCapture({ open, onClose, onCapture }: QuickCaptureProps) {
+export function QuickCapture({ open, onClose, onCapture, folders = [], defaultFolderId }: QuickCaptureProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
+  const [folderId, setFolderId] = useState(defaultFolderId || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,10 +24,12 @@ export function QuickCapture({ open, onClose, onCapture }: QuickCaptureProps) {
       content: content.trim(),
       sourceUrl: sourceUrl.trim() || undefined,
       sourceTitle: title.trim() || undefined,
+      folderId: folderId || undefined,
     });
     setTitle('');
     setContent('');
     setSourceUrl('');
+    setFolderId(defaultFolderId || '');
     onClose();
   };
 
@@ -85,6 +90,22 @@ export function QuickCapture({ open, onClose, onCapture }: QuickCaptureProps) {
             placeholder="https://..."
           />
         </div>
+
+        {folders.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Investigation</label>
+            <select
+              value={folderId}
+              onChange={(e) => setFolderId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">No investigation</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <button

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, ShieldOff, Upload, Briefcase, MessageSquare } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -436,7 +436,7 @@ export function NoteEditor({
           title="IOC Analysis"
           aria-label="Toggle IOC analysis panel"
         >
-          <Shield size={16} />
+          <span className="text-[10px] font-bold tracking-wide">IOC</span>
           {iocCount > 0 && (
             <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
               {iocCount}
@@ -451,7 +451,7 @@ export function NoteEditor({
             title={defangPreview ? 'Show original IOCs' : 'Defang IOCs in preview'}
             aria-label="Toggle defanged IOC display"
           >
-            <ShieldOff size={16} />
+            <span className="text-[10px] font-bold tracking-wide">DEFANG</span>
           </button>
         )}
 

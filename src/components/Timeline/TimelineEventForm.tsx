@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { TimelineEvent, TimelineEventType, ConfidenceLevel, Folder, Tag, IOCTarget, IOCAnalysis, IOCType } from '../../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
@@ -270,7 +270,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
               title="IOC Analysis"
               aria-label="Toggle IOC analysis"
             >
-              <Shield size={14} />
+              <span className="text-[10px] font-bold tracking-wide">IOC</span>
               {iocCount > 0 && (
                 <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">{iocCount}</span>
               )}

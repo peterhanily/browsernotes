@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, Shield, MessageSquare, Archive, RotateCcw } from 'lucide-react';
+import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, MessageSquare, Archive, RotateCcw } from 'lucide-react';
 import type { Task, Priority } from '../../types';
 import { PRIORITY_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -66,7 +66,7 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
       <div className="flex items-center gap-2 shrink-0">
         {(task.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-            <Shield size={10} />
+            <span className="text-[8px] font-bold leading-none">IOC</span>
             {task.iocAnalysis?.iocs.filter((i) => !i.dismissed).length}
           </span>
         )}

@@ -1,4 +1,4 @@
-import { Briefcase, Tag, FileText, ListChecks, Clock, PenTool, ShieldCheck, Info } from 'lucide-react';
+import { Briefcase, Tag, FileText, ListChecks, Clock, PenTool, Info } from 'lucide-react';
 import type { InvestigationStatus, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -118,7 +118,7 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
             title="Boards"
           />
           <EntityChip
-            icon={<ShieldCheck size={11} />}
+            icon={<span className="text-[8px] font-bold leading-none">IOC</span>}
             count={entityCounts.iocs}
             active={activeView === 'ioc-stats'}
             onClick={() => onViewChange('ioc-stats')}

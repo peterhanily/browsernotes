@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { X, RefreshCw, ChevronDown, ChevronRight, Shield, ShieldOff, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, ChevronRight, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
 import type { IOCTarget, IOCEntry, IOCType, IOCAnalysis } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { useIOCAnalysis } from '../../hooks/useIOCAnalysis';
@@ -216,7 +216,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
     <div className="shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col h-full overflow-hidden" style={style || { width: '20rem' }}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 shrink-0">
-        <Shield size={16} className="text-accent" />
+        <span className="text-[11px] font-bold tracking-wide text-accent">IOC</span>
         <span className="text-sm font-medium text-gray-200 flex-1">IOC Analysis</span>
         {iocCount > 0 && (
           <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">{iocCount}</span>
@@ -227,7 +227,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
           title={showDefanged ? 'Show original values' : 'Defang IOC values'}
           aria-label="Toggle defanged display"
         >
-          <ShieldOff size={14} />
+          <span className="text-[10px] font-bold tracking-wide">DEFANG</span>
         </button>
         <button
           onClick={analyze}
@@ -301,7 +301,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {!analysis ? (
           <div className="flex flex-col items-center justify-center py-8 text-gray-600">
-            <Shield size={32} className="mb-2" />
+            <span className="text-2xl font-bold text-gray-600 mb-2">IOC</span>
             <p className="text-sm">No analysis yet</p>
             <button
               onClick={analyze}

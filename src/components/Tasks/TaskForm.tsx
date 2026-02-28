@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
-import { Shield, X, MessageSquare, Trash2 } from 'lucide-react';
+import { X, MessageSquare, Trash2 } from 'lucide-react';
 import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -161,7 +161,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
                 title="IOC Analysis"
                 aria-label="Toggle IOC analysis"
               >
-                <Shield size={14} />
+                <span className="text-[10px] font-bold tracking-wide">IOC</span>
                 {iocCount > 0 && (
                   <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">{iocCount}</span>
                 )}

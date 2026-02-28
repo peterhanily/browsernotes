@@ -903,8 +903,6 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('demo')) return;
     demoProcessedRef.current = true;
-    // Clean the URL
-    history.replaceState(null, '', location.pathname + location.hash);
     if (sampleLoaded) {
       setShowDemoModal(true);
     } else {

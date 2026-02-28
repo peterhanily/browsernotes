@@ -928,6 +928,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('demo')) return;
     demoProcessedRef.current = true;
+    // Clean the ?demo param from the URL so it doesn't linger
+    const url = new URL(window.location.href);
+    url.searchParams.delete('demo');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
     if (sampleLoaded) {
       setShowDemoModal(true);
     } else {

@@ -10,7 +10,7 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 
 ### Notes & Editor
 - **Markdown Notes** — Write in markdown with live preview, split editor, and syntax highlighting for 20+ languages
-- **Wiki-Link Internal Linking** — Type `[[note title]]` to create clickable links between notes, with case-insensitive matching and broken-link indicators
+- **ThreatCaddyLink** — Type `[[note title]]` to create clickable links between notes with autocomplete, case-insensitive matching and broken-link indicators
 - **Slash Commands** — Type `/` for a Notion-style command menu with formatting, blocks, threat intel templates (IOC tables, MITRE references, TLP headers), and quick inserts (date, callouts, wiki-links)
 - **Note Annotations** — Add timestamped comments and annotations to any note
 - **Defang/Refang Toggle** — Preview network IOCs in defanged form (e.g. `hxxps://`, `example[.]com`) with one click

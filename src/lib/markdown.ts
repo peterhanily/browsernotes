@@ -114,9 +114,9 @@ export function preprocessWikiLinks(content: string, notes: WikiLinkTarget[]): s
     return part.replace(/\[\[([^\]]+)\]\]/g, (_match, title: string) => {
       const target = titleMap.get(title.toLowerCase());
       if (target) {
-        return `<a data-note-link="true" data-note-id="${target.id}" class="wiki-link">${title}</a>`;
+        return `<a data-note-link="true" data-note-id="${target.id}" class="tclink">${title}</a>`;
       }
-      return `<span data-note-link="broken" class="wiki-link-broken">${title}</span>`;
+      return `<span data-note-link="broken" class="tclink-broken">${title}</span>`;
     });
   }).join('');
 }

@@ -182,19 +182,19 @@ describe('renderMarkdown', () => {
     expect(html).toContain('<strong>bold link</strong>');
   });
 
-  // ── Wiki-links ──────────────────────────────────────────────────
+  // ── ThreatCaddyLinks ───────────────────────────────────────────
 
-  describe('wiki-links', () => {
+  describe('ThreatCaddyLinks', () => {
     const sampleNotes: WikiLinkTarget[] = [
       { id: 'note-1', title: 'IOC Analysis' },
       { id: 'note-2', title: 'Threat Report' },
       { id: 'note-3', title: 'Malware Sample' },
     ];
 
-    it('resolved wiki-link contains data-note-id and wiki-link class', () => {
+    it('resolved link contains data-note-id and tclink class', () => {
       const html = renderMarkdown('See [[IOC Analysis]] for details', sampleNotes);
       expect(html).toContain('data-note-id="note-1"');
-      expect(html).toContain('class="wiki-link"');
+      expect(html).toContain('class="tclink"');
       expect(html).toContain('data-note-link="true"');
       expect(html).toContain('>IOC Analysis</a>');
     });
@@ -202,39 +202,39 @@ describe('renderMarkdown', () => {
     it('case-insensitive matching', () => {
       const html = renderMarkdown('See [[ioc analysis]] for details', sampleNotes);
       expect(html).toContain('data-note-id="note-1"');
-      expect(html).toContain('class="wiki-link"');
+      expect(html).toContain('class="tclink"');
     });
 
-    it('broken link has wiki-link-broken class and no data-note-id', () => {
+    it('broken link has tclink-broken class and no data-note-id', () => {
       const html = renderMarkdown('See [[Nonexistent Note]]', sampleNotes);
-      expect(html).toContain('class="wiki-link-broken"');
+      expect(html).toContain('class="tclink-broken"');
       expect(html).toContain('data-note-link="broken"');
       expect(html).not.toContain('data-note-id');
       expect(html).toContain('>Nonexistent Note</span>');
     });
 
-    it('multiple wiki-links in one line', () => {
+    it('multiple links in one line', () => {
       const html = renderMarkdown('See [[IOC Analysis]] and [[Threat Report]]', sampleNotes);
       expect(html).toContain('data-note-id="note-1"');
       expect(html).toContain('data-note-id="note-2"');
     });
 
-    it('wiki-links inside code fences are not processed', () => {
+    it('links inside code fences are not processed', () => {
       const html = renderMarkdown('```\n[[IOC Analysis]]\n```', sampleNotes);
       expect(html).not.toContain('data-note-id');
-      expect(html).not.toContain('wiki-link');
+      expect(html).not.toContain('tclink');
     });
 
-    it('wiki-links inside inline code are not processed', () => {
+    it('links inside inline code are not processed', () => {
       const html = renderMarkdown('Use `[[IOC Analysis]]` syntax', sampleNotes);
       expect(html).not.toContain('data-note-id');
-      expect(html).not.toContain('class="wiki-link"');
+      expect(html).not.toContain('class="tclink"');
     });
 
     it('backward compatible — no notes array means [[...]] passes through unchanged', () => {
       const html = renderMarkdown('See [[IOC Analysis]] for details');
       expect(html).not.toContain('data-note-id');
-      expect(html).not.toContain('wiki-link');
+      expect(html).not.toContain('tclink');
       expect(html).toContain('[[IOC Analysis]]');
     });
   });

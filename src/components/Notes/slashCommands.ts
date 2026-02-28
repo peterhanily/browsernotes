@@ -26,7 +26,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'strikethrough', label: 'Strikethrough', description: 'Crossed out text', category: 'Formatting', icon: Strikethrough, keywords: ['strike', 'del'], insert: '~~text~~', cursorOffset: -2 },
   { id: 'code-inline', label: 'Code', description: 'Inline code', category: 'Formatting', icon: Code, keywords: ['mono', 'inline'], insert: '`code`', cursorOffset: -1 },
   { id: 'link', label: 'Link', description: 'Hyperlink', category: 'Formatting', icon: Link, keywords: ['url', 'href', 'anchor'], insert: '[text](url)', cursorOffset: -6 },
-  { id: 'wiki-link', label: 'Wiki Link', description: 'Link to another note', category: 'Formatting', icon: Link2, keywords: ['internal', 'note', 'wikilink', 'backlink'], insert: '[[]]', cursorOffset: -2 },
+  { id: 'tclink', label: 'ThreatCaddyLink', description: 'Link to another note', category: 'Formatting', icon: Link2, keywords: ['internal', 'note', 'wikilink', 'backlink', 'threatcaddy', 'tclink'], insert: '[[]]', cursorOffset: -2 },
 
   // Blocks
   { id: 'bullet', label: 'Bullet list', description: 'Unordered list', category: 'Blocks', icon: List, keywords: ['ul', 'unordered'], insert: '- ' },

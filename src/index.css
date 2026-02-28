@@ -195,18 +195,18 @@
 
 .light .markdown-preview a:hover { color: #6366f1; }
 
-.markdown-preview .wiki-link {
+.markdown-preview .tclink {
   color: #818cf8;
   text-decoration: underline;
   text-decoration-style: dashed;
   cursor: pointer;
 }
 
-.light .markdown-preview .wiki-link {
+.light .markdown-preview .tclink {
   color: #4f46e5;
 }
 
-.markdown-preview .wiki-link-broken {
+.markdown-preview .tclink-broken {
   color: #6b7280;
   text-decoration: underline;
   text-decoration-style: dashed;
@@ -214,7 +214,7 @@
   cursor: default;
 }
 
-.light .markdown-preview .wiki-link-broken {
+.light .markdown-preview .tclink-broken {
   color: #9ca3af;
 }
 

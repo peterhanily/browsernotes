@@ -11,6 +11,8 @@ import { IOCPanel } from '../Analysis/IOCPanel';
 import { ResizeHandle } from '../Common/ResizeHandle';
 import { EntityLinker } from '../Common/EntityLinker';
 import { SlashCommandMenu } from './SlashCommandMenu';
+import { LinkAutocompleteMenu } from './LinkAutocompleteMenu';
+import type { LinkCandidate } from './LinkAutocompleteMenu';
 import { SLASH_COMMANDS, getCaretCoordinates } from './slashCommands';
 import { useCloudSync } from '../../hooks/useCloudSync';
 import { useResizable } from '../../hooks/useResizable';
@@ -86,6 +88,14 @@ export function NoteEditor({
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
 
+  // Link autocomplete menu state
+  const linkMenuRef = useRef<HTMLDivElement>(null);
+  const [linkMenuOpen, setLinkMenuOpen] = useState(false);
+  const [linkTriggerPos, setLinkTriggerPos] = useState<number | null>(null);
+  const [linkFilter, setLinkFilter] = useState('');
+  const [linkActiveIndex, setLinkActiveIndex] = useState(0);
+  const [linkMenuPosition, setLinkMenuPosition] = useState({ top: 0, left: 0 });
+
   // Auto-extract IOCs on content changes
   useAutoIOCExtraction({
     entityId: note.id,
@@ -143,6 +153,30 @@ export function NoteEditor({
   }, [save]);
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Link autocomplete menu keyboard navigation
+    if (linkMenuOpen && linkCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setLinkActiveIndex(i => Math.min(i + 1, linkCandidates.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setLinkActiveIndex(i => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        executeLinkSelection(linkCandidates[linkActiveIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setLinkMenuOpen(false);
+        return;
+      }
+    }
+
     // Slash command menu keyboard navigation
     if (slashMenuOpen && filteredSlashCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -295,6 +329,113 @@ export function NoteEditor({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [slashMenuOpen]);
+
+  // Link autocomplete: filtered candidates
+  const linkCandidates = useMemo<LinkCandidate[]>(() => {
+    if (!linkMenuOpen) return [];
+    const q = linkFilter.toLowerCase();
+    return allNotes
+      .filter(n => !n.trashed && n.id !== note.id)
+      .filter(n => !q || n.title.toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (!q) return a.title.localeCompare(b.title);
+        const aPrefix = a.title.toLowerCase().startsWith(q);
+        const bPrefix = b.title.toLowerCase().startsWith(q);
+        if (aPrefix && !bPrefix) return -1;
+        if (!aPrefix && bPrefix) return 1;
+        return a.title.localeCompare(b.title);
+      })
+      .slice(0, 20)
+      .map(n => ({ id: n.id, title: n.title }));
+  }, [linkMenuOpen, linkFilter, allNotes, note.id]);
+
+  // Reset link active index when filter changes
+  useEffect(() => {
+    setLinkActiveIndex(0);
+  }, [linkFilter]);
+
+  // Link autocomplete: detect "[[" trigger
+  const detectLinkTrigger = useCallback((value: string, cursorPos: number) => {
+    // Count backticks before cursor to detect inline code
+    let backtickCount = 0;
+    for (let i = 0; i < cursorPos; i++) {
+      if (value[i] === '`') backtickCount++;
+    }
+    // If inside inline code (odd backtick count), skip
+    if (backtickCount % 2 === 1) {
+      setLinkMenuOpen(false);
+      return;
+    }
+
+    // Check if inside a code fence
+    const beforeCursor = value.slice(0, cursorPos);
+    const fenceMatches = beforeCursor.match(/```/g);
+    if (fenceMatches && fenceMatches.length % 2 === 1) {
+      setLinkMenuOpen(false);
+      return;
+    }
+
+    // Scan backwards from cursor for [[ — max 100 chars back
+    for (let i = cursorPos - 1; i >= Math.max(0, cursorPos - 100); i--) {
+      const ch = value[i];
+      // Stop on newline
+      if (ch === '\n') {
+        setLinkMenuOpen(false);
+        return;
+      }
+      // Stop if we hit ]] (already closed)
+      if (ch === ']' && i > 0 && value[i - 1] === ']') {
+        setLinkMenuOpen(false);
+        return;
+      }
+      // Found [[
+      if (ch === '[' && i > 0 && value[i - 1] === '[') {
+        const filter = value.slice(i + 1, cursorPos);
+        setLinkMenuOpen(true);
+        setLinkTriggerPos(i - 1); // position of first [
+        setLinkFilter(filter);
+        if (textareaRef.current) {
+          setLinkMenuPosition(getCaretCoordinates(textareaRef.current, i - 1));
+        }
+        return;
+      }
+    }
+    setLinkMenuOpen(false);
+  }, []);
+
+  // Link autocomplete: execute selection
+  const executeLinkSelection = useCallback((candidate: LinkCandidate) => {
+    const textarea = textareaRef.current;
+    if (!textarea || linkTriggerPos === null) return;
+
+    const cursor = textarea.selectionStart;
+    const insertText = `[[${candidate.title}]]`;
+    const newContent = content.slice(0, linkTriggerPos) + insertText + content.slice(cursor);
+    handleContentChange(newContent);
+
+    setLinkMenuOpen(false);
+    setLinkTriggerPos(null);
+    setLinkFilter('');
+    setLinkActiveIndex(0);
+
+    const newCursorPos = linkTriggerPos + insertText.length;
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+      textarea.focus();
+    }, 0);
+  }, [content, linkTriggerPos, handleContentChange]);
+
+  // Link autocomplete: click-outside to close
+  useEffect(() => {
+    if (!linkMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (linkMenuRef.current && !linkMenuRef.current.contains(e.target as Node)) {
+        setLinkMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [linkMenuOpen]);
 
   // Show share feedback when cloud sync finishes
   useEffect(() => {
@@ -570,7 +711,9 @@ export function NoteEditor({
                   const val = e.target.value;
                   setTimeout(() => {
                     if (textareaRef.current) {
-                      detectSlashTrigger(val, textareaRef.current.selectionStart);
+                      const pos = textareaRef.current.selectionStart;
+                      detectSlashTrigger(val, pos);
+                      detectLinkTrigger(val, pos);
                     }
                   }, 0);
                 }}
@@ -587,6 +730,15 @@ export function NoteEditor({
                   position={slashMenuPosition}
                   onSelect={executeSlashCommand}
                   menuRef={slashMenuRef}
+                />
+              )}
+              {linkMenuOpen && linkCandidates.length > 0 && (
+                <LinkAutocompleteMenu
+                  items={linkCandidates}
+                  activeIndex={linkActiveIndex}
+                  position={linkMenuPosition}
+                  onSelect={executeLinkSelection}
+                  menuRef={linkMenuRef}
                 />
               )}
             </div>

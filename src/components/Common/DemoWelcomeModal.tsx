@@ -21,7 +21,7 @@ export function DemoWelcomeModal({ open, onClose, onStartTour, onDeleteDemo }: D
             <li>Browse notes, tasks, and timeline events</li>
             <li>View the investigation graph and IOC analysis</li>
             <li>Try the whiteboard and entity linking</li>
-            <li>Use <code className="bg-gray-800 px-1 rounded text-xs">[[wiki-links]]</code> to link between notes</li>
+            <li>Use <code className="bg-gray-800 px-1 rounded text-xs">[[ThreatCaddyLinks]]</code> to link between notes</li>
           </ul>
         </div>
 

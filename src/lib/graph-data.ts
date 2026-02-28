@@ -126,7 +126,8 @@ export function buildGraphData(
   }
 
   // Process tasks
-  for (const task of tasks) {
+  const activeTasks = tasks.filter((t) => !t.trashed);
+  for (const task of activeTasks) {
     const taskNodeId = `task:${task.id}`;
     nodeIdSet.add(taskNodeId);
     nodes.push({
@@ -162,7 +163,8 @@ export function buildGraphData(
   }
 
   // Process timeline events
-  for (const event of timelineEvents) {
+  const activeEvents = timelineEvents.filter((e) => !e.trashed);
+  for (const event of activeEvents) {
     const eventNodeId = `event:${event.id}`;
     const eventTypeInfo = TIMELINE_EVENT_TYPE_LABELS[event.eventType];
     const eventColor = eventTypeInfo?.color || '#6b7280';

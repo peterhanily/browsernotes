@@ -105,15 +105,15 @@ describe('buildGraphData', () => {
     expect(nodes[0].id).toBe('note:note-1');
   });
 
-  it('creates task nodes', () => {
-    const tasks = [makeTask()];
+  it('creates task nodes for non-trashed tasks', () => {
+    const tasks = [makeTask(), makeTask({ id: 'task-2', trashed: true })];
     const { nodes } = buildGraphData([], tasks, []);
     expect(nodes.filter((n) => n.type === 'task')).toHaveLength(1);
     expect(nodes[0].id).toBe('task:task-1');
   });
 
-  it('creates timeline event nodes', () => {
-    const events = [makeEvent()];
+  it('creates timeline event nodes for non-trashed events', () => {
+    const events = [makeEvent(), makeEvent({ id: 'event-2', trashed: true })];
     const { nodes } = buildGraphData([], [], events);
     expect(nodes.filter((n) => n.type === 'timeline-event')).toHaveLength(1);
     expect(nodes[0].id).toBe('event:event-1');

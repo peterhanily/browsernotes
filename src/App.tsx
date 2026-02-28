@@ -1368,6 +1368,7 @@ export default function App() {
         folders={folders}
         timelines={timelines}
         defaultFolderId={selectedFolderId}
+        onCreateTimeline={loggedCreateTimeline}
         onImportComplete={handleDataImportComplete}
       />
 

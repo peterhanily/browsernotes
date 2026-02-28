@@ -27,6 +27,7 @@ interface DataImportModalProps {
   timelines: Timeline[];
   defaultFolderId?: string;
   defaultTimelineId?: string;
+  onCreateTimeline: (name: string) => Promise<Timeline>;
   onImportComplete: (result: ImportResult) => void;
 }
 
@@ -48,6 +49,7 @@ export function DataImportModal({
   timelines,
   defaultFolderId,
   defaultTimelineId,
+  onCreateTimeline,
   onImportComplete,
 }: DataImportModalProps) {
   const [step, setStep] = useState<Step>('input');
@@ -60,6 +62,7 @@ export function DataImportModal({
   const [createEvents, setCreateEvents] = useState(true);
   const [extractIOCsFlag, setExtractIOCsFlag] = useState(true);
   const [createNote, setCreateNote] = useState(true);
+  const [newTimelineName, setNewTimelineName] = useState('');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState('');
 
@@ -79,6 +82,7 @@ export function DataImportModal({
       setCreateEvents(true);
       setExtractIOCsFlag(true);
       setCreateNote(true);
+      setNewTimelineName('');
       setImportResult(null);
       setImportError('');
     }
@@ -182,10 +186,25 @@ export function DataImportModal({
     try {
       // Build timeline events
       if (createEvents && hasTimestamp) {
-        const tid = timelineId || timelines[0]?.id || '';
-        if (!tid) {
-          result.errors.push('No timeline selected — skipping timeline events');
-        } else {
+        let tid = timelineId;
+
+        // Create a new timeline if requested
+        if (tid === '__new__' && newTimelineName.trim()) {
+          const created = await onCreateTimeline(newTimelineName.trim());
+          tid = created.id;
+        }
+
+        // Fall back to first existing timeline, or auto-create one
+        if (!tid || tid === '__new__') {
+          if (timelines.length > 0) {
+            tid = timelines[0].id;
+          } else {
+            const created = await onCreateTimeline('Data Import');
+            tid = created.id;
+          }
+        }
+
+        {
           const { events, errors } = buildTimelineEvents(
             parseResult.rows,
             columnMappings,
@@ -233,7 +252,7 @@ export function DataImportModal({
       setImportResult(result);
       setStep('done');
     }
-  }, [parseResult, createEvents, hasTimestamp, timelineId, timelines, columnMappings, folderId, extractIOCsFlag, hasIOCColumns, createNote]);
+  }, [parseResult, createEvents, hasTimestamp, timelineId, timelines, columnMappings, folderId, extractIOCsFlag, hasIOCColumns, createNote, newTimelineName, onCreateTimeline]);
 
   // Done
   const handleDone = useCallback(() => {
@@ -412,11 +431,22 @@ export function DataImportModal({
                 disabled={!createEvents || !hasTimestamp}
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg text-sm text-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-500 disabled:opacity-40"
               >
-                <option value="">Select timeline...</option>
+                <option value="">All Events (first available)</option>
+                <option value="__new__">+ New Timeline...</option>
                 {timelines.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
+              {timelineId === '__new__' && (
+                <input
+                  type="text"
+                  value={newTimelineName}
+                  onChange={(e) => setNewTimelineName(e.target.value)}
+                  placeholder="Timeline name..."
+                  className="w-full mt-1.5 bg-gray-700 border border-gray-600 rounded-lg text-sm text-gray-200 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              )}
             </div>
 
             <div className="sm:col-span-2 flex flex-wrap gap-4">

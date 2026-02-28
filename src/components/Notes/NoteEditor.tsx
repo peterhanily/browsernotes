@@ -464,7 +464,7 @@ export function NoteEditor({
           <MessageSquare size={16} />
           {(note.annotations?.length ?? 0) > 0 && (
             <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
-              {note.annotations!.length}
+              {note.annotations?.length}
             </span>
           )}
         </button>

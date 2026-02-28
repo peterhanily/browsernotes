@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Trash2, Archive, RotateCcw, ChevronDown, ChevronRight,
-  FileText, ListChecks, Clock, PenTool,
+  FileText, ListChecks, Clock, PenTool, Search,
 } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, Folder } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
@@ -320,14 +320,14 @@ export function TrashArchiveView({
               })}
             </EntitySection>
 
-            <EntitySection icon={<span className="text-xs leading-none">☣️</span>} label="IOCs" count={items.iocs.length}>
+            <EntitySection icon={<Search size={14} />} label="IOCs" count={items.iocs.length}>
               {items.iocs.map((ioc) => {
                 const actions = makeActions(ioc.id, onRestoreIOC, onDeleteIOCPermanently, onUnarchiveIOC, onTrashIOC);
                 const typeLabel = IOC_TYPE_LABELS[ioc.type]?.label || ioc.type;
                 return (
                   <ItemRow
                     key={ioc.id}
-                    icon={<span className="text-xs leading-none">☣️</span>}
+                    icon={<Search size={14} />}
                     title={`${ioc.value} (${typeLabel})`}
                     folderName={getFolderName(ioc.folderId)}
                     timestamp={isTrash ? ioc.trashedAt : ioc.updatedAt}

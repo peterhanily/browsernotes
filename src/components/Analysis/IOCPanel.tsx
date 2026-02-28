@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { X, RefreshCw, ChevronDown, ChevronRight, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, ChevronRight, Download, Upload, XCircle, Tag, Check, Search } from 'lucide-react';
 import type { IOCTarget, IOCEntry, IOCType, IOCAnalysis } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { useIOCAnalysis } from '../../hooks/useIOCAnalysis';
@@ -216,19 +216,16 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
     <div className="shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col h-full overflow-hidden" style={style || { width: '20rem' }}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 shrink-0">
-        <span className="text-sm leading-none">☣️</span>
+        <Search size={16} />
         <span className="text-sm font-medium text-gray-200 flex-1">IOC Analysis</span>
         {iocCount > 0 && (
           <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">{iocCount}</span>
         )}
-        <button
-          onClick={() => setShowDefanged(!showDefanged)}
-          className={cn('p-1 rounded', showDefanged ? 'text-accent' : 'text-gray-500 hover:text-gray-300')}
-          title={showDefanged ? 'Show original values' : 'Defang IOC values'}
-          aria-label="Toggle defanged display"
-        >
-          <span className="text-xs leading-none">🐍</span>
-        </button>
+        <label className="relative inline-flex items-center cursor-pointer ml-1" title={showDefanged ? 'Show original values' : 'Defang IOC values'}>
+          <input type="checkbox" checked={showDefanged} onChange={() => setShowDefanged(!showDefanged)} className="sr-only peer" />
+          <div className="w-7 h-4 bg-gray-700 peer-checked:bg-accent/60 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 peer-checked:after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-3" />
+          <span className="ml-1.5 text-[10px] text-gray-500 peer-checked:text-accent select-none">Defang</span>
+        </label>
         <button
           onClick={analyze}
           disabled={analyzing}
@@ -301,7 +298,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {!analysis ? (
           <div className="flex flex-col items-center justify-center py-8 text-gray-600">
-            <span className="text-4xl mb-2">☣️</span>
+            <Search size={36} className="mb-2" />
             <p className="text-sm">No analysis yet</p>
             <button
               onClick={analyze}

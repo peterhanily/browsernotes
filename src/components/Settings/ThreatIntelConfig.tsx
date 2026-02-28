@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, Download, X, FileJson, Users, ChevronDown, ChevronRight, RotateCcw, Plus } from 'lucide-react';
+import { Upload, Download, X, FileJson, Users, ChevronDown, ChevronRight, RotateCcw, Plus, Search } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import type { IOCType, IOCRelationshipDef } from '../../types';
 import { IOC_TYPE_LABELS, DEFAULT_IOC_SUBTYPES, DEFAULT_RELATIONSHIP_TYPES } from '../../types';
@@ -207,7 +207,7 @@ export function ThreatIntelConfig() {
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-        <span className="text-sm leading-none">☣️</span>
+        <Search size={16} />
         Threat Intel Configuration
       </h3>
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
   Archive, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Settings as SettingsIcon,
-  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw,
+  PanelLeftClose, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -249,7 +249,7 @@ export function Sidebar({
           onClick={() => nav(() => navToView('graph'))}
         />
         <SidebarItem
-          icon={<span className="text-base leading-none">☣️</span>}
+          icon={<Search size={16} />}
           label="IOC Stats"
           count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
           active={activeView === 'ioc-stats'}

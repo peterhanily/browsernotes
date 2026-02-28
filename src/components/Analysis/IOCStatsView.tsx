@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import type { Note, Task, TimelineEvent, StandaloneIOC, Settings, IOCEntry, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 
@@ -199,11 +199,11 @@ export function IOCStatsView({ notes, tasks, timelineEvents, standaloneIOCs = []
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <div data-tour="ioc-stats-header" className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
-          <span className="text-sm leading-none">☣️</span>
+          <Search size={16} />
           <span className="text-sm font-medium text-gray-200">IOC Statistics</span>
         </div>
         <div className="flex flex-col items-center justify-center flex-1 text-gray-600">
-          <span className="text-3xl mb-3">☣️</span>
+          <Search size={36} className="mb-3" />
           <p className="text-lg font-medium">No IOCs found</p>
           <p className="text-sm mt-1">Analyze notes, tasks, or timeline events to extract indicators.</p>
         </div>
@@ -217,7 +217,7 @@ export function IOCStatsView({ notes, tasks, timelineEvents, standaloneIOCs = []
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <div data-tour="ioc-stats-header" className="flex items-center gap-2 px-4 py-3 border-b border-gray-800 shrink-0">
-        <span className="text-sm leading-none">☣️</span>
+        <Search size={16} />
         <span className="text-sm font-medium text-gray-200">IOC Statistics</span>
         {selectedFolderId && (
           <div className="flex rounded-lg overflow-hidden border border-gray-700 ml-2">

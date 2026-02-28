@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -436,7 +436,7 @@ export function NoteEditor({
           title="IOC Analysis"
           aria-label="Toggle IOC analysis panel"
         >
-          <span className="text-xs leading-none">☣️</span>
+          <Search size={14} />
           {iocCount > 0 && (
             <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
               {iocCount}
@@ -445,14 +445,11 @@ export function NoteEditor({
         </button>
 
         {showPreview && (
-          <button
-            onClick={() => setDefangPreview(!defangPreview)}
-            className={cn('p-1.5 rounded', defangPreview ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
-            title={defangPreview ? 'Show original IOCs' : 'Defang IOCs in preview'}
-            aria-label="Toggle defanged IOC display"
-          >
-            <span className="text-xs leading-none">🐍</span>
-          </button>
+          <label className="relative inline-flex items-center cursor-pointer" title={defangPreview ? 'Show original IOCs' : 'Defang IOCs in preview'}>
+            <input type="checkbox" checked={defangPreview} onChange={() => setDefangPreview(!defangPreview)} className="sr-only peer" />
+            <div className="w-7 h-4 bg-gray-700 peer-checked:bg-accent/60 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 peer-checked:after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-3" />
+            <span className="ml-1.5 text-[10px] text-gray-500 peer-checked:text-accent select-none">Defang</span>
+          </label>
         )}
 
         <button

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Archive, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw, Search } from 'lucide-react';
 import type { StandaloneIOC, Folder, Tag } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -78,7 +78,7 @@ export function StandaloneIOCList({
       <div className="flex-1 overflow-y-auto p-4">
         {iocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-600">
-            <span className="text-3xl mb-3">☣️</span>
+            <Search size={36} className="mb-3" />
             <p className="text-lg font-medium">No standalone IOCs yet</p>
             <p className="text-sm mt-1">Create IOCs to track indicators independently</p>
           </div>

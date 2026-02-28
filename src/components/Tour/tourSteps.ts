@@ -25,7 +25,7 @@ export const tourSteps: TourStep[] = [
     id: 'search-create',
     target: '[data-tour="search"]',
     title: 'Search & Create',
-    description: 'Press Ctrl+K to search across notes, tasks, timeline events, and whiteboards. Use the "+ New" dropdown to create notes, tasks, events, whiteboards, or standalone IOCs.',
+    description: 'Press Ctrl+K to search across notes, tasks, timeline events, and whiteboards. Use the "+ New" dropdown to create notes, tasks, events, whiteboards, standalone IOCs, or import data from CSV/JSON.',
     placement: 'bottom',
   },
   {
@@ -47,7 +47,7 @@ export const tourSteps: TourStep[] = [
     id: 'timeline',
     target: '[data-tour="timeline"]',
     title: 'Timeline',
-    description: 'Build incident timelines with typed events, MITRE ATT&CK mappings, and IOC linking. Visualize with the Gantt chart.',
+    description: 'Build incident timelines with typed events, MITRE ATT&CK mappings, and IOC linking. Visualize with the Gantt chart. Import bulk events from SIEM exports via New → Import Data.',
     placement: 'right',
   },
   {
@@ -93,7 +93,7 @@ export const tourSteps: TourStep[] = [
     id: 'demo-data',
     target: '[data-tour="load-sample"]',
     title: 'Sample Investigation',
-    description: 'Load Operation DARK GLACIER, a full-scale breach investigation with geolocated events, IOC relationship graphs, 12 analysis notes, and 20 timeline events. Explore every ThreatCaddy feature. Delete it when done.',
+    description: 'Load Operation DARK GLACIER, a full-scale breach investigation with geolocated events, IOC relationship graphs, 13 analysis notes, 20 timeline events, and an attack flow whiteboard. Explore every ThreatCaddy feature. Delete it when done.',
     placement: 'bottom',
     showSettings: true,
   },

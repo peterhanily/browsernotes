@@ -56,7 +56,7 @@ export function generateSampleInvestigation(): {
 
 Midnight Typhoon compromised a third-party PDF processing library used by OpenSlaw.ai, injecting a backdoor into the build pipeline. The backdoor established C2 via domain-fronted HTTPS and DNS tunneling. Attackers pivoted through AWS infrastructure, harvested IAM credentials and SSO tokens, and staged 2.3 GB of legal documents for exfiltration to servers in Bucharest and Singapore.
 
-This sample investigation demonstrates every ThreatCaddy feature. **Delete it when done exploring.**`,
+This sample investigation demonstrates every ThreatCaddy feature — notes, IOCs, timelines, entity graphs, whiteboards, tasks, data import, and more. **Delete it when done exploring.**`,
     status: 'active',
     clsLevel: 'TLP:AMBER',
     papLevel: 'PAP:AMBER',
@@ -738,6 +738,59 @@ Indicators align with known **Midnight Typhoon** infrastructure patterns, toolin
       createdAt: baseTs + 5 * DAY,
       updatedAt: baseTs + 5 * DAY + 4 * HOUR,
     },
+    // Note 13: SIEM Data Import
+    {
+      id: sampleId('note', 13),
+      title: 'SIEM Log Import — Splunk CSV & CrowdStrike JSON',
+      content: `# SIEM Data Import Log
+
+## Imported Datasets
+
+Two data sources were bulk-imported into this investigation using ThreatCaddy's **Data Import** feature (New → Import Data):
+
+### 1. Splunk Alert Export (CSV)
+
+\`\`\`
+timestamp,src_ip,dst_ip,alert_name,severity,mitre_technique
+${new Date(baseTs + 2 * HOUR).toISOString()},10.2.1.50,185.220.101.34,Outbound C2 Beacon,critical,T1071.001
+${new Date(baseTs + 4 * HOUR).toISOString()},10.2.1.50,91.215.85.17,DNS Tunnel Activity,high,T1572
+${new Date(baseTs + DAY).toISOString()},10.2.1.50,52.94.76.0,AWS API Enumeration,medium,T1580
+\`\`\`
+
+- **Format:** CSV with 847 rows
+- **Auto-mapped columns:** timestamp, src_ip (IOC:IPv4), dst_ip (IOC:IPv4), alert_name (Event Title), severity (Confidence), mitre_technique (MITRE Technique)
+- **Result:** 847 timeline events created, 23 unique IOCs extracted
+
+### 2. CrowdStrike EDR Telemetry (JSON)
+
+\`\`\`json
+[
+  {"timestamp": "${new Date(baseTs).toISOString()}", "ImageFileName": "libpdfmetrics.node", "SHA256": "7d865e959b2466...", "ParentImageFileName": "node.exe", "DetectName": "Backdoor/Node.Implant"},
+  {"timestamp": "${new Date(baseTs + 45 * MIN).toISOString()}", "ImageFileName": "dns.exe", "DnsRequest": "data.update-svc-cdn.net", "DetectName": "SuspiciousDnsQuery"}
+]
+\`\`\`
+
+- **Format:** JSON array with nested process tree objects
+- **Auto-flattened:** \`process.parent.name\` → dot-notation columns
+- **Result:** 312 timeline events, 8 unique file-path IOCs, 15 hash IOCs
+
+## Import Feature Notes
+
+The Data Import feature supports:
+- **Paste or file drop** — CSV, TSV, JSON array, NDJSON
+- **Auto-detection** — Format detection + column mapping for common SIEM schemas
+- **Column override** — Manual mapping adjustment before import
+- **Bulk creation** — Timeline events, standalone IOCs, and summary note in one step
+- **Deduplication** — IOCs deduplicated by type:value pair`,
+      folderId: SAMPLE_FOLDER_ID,
+      tags: ['midnight-typhoon'],
+      pinned: false,
+      archived: false,
+      trashed: false,
+      clsLevel: 'TLP:AMBER',
+      createdAt: baseTs + 5 * DAY + 2 * HOUR,
+      updatedAt: baseTs + 5 * DAY + 6 * HOUR,
+    },
   ];
 
   // ─── Tasks (14) ────────────────────────────────────────────────────
@@ -1279,20 +1332,119 @@ Indicators align with known **Midnight Typhoon** infrastructure patterns, toolin
   ];
 
   // ─── Whiteboard ────────────────────────────────────────────────────
+  // Excalidraw element helper — provides required defaults
+  const el = (id: string, type: string, x: number, y: number, w: number, h: number, overrides: Record<string, unknown> = {}) => ({
+    id, type, x, y, width: w, height: h,
+    strokeColor: '#ffffff', backgroundColor: 'transparent', fillStyle: 'solid' as const,
+    strokeWidth: 2, strokeStyle: 'solid' as const, roughness: 0, opacity: 100,
+    angle: 0, seed: Math.abs(id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 7919),
+    version: 1, versionNonce: Math.abs(id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 6211),
+    index: null, isDeleted: false, groupIds: [] as string[], frameId: null,
+    boundElements: null, updated: baseTs + 3 * DAY, link: null, locked: false,
+    roundness: type === 'arrow' || type === 'line' ? null : { type: 'adaptive' as const },
+    ...overrides,
+  });
+  const txt = (id: string, x: number, y: number, w: number, h: number, text: string, overrides: Record<string, unknown> = {}) => ({
+    ...el(id, 'text', x, y, w, h),
+    text, originalText: text, autoResize: true,
+    fontSize: 16, fontFamily: 1, textAlign: 'center', verticalAlign: 'middle',
+    containerId: null, lineHeight: 1.25,
+    ...overrides,
+  });
+  const arrow = (id: string, x: number, y: number, points: number[][], overrides: Record<string, unknown> = {}) => ({
+    ...el(id, 'arrow', x, y, Math.abs(points[points.length - 1][0]), Math.abs(points[points.length - 1][1])),
+    points, startArrowhead: null, endArrowhead: 'arrow',
+    startBinding: null, endBinding: null, lastCommittedPoint: null,
+    strokeColor: '#6b7280', strokeWidth: 2,
+    ...overrides,
+  });
+
   const whiteboardElements = JSON.stringify([
-    // Attack flow boxes
-    { type: 'rectangle', id: 'wb-el-1', x: 50, y: 80, width: 180, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Supply Chain\n(@pdfcore/render)' } },
-    { type: 'rectangle', id: 'wb-el-2', x: 50, y: 200, width: 180, height: 60, strokeColor: '#f97316', backgroundColor: '#f9731622', fillStyle: 'solid', label: { text: 'Phishing Campaign\n(DocuSign Lure)' } },
-    { type: 'rectangle', id: 'wb-el-3', x: 310, y: 80, width: 180, height: 60, strokeColor: '#a855f7', backgroundColor: '#a855f722', fillStyle: 'solid', label: { text: 'Backdoor Activation\n(libpdfmetrics.node)' } },
-    { type: 'rectangle', id: 'wb-el-4', x: 310, y: 200, width: 180, height: 60, strokeColor: '#ec4899', backgroundColor: '#ec489922', fillStyle: 'solid', label: { text: 'SSO Token Stolen\n(Evilginx)' } },
-    { type: 'rectangle', id: 'wb-el-5', x: 570, y: 80, width: 180, height: 60, strokeColor: '#3b82f6', backgroundColor: '#3b82f622', fillStyle: 'solid', label: { text: 'C2 Established\n(Domain Fronting)' } },
-    { type: 'rectangle', id: 'wb-el-6', x: 570, y: 200, width: 180, height: 60, strokeColor: '#06b6d4', backgroundColor: '#06b6d422', fillStyle: 'solid', label: { text: 'AWS Credential Theft\n(IAM + SSO)' } },
-    { type: 'rectangle', id: 'wb-el-7', x: 830, y: 140, width: 180, height: 60, strokeColor: '#14b8a6', backgroundColor: '#14b8a622', fillStyle: 'solid', label: { text: 'Cloud Lateral Movement\n(S3, RDS, EC2)' } },
-    { type: 'rectangle', id: 'wb-el-8', x: 1090, y: 140, width: 180, height: 60, strokeColor: '#ef4444', backgroundColor: '#ef444422', fillStyle: 'solid', label: { text: 'Data Exfiltration\n(2.3 GB Legal Docs)' } },
-    // Location annotations
-    { type: 'text', id: 'wb-el-9', x: 570, y: 30, width: 180, height: 30, text: 'Moscow → Shanghai', fontSize: 12, strokeColor: '#6b7280' },
-    { type: 'text', id: 'wb-el-10', x: 1090, y: 210, width: 180, height: 30, text: 'Bucharest → Singapore', fontSize: 12, strokeColor: '#6b7280' },
-    { type: 'text', id: 'wb-el-11', x: 830, y: 210, width: 180, height: 30, text: 'AWS us-east-1 (Virginia)', fontSize: 12, strokeColor: '#6b7280' },
+    // ── Title ──
+    txt('wb-t0', 420, 10, 440, 40, 'OPERATION DARK GLACIER — Attack Flow', { fontSize: 24, fontFamily: 2, strokeColor: '#ef4444', textAlign: 'center' }),
+    txt('wb-t1', 450, 55, 380, 24, 'Midnight Typhoon · 5-Day Attack Window · OpenSlaw.ai', { fontSize: 13, fontFamily: 2, strokeColor: '#6b7280', textAlign: 'center' }),
+
+    // ── Phase 1: Initial Access (Day 0) ──
+    txt('wb-ph1', 20, 95, 200, 20, 'DAY 0 — INITIAL ACCESS', { fontSize: 11, fontFamily: 2, strokeColor: '#ef4444', textAlign: 'left' }),
+    // Supply chain box
+    el('wb-r1', 'rectangle', 30, 120, 220, 80, { strokeColor: '#ef4444', backgroundColor: '#ef444415' }),
+    txt('wb-r1t', 35, 125, 210, 24, 'Supply Chain Compromise', { fontSize: 15, fontFamily: 2, strokeColor: '#ef4444', containerId: null }),
+    txt('wb-r1s', 35, 152, 210, 40, '@pdfcore/render v3.2.1\nBackdoored npm package\nT1195.002', { fontSize: 11, strokeColor: '#9ca3af' }),
+    // Phishing box
+    el('wb-r2', 'rectangle', 30, 230, 220, 80, { strokeColor: '#f97316', backgroundColor: '#f9731615' }),
+    txt('wb-r2t', 35, 235, 210, 24, 'Phishing Campaign', { fontSize: 15, fontFamily: 2, strokeColor: '#f97316' }),
+    txt('wb-r2s', 35, 262, 210, 40, 'DocuSign lure → 5 engineers\n1 credential captured (m.chen)\nT1566.001', { fontSize: 11, strokeColor: '#9ca3af' }),
+
+    // ── Phase 2: Execution & C2 (Day 0) ──
+    txt('wb-ph2', 310, 95, 200, 20, 'DAY 0 — EXECUTION & C2', { fontSize: 11, fontFamily: 2, strokeColor: '#a855f7', textAlign: 'left' }),
+    el('wb-r3', 'rectangle', 310, 120, 220, 80, { strokeColor: '#a855f7', backgroundColor: '#a855f715' }),
+    txt('wb-r3t', 315, 125, 210, 24, 'Backdoor Activation', { fontSize: 15, fontFamily: 2, strokeColor: '#a855f7' }),
+    txt('wb-r3s', 315, 152, 210, 40, 'libpdfmetrics.node dropped\nEnv vars harvested\nAWS keys, DB creds, Okta token', { fontSize: 11, strokeColor: '#9ca3af' }),
+    el('wb-r4', 'rectangle', 310, 230, 220, 80, { strokeColor: '#3b82f6', backgroundColor: '#3b82f615' }),
+    txt('wb-r4t', 315, 235, 210, 24, 'Dual C2 Channels', { fontSize: 15, fontFamily: 2, strokeColor: '#3b82f6' }),
+    txt('wb-r4s', 315, 262, 210, 40, 'HTTPS domain fronting\ncdn-assets-proxy.com → Moscow\nDNS tunnel → Shanghai', { fontSize: 11, strokeColor: '#9ca3af' }),
+
+    // ── Phase 3: Pivot & Escalation (Day 1-2) ──
+    txt('wb-ph3', 590, 95, 250, 20, 'DAY 1-2 — PIVOT & ESCALATION', { fontSize: 11, fontFamily: 2, strokeColor: '#06b6d4', textAlign: 'left' }),
+    el('wb-r5', 'rectangle', 590, 120, 220, 80, { strokeColor: '#06b6d4', backgroundColor: '#06b6d415' }),
+    txt('wb-r5t', 595, 125, 210, 24, 'AWS Cloud Pivot', { fontSize: 15, fontFamily: 2, strokeColor: '#06b6d4' }),
+    txt('wb-r5s', 595, 152, 210, 40, 'CI role → prod-api role\nS3 + RDS + SES access\nT1078.004', { fontSize: 11, strokeColor: '#9ca3af' }),
+    el('wb-r6', 'rectangle', 590, 230, 220, 80, { strokeColor: '#ec4899', backgroundColor: '#ec489915' }),
+    txt('wb-r6t', 595, 235, 210, 24, 'Privilege Escalation', { fontSize: 15, fontFamily: 2, strokeColor: '#ec4899' }),
+    txt('wb-r6s', 595, 262, 210, 40, 'SSO → openslaw-admin role\nCloudTrail disabled 4h\nFull admin access', { fontSize: 11, strokeColor: '#9ca3af' }),
+
+    // ── Phase 4: Collection & Exfil (Day 3-4) ──
+    txt('wb-ph4', 870, 95, 230, 20, 'DAY 3-4 — EXFILTRATION', { fontSize: 11, fontFamily: 2, strokeColor: '#eab308', textAlign: 'left' }),
+    el('wb-r7', 'rectangle', 870, 120, 220, 80, { strokeColor: '#eab308', backgroundColor: '#eab30815' }),
+    txt('wb-r7t', 875, 125, 210, 24, 'Data Collection', { fontSize: 15, fontFamily: 2, strokeColor: '#eab308' }),
+    txt('wb-r7s', 875, 152, 210, 40, '12,847 legal documents\n47 client matters\ns3://openslaw-legal-docs/', { fontSize: 11, strokeColor: '#9ca3af' }),
+    el('wb-r8', 'rectangle', 870, 230, 220, 80, { strokeColor: '#ef4444', backgroundColor: '#ef444415' }),
+    txt('wb-r8t', 875, 235, 210, 24, 'Exfiltration', { fontSize: 15, fontFamily: 2, strokeColor: '#ef4444' }),
+    txt('wb-r8s', 875, 262, 210, 40, '2.3 GB encrypted (7z, AES-256)\nBucharest staging → Singapore\nT1567.002', { fontSize: 11, strokeColor: '#9ca3af' }),
+
+    // ── Phase 5: Detection & Response (Day 4-5) ──
+    txt('wb-ph5', 1150, 95, 230, 20, 'DAY 4-5 — RESPONSE', { fontSize: 11, fontFamily: 2, strokeColor: '#22c55e', textAlign: 'left' }),
+    // Detection diamond
+    el('wb-d1', 'diamond', 1175, 120, 160, 80, { strokeColor: '#22c55e', backgroundColor: '#22c55e15' }),
+    txt('wb-d1t', 1195, 140, 120, 40, 'SOC ALERT\nAnomaly Detected', { fontSize: 12, fontFamily: 2, strokeColor: '#22c55e' }),
+    el('wb-r9', 'rectangle', 1150, 230, 220, 80, { strokeColor: '#10b981', backgroundColor: '#10b98115' }),
+    txt('wb-r9t', 1155, 235, 210, 24, 'Containment & Eradication', { fontSize: 15, fontFamily: 2, strokeColor: '#10b981' }),
+    txt('wb-r9s', 1155, 262, 210, 40, 'C2 blocked, keys revoked\nnpm rolled back, server rebuilt\nForensic imaging complete', { fontSize: 11, strokeColor: '#9ca3af' }),
+
+    // ── Arrows (phase connections) ──
+    arrow('wb-a1', 250, 155, [[0, 0], [60, 0]], { strokeColor: '#ef4444' }),    // Supply Chain → Backdoor
+    arrow('wb-a2', 250, 265, [[0, 0], [60, 0]], { strokeColor: '#f97316' }),    // Phishing → C2
+    arrow('wb-a3', 530, 155, [[0, 0], [60, 0]], { strokeColor: '#a855f7' }),    // Backdoor → AWS Pivot
+    arrow('wb-a4', 530, 265, [[0, 0], [60, 0]], { strokeColor: '#3b82f6' }),    // C2 → Priv Esc
+    arrow('wb-a5', 810, 155, [[0, 0], [60, 0]], { strokeColor: '#06b6d4' }),    // AWS Pivot → Collection
+    arrow('wb-a6', 810, 265, [[0, 0], [60, 0]], { strokeColor: '#ec4899' }),    // Priv Esc → Exfil
+    arrow('wb-a7', 1090, 155, [[0, 0], [85, 0]], { strokeColor: '#eab308' }),   // Collection → Detection
+    arrow('wb-a8', 1090, 265, [[0, 0], [60, 0]], { strokeColor: '#ef4444' }),   // Exfil → Containment
+    // Vertical connections
+    arrow('wb-a9', 140, 200, [[0, 0], [0, 30]], { strokeColor: '#6b7280', strokeWidth: 1, strokeStyle: 'dashed' }),    // Supply → Phishing (parallel vectors)
+    arrow('wb-a10', 420, 200, [[0, 0], [0, 30]], { strokeColor: '#6b7280', strokeWidth: 1, strokeStyle: 'dashed' }),   // Backdoor → C2
+    arrow('wb-a11', 700, 200, [[0, 0], [0, 30]], { strokeColor: '#6b7280', strokeWidth: 1, strokeStyle: 'dashed' }),   // Pivot → Priv Esc
+    arrow('wb-a12', 980, 200, [[0, 0], [0, 30]], { strokeColor: '#6b7280', strokeWidth: 1, strokeStyle: 'dashed' }),   // Collection → Exfil
+    arrow('wb-a13', 1255, 200, [[0, 0], [0, 30]], { strokeColor: '#22c55e', strokeWidth: 1 }),   // Detection → Containment
+
+    // ── Infrastructure annotations (bottom row) ──
+    txt('wb-inf', 420, 345, 440, 20, 'INFRASTRUCTURE', { fontSize: 11, fontFamily: 2, strokeColor: '#6b7280', textAlign: 'center' }),
+    el('wb-infbox', 'rectangle', 30, 365, 1340, 70, { strokeColor: '#374151', backgroundColor: '#1f293715', strokeWidth: 1 }),
+    txt('wb-inf1', 45, 372, 200, 20, '185.220.101.34', { fontSize: 13, fontFamily: 3, strokeColor: '#3b82f6', textAlign: 'left' }),
+    txt('wb-inf1l', 45, 395, 200, 16, 'C2 Server · Moscow, RU', { fontSize: 10, strokeColor: '#6b7280', textAlign: 'left' }),
+    txt('wb-inf2', 280, 372, 200, 20, '91.215.85.17', { fontSize: 13, fontFamily: 3, strokeColor: '#06b6d4', textAlign: 'left' }),
+    txt('wb-inf2l', 280, 395, 200, 16, 'DNS Tunnel NS · Shanghai, CN', { fontSize: 10, strokeColor: '#6b7280', textAlign: 'left' }),
+    txt('wb-inf3', 520, 372, 200, 20, '89.44.9.241', { fontSize: 13, fontFamily: 3, strokeColor: '#f97316', textAlign: 'left' }),
+    txt('wb-inf3l', 520, 395, 200, 16, 'Phishing Host · Amsterdam, NL', { fontSize: 10, strokeColor: '#6b7280', textAlign: 'left' }),
+    txt('wb-inf4', 760, 372, 200, 20, '185.156.73.22', { fontSize: 13, fontFamily: 3, strokeColor: '#eab308', textAlign: 'left' }),
+    txt('wb-inf4l', 760, 395, 200, 16, 'Exfil Staging · Bucharest, RO', { fontSize: 10, strokeColor: '#6b7280', textAlign: 'left' }),
+    txt('wb-inf5', 1000, 372, 200, 20, '103.253.41.98', { fontSize: 13, fontFamily: 3, strokeColor: '#ef4444', textAlign: 'left' }),
+    txt('wb-inf5l', 1000, 395, 200, 16, 'Data Landing · Singapore, SG', { fontSize: 10, strokeColor: '#6b7280', textAlign: 'left' }),
+
+    // ── MITRE ATT&CK reference (top-right) ──
+    el('wb-mitre', 'rectangle', 1150, 0, 220, 85, { strokeColor: '#374151', backgroundColor: '#1f293715', strokeWidth: 1 }),
+    txt('wb-mitret', 1160, 5, 200, 16, 'MITRE ATT&CK', { fontSize: 11, fontFamily: 2, strokeColor: '#14b8a6', textAlign: 'left' }),
+    txt('wb-mitrel', 1160, 22, 200, 60, 'T1195.002 · T1566.001\nT1078.004 · T1071.001\nT1572 · T1567.002\nT1537 · T1560.001', { fontSize: 10, fontFamily: 3, strokeColor: '#6b7280', textAlign: 'left', lineHeight: 1.4 }),
   ]);
 
   const whiteboard: Whiteboard = {

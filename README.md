@@ -34,6 +34,7 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 
 ### Timeline & Whiteboard
 - **Incident Timeline** — Map events to MITRE ATT&CK tactics with timestamps, confidence levels, linked IOCs, and multi-timeline support
+- **Smart Data Import** — Paste or drop CSV, TSV, JSON, or NDJSON from SIEMs and EDR tools; auto-detect format, auto-map columns (Splunk, CrowdStrike, Elastic), bulk-create timeline events and IOCs
 - **Whiteboards** — Freeform drawing with Excalidraw integration
 - **Activity Log** — Track all actions across notes, tasks, timeline, and IOCs
 
@@ -64,6 +65,7 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 - Dexie.js (IndexedDB)
 - Cytoscape.js (entity graph visualization)
 - Excalidraw (whiteboards)
+- Papa Parse (CSV/TSV parsing)
 - marked + highlight.js + DOMPurify
 - lucide-react
 

@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 
@@ -104,6 +104,17 @@ function sanitizeComment(raw: unknown): TaskComment | null {
   };
 }
 
+function sanitizeAnnotation(raw: unknown): NoteAnnotation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== 'string' || typeof r.text !== 'string') return null;
+  return {
+    id: str(r.id),
+    text: str(r.text),
+    createdAt: num(r.createdAt, Date.now()),
+  };
+}
+
 export function sanitizeNote(raw: unknown): Note | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -126,6 +137,9 @@ export function sanitizeNote(raw: unknown): Note | null {
     linkedNoteIds: Array.isArray(r.linkedNoteIds) ? strArr(r.linkedNoteIds) : undefined,
     linkedTaskIds: Array.isArray(r.linkedTaskIds) ? strArr(r.linkedTaskIds) : undefined,
     linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
+    annotations: Array.isArray(r.annotations)
+      ? (r.annotations as unknown[]).map(sanitizeAnnotation).filter((a): a is NoteAnnotation => a !== null)
+      : undefined,
     createdAt: num(r.createdAt, Date.now()),
     updatedAt: num(r.updatedAt, Date.now()),
   };
@@ -163,6 +177,7 @@ function sanitizeTask(raw: unknown): Task | null {
 }
 
 const VALID_INVESTIGATION_STATUS = ['active', 'closed', 'archived'];
+const VALID_CLOSURE_RESOLUTIONS = ['resolved', 'false-positive', 'escalated', 'duplicate', 'inconclusive'];
 
 function sanitizeFolder(raw: unknown): Folder | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -183,6 +198,11 @@ function sanitizeFolder(raw: unknown): Folder | null {
     updatedAt: r.updatedAt != null ? num(r.updatedAt) : undefined,
     tags: Array.isArray(r.tags) ? strArr(r.tags) : undefined,
     timelineId: r.timelineId != null ? str(r.timelineId) : undefined,
+    closureResolution: r.closureResolution != null && VALID_CLOSURE_RESOLUTIONS.includes(str(r.closureResolution))
+      ? str(r.closureResolution) as Folder['closureResolution']
+      : undefined,
+    closedReason: r.closedReason != null ? str(r.closedReason) : undefined,
+    closedAt: r.closedAt != null ? num(r.closedAt) : undefined,
   };
 }
 

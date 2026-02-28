@@ -12,6 +12,16 @@ export function defang(text: string): string {
     .replace(/\(dot\)/gi, '.');
 }
 
+// Convert a refanged IOC value back to defanged form for safe display
+export function refangToDefanged(text: string): string {
+  return text
+    .replace(/https/gi, 'hxxps')
+    .replace(/http/gi, 'hxxp')
+    .replace(/:\/\//g, '[://]')
+    .replace(/@/g, '[@]')
+    .replace(/\./g, '[.]');
+}
+
 // Check if a hex string is all the same character (false positive)
 function isUniformHex(s: string): boolean {
   const lower = s.toLowerCase();

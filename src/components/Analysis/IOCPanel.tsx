@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { X, RefreshCw, ChevronDown, ChevronRight, Shield, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
+import { X, RefreshCw, ChevronDown, ChevronRight, Shield, ShieldOff, Download, Upload, XCircle, Tag, Check } from 'lucide-react';
 import type { IOCTarget, IOCEntry, IOCType, IOCAnalysis } from '../../types';
 import { IOC_TYPE_LABELS } from '../../types';
 import { useIOCAnalysis } from '../../hooks/useIOCAnalysis';
@@ -56,6 +56,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
 
   const [collapsedTypes, setCollapsedTypes] = useState<Set<IOCType>>(new Set());
   const [showDismissed, setShowDismissed] = useState(false);
+  const [showDefanged, setShowDefanged] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [attributionForType, setAttributionForType] = useState<IOCType | null>(null);
   const [attributionInput, setAttributionInput] = useState('');
@@ -220,6 +221,14 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
         {iocCount > 0 && (
           <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">{iocCount}</span>
         )}
+        <button
+          onClick={() => setShowDefanged(!showDefanged)}
+          className={cn('p-1 rounded', showDefanged ? 'text-accent' : 'text-gray-500 hover:text-gray-300')}
+          title={showDefanged ? 'Show original values' : 'Defang IOC values'}
+          aria-label="Toggle defanged display"
+        >
+          <ShieldOff size={14} />
+        </button>
         <button
           onClick={analyze}
           disabled={analyzing}
@@ -425,6 +434,7 @@ export function IOCPanel({ item, onUpdate, onClose, attributionActors, threatInt
                             attributionActors={attributionActors}
                             threatIntelConfig={threatIntelConfig}
                             allIOCs={analysis?.iocs}
+                            defanged={showDefanged}
                           />
                         ))}
                       </div>

@@ -1014,6 +1014,7 @@ export default function App() {
       activeView={activeView}
       onViewChange={(v: ViewMode) => navigateTo(v)}
       entityCounts={investigationScopedCounts}
+      onEditFolder={selectedFolderId ? () => setEditingFolderId(selectedFolderId) : undefined}
     />
   ) : null;
 

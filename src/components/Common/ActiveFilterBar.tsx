@@ -1,4 +1,4 @@
-import { Briefcase, Tag, FileText, ListChecks, Clock, PenTool, ShieldCheck } from 'lucide-react';
+import { Briefcase, Tag, FileText, ListChecks, Clock, PenTool, ShieldCheck, Info } from 'lucide-react';
 import type { InvestigationStatus, ViewMode } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -24,6 +24,7 @@ interface ActiveFilterBarProps {
   activeView?: ViewMode;
   onViewChange?: (view: ViewMode) => void;
   entityCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
+  onEditFolder?: () => void;
 }
 
 function EntityChip({ icon, count, active, onClick, title }: {
@@ -44,7 +45,7 @@ function EntityChip({ icon, count, active, onClick, title }: {
   );
 }
 
-export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, activeView, onViewChange, entityCounts }: ActiveFilterBarProps) {
+export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, activeView, onViewChange, entityCounts, onEditFolder }: ActiveFilterBarProps) {
   if (!folderName && !tagName) return null;
 
   const accentColor = folderColor || tagColor || '#6366f1';
@@ -63,6 +64,16 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
         <span className="flex items-center gap-1.5">
           <Briefcase size={14} style={{ color: folderColor }} />
           <span className="text-gray-200 font-medium">{folderName}</span>
+          {onEditFolder && (
+            <button
+              onClick={onEditFolder}
+              className="p-0.5 rounded text-gray-500 hover:text-gray-300"
+              title="Investigation details"
+              aria-label="View investigation details"
+            >
+              <Info size={13} />
+            </button>
+          )}
         </span>
       )}
       {tagName && (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Briefcase } from 'lucide-react';
-import type { Folder, InvestigationStatus } from '../../types';
-import { NOTE_COLORS } from '../../types';
+import type { Folder, InvestigationStatus, ClosureResolution } from '../../types';
+import { NOTE_COLORS, CLOSURE_RESOLUTION_LABELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import type { Tag } from '../../types';
 import { cn, formatFullDate } from '../../lib/utils';
@@ -115,7 +115,13 @@ export function InvestigationDetailPanel({
               {STATUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
-                  onClick={() => onUpdate(folder.id, { status: opt.value })}
+                  onClick={() => {
+                    if (opt.value === 'closed') {
+                      onUpdate(folder.id, { status: opt.value, closedAt: Date.now() });
+                    } else {
+                      onUpdate(folder.id, { status: opt.value, closureResolution: undefined, closedReason: undefined, closedAt: undefined });
+                    }
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                     status === opt.value
@@ -129,6 +135,39 @@ export function InvestigationDetailPanel({
                 </button>
               ))}
             </div>
+
+            {/* Closure details (visible when status is closed) */}
+            {status === 'closed' && (
+              <div className="mt-3 pl-2 border-l-2 border-gray-700 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Resolution</label>
+                  <select
+                    value={folder.closureResolution || ''}
+                    onChange={(e) => onUpdate(folder.id, { closureResolution: (e.target.value || undefined) as ClosureResolution | undefined })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent"
+                  >
+                    <option value="">Select resolution...</option>
+                    {(Object.entries(CLOSURE_RESOLUTION_LABELS) as [ClosureResolution, string][]).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Closure Notes</label>
+                  <textarea
+                    value={folder.closedReason || ''}
+                    onChange={(e) => onUpdate(folder.id, { closedReason: e.target.value || undefined })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent h-20 resize-none"
+                    placeholder="Reason for closing..."
+                  />
+                </div>
+                {folder.closedAt && (
+                  <div className="text-xs text-gray-500">
+                    Closed {formatFullDate(folder.closedAt)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Classification & PAP */}

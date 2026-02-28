@@ -17,6 +17,7 @@ export interface Note {
   linkedNoteIds?: string[];
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
+  annotations?: NoteAnnotation[];
   createdAt: number;
   updatedAt: number;
 }
@@ -32,6 +33,12 @@ export interface IOCTarget {
 }
 
 export interface TaskComment {
+  id: string;
+  text: string;
+  createdAt: number;
+}
+
+export interface NoteAnnotation {
   id: string;
   text: string;
   createdAt: number;
@@ -68,6 +75,16 @@ export interface Task {
 
 export type InvestigationStatus = 'active' | 'closed' | 'archived';
 
+export type ClosureResolution = 'resolved' | 'false-positive' | 'escalated' | 'duplicate' | 'inconclusive';
+
+export const CLOSURE_RESOLUTION_LABELS: Record<ClosureResolution, string> = {
+  'resolved': 'Resolved',
+  'false-positive': 'False Positive',
+  'escalated': 'Escalated',
+  'duplicate': 'Duplicate',
+  'inconclusive': 'Inconclusive',
+};
+
 export interface Folder {
   id: string;
   name: string;
@@ -82,6 +99,9 @@ export interface Folder {
   updatedAt?: number;
   tags?: string[];
   timelineId?: string;
+  closureResolution?: ClosureResolution;
+  closedReason?: string;
+  closedAt?: number;
 }
 
 export interface Tag {

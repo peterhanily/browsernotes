@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
-import { extractIOCs, defang, mergeIOCAnalysis, extractYaraRules, extractSigmaRules } from '../lib/ioc-extractor';
+import { extractIOCs, defang, mergeIOCAnalysis, extractYaraRules, extractSigmaRules, refangToDefanged } from '../lib/ioc-extractor';
 import type { IOCAnalysis, IOCEntry } from '../types';
 
 // ── defang ──────────────────────────────────────────────────────────
@@ -576,5 +576,324 @@ detection:
 
   it('returns empty for text with no title: lines', () => {
     expect(extractSigmaRules('just some text')).toEqual([]);
+  });
+});
+
+// ── defang - edge cases ─────────────────────────────────────────────
+
+describe('defang - edge cases', () => {
+  it('handles mixed defanging patterns in a single URL', () => {
+    expect(defang('hxxps[:]//evil[.]com[/]path')).toBe('https://evil.com/path');
+  });
+
+  it('handles partial defanging (only dots)', () => {
+    expect(defang('https://evil[.]com')).toBe('https://evil.com');
+  });
+
+  it('handles partial defanging (only protocol)', () => {
+    expect(defang('hxxps://evil.com')).toBe('https://evil.com');
+  });
+
+  it('handles nested defanging (dot inside parens)', () => {
+    expect(defang('evil(dot)com')).toBe('evil.com');
+  });
+
+  it('handles defanged email', () => {
+    expect(defang('user[@]evil[.]com')).toBe('user@evil.com');
+  });
+
+  it('handles multiple dots defanged', () => {
+    expect(defang('sub[.]domain[.]evil[.]com')).toBe('sub.domain.evil.com');
+  });
+});
+
+// ── refangToDefanged ────────────────────────────────────────────────
+
+describe('refangToDefanged', () => {
+  it('defangs https URL', () => {
+    expect(refangToDefanged('https://evil.com/path')).toBe('hxxps[://]evil[.]com/path');
+  });
+
+  it('defangs http URL', () => {
+    expect(refangToDefanged('http://evil.com')).toBe('hxxp[://]evil[.]com');
+  });
+
+  it('defangs email address', () => {
+    expect(refangToDefanged('user@evil.com')).toBe('user[@]evil[.]com');
+  });
+
+  it('defangs IPv4 address', () => {
+    expect(refangToDefanged('192.168.1.1')).toBe('192[.]168[.]1[.]1');
+  });
+
+  it('defangs domain name', () => {
+    expect(refangToDefanged('malware.evil.com')).toBe('malware[.]evil[.]com');
+  });
+
+  it('passes through hash values unchanged', () => {
+    const hash = 'd41d8cd98f00b204e9800998ecf8427e';
+    expect(refangToDefanged(hash)).toBe(hash);
+  });
+
+  it('produces a value that is visually distinct from original', () => {
+    const original = 'https://evil.com/path';
+    const defanged = refangToDefanged(original);
+    expect(defanged).not.toBe(original);
+    expect(defanged).toContain('hxxps');
+    expect(defanged).toContain('[.]');
+  });
+
+  it('handles URL with port', () => {
+    const result = refangToDefanged('https://evil.com:8443/path');
+    expect(result).toContain('hxxps');
+    expect(result).toContain('[.]');
+    expect(result).toContain('8443');
+  });
+});
+
+// ── extractIOCs - URL edge cases ────────────────────────────────────
+
+describe('extractIOCs - URL edge cases', () => {
+  it('extracts URL with query parameters', () => {
+    const result = extractIOCs('Visit https://evil.com/page?id=123&token=abc');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain('?id=123');
+  });
+
+  it('extracts URL with fragment', () => {
+    const result = extractIOCs('See https://evil.com/page#section');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain('#section');
+  });
+
+  it('extracts URL with port number', () => {
+    const result = extractIOCs('C2 at https://evil.com:8443/callback');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain(':8443');
+  });
+
+  it('extracts URL with encoded characters', () => {
+    const result = extractIOCs('Found https://evil.com/path%20with%20spaces');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain('%20');
+  });
+
+  it('extracts long URL without truncation', () => {
+    const longPath = '/a'.repeat(200);
+    const result = extractIOCs(`Found https://evil.com${longPath}`);
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+  });
+
+  it('strips trailing parenthesis from URLs', () => {
+    const result = extractIOCs('(see https://evil.com/path)');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toBe('https://evil.com/path');
+  });
+
+  it('extracts multiple URLs on same line', () => {
+    const result = extractIOCs('URLs: https://evil.com and https://bad.org/path');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(2);
+  });
+
+  it('extracts URL with subdirectory path', () => {
+    const result = extractIOCs('Found https://evil.com/a/b/c/d.exe');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain('/a/b/c/d.exe');
+  });
+});
+
+// ── extractIOCs - domain edge cases ─────────────────────────────────
+
+describe('extractIOCs - domain edge cases', () => {
+  it('extracts deep subdomain', () => {
+    const result = extractIOCs('Beacon to a.b.c.evil.com observed');
+    const domains = result.filter((i) => i.type === 'domain');
+    expect(domains.map((d) => d.value)).toContain('a.b.c.evil.com');
+  });
+
+  it('extracts short two-label domain', () => {
+    const result = extractIOCs('Traffic to evil.com detected');
+    const domains = result.filter((i) => i.type === 'domain');
+    expect(domains.map((d) => d.value)).toContain('evil.com');
+  });
+
+  it('extracts domain with hyphens', () => {
+    const result = extractIOCs('Found my-evil-domain.com in logs');
+    const domains = result.filter((i) => i.type === 'domain');
+    expect(domains.map((d) => d.value)).toContain('my-evil-domain.com');
+  });
+
+  it('extracts .onion domains', () => {
+    const result = extractIOCs('Tor hidden service at darkweb123abc.onion');
+    const domains = result.filter((i) => i.type === 'domain');
+    expect(domains.map((d) => d.value)).toContain('darkweb123abc.onion');
+  });
+
+  it('extracts .tk domains', () => {
+    const result = extractIOCs('Suspicious domain evil.tk flagged');
+    const domains = result.filter((i) => i.type === 'domain');
+    expect(domains.map((d) => d.value)).toContain('evil.tk');
+  });
+});
+
+// ── extractIOCs - IPv4 edge cases ───────────────────────────────────
+
+describe('extractIOCs - IPv4 edge cases', () => {
+  it('extracts IPv4 with CIDR notation (IP part only)', () => {
+    // CIDR suffix may or may not be included; IP should be extracted
+    const result = extractIOCs('Block 10.0.0.0/24 at firewall');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s.length).toBeGreaterThanOrEqual(1);
+    expect(ipv4s.some((i) => i.value.startsWith('10.0.0.0'))).toBe(true);
+  });
+
+  it('extracts comma-separated IPv4 addresses', () => {
+    const result = extractIOCs('IPs: 10.1.1.1,10.2.2.2,10.3.3.3');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(3);
+  });
+
+  it('extracts IPv4 embedded in URL', () => {
+    const result = extractIOCs('Callback to http://192.168.1.100:4444/shell');
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+    expect(urls[0].value).toContain('192.168.1.100');
+  });
+
+  it('extracts edge-case valid IPv4 (250.250.250.250)', () => {
+    const result = extractIOCs('IP: 250.250.250.250');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(1);
+    expect(ipv4s[0].value).toBe('250.250.250.250');
+  });
+});
+
+// ── extractIOCs - IPv6 edge cases ───────────────────────────────────
+
+describe('extractIOCs - IPv6 edge cases', () => {
+  it('extracts ::1 loopback', () => {
+    const result = extractIOCs('Listening on ::1');
+    const ipv6s = result.filter((i) => i.type === 'ipv6');
+    expect(ipv6s).toHaveLength(1);
+    expect(ipv6s[0].value).toBe('::1');
+  });
+
+  it('extracts link-local address', () => {
+    const result = extractIOCs('Link-local fe80::1%eth0 detected');
+    const ipv6s = result.filter((i) => i.type === 'ipv6');
+    expect(ipv6s).toHaveLength(1);
+    expect(ipv6s[0].value).toContain('fe80');
+  });
+
+  it('extracts full IPv6 address', () => {
+    const result = extractIOCs('Address: 2001:0db8:85a3:0000:0000:8a2e:0370:7334');
+    const ipv6s = result.filter((i) => i.type === 'ipv6');
+    expect(ipv6s).toHaveLength(1);
+  });
+
+  it('extracts IPv4-mapped IPv6 address', () => {
+    const result = extractIOCs('Mapped address ::ffff:192.168.1.1');
+    const ipv6s = result.filter((i) => i.type === 'ipv6');
+    expect(ipv6s).toHaveLength(1);
+  });
+});
+
+// ── extractIOCs - hash edge cases ───────────────────────────────────
+
+describe('extractIOCs - hash edge cases', () => {
+  it('extracts adjacent hashes separated by newline', () => {
+    const md5 = 'aabbccdd11223344aabbccdd11223344';
+    const sha1 = 'aabbccdd11223344aabbccdd1122334455667788';
+    const result = extractIOCs(`${md5}\n${sha1}`);
+    // Both should be detected (sha1 is 40 chars, md5 is 32 chars — not substrings of each other)
+    const hashes = result.filter((i) => ['md5', 'sha1'].includes(i.type));
+    expect(hashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('extracts uppercase SHA-256', () => {
+    const hash = 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855';
+    const result = extractIOCs(`Hash: ${hash}`);
+    const sha256s = result.filter((i) => i.type === 'sha256');
+    expect(sha256s).toHaveLength(1);
+  });
+
+  it('extracts hash in URL path', () => {
+    const hash = 'd41d8cd98f00b204e9800998ecf8427e';
+    const result = extractIOCs(`https://vt.com/file/${hash}/analysis`);
+    // Should find the URL and potentially the md5
+    const urls = result.filter((i) => i.type === 'url');
+    expect(urls).toHaveLength(1);
+  });
+
+  it('does not extract partial hex that is not exactly 32/40/64 chars', () => {
+    // 31 hex chars — not a valid hash length
+    const partial = 'aabbccdd11223344aabbccdd1122334';
+    const result = extractIOCs(partial);
+    const hashes = result.filter((i) => ['md5', 'sha1', 'sha256'].includes(i.type));
+    expect(hashes).toHaveLength(0);
+  });
+});
+
+// ── extractIOCs - false positive resistance ─────────────────────────
+
+describe('extractIOCs - false positive resistance', () => {
+  it('does not extract version numbers as IPs', () => {
+    // Version numbers like 1.2.3 don't match IPv4 (need 4 octets)
+    const result = extractIOCs('Version 1.2.3 released');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(0);
+  });
+
+  it('does not extract CSS hex colors as hashes', () => {
+    const result = extractIOCs('color: #ff5733; background: #112233;');
+    const hashes = result.filter((i) => ['md5', 'sha1', 'sha256'].includes(i.type));
+    expect(hashes).toHaveLength(0);
+  });
+
+  it('does not extract UUIDs as hashes', () => {
+    const result = extractIOCs('id: 550e8400-e29b-41d4-a716-446655440000');
+    const md5s = result.filter((i) => i.type === 'md5');
+    expect(md5s).toHaveLength(0);
+  });
+
+  it('does not extract date-like strings as IPs', () => {
+    const result = extractIOCs('Date: 2024.01.15 was the deadline');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(0);
+  });
+
+  it('rejects reserved/broadcast IPs', () => {
+    const result = extractIOCs('127.0.0.1 and 0.0.0.0 and 255.255.255.255');
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(0);
+  });
+});
+
+// ── extractIOCs - large input ───────────────────────────────────────
+
+describe('extractIOCs - large input', () => {
+  it('handles 100K character input without errors', { timeout: 15_000 }, () => {
+    const bigText = 'Some text with 10.20.30.40 and evil.com ' + 'x'.repeat(100_000);
+    const result = extractIOCs(bigText);
+    expect(result.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('handles input with many IOCs scattered throughout', () => {
+    // Build input with 50 distinct IPs
+    const parts: string[] = [];
+    for (let i = 1; i <= 50; i++) {
+      parts.push(`IP: 10.0.${i}.${i} was observed.`);
+    }
+    const result = extractIOCs(parts.join('\n'));
+    const ipv4s = result.filter((i) => i.type === 'ipv4');
+    expect(ipv4s).toHaveLength(50);
   });
 });

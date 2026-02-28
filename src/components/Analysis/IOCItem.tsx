@@ -4,6 +4,7 @@ import type { IOCEntry, IOCType, ConfidenceLevel, IOCRelationship, IOCRelationsh
 import { CONFIDENCE_LEVELS, DEFAULT_IOC_SUBTYPES, DEFAULT_RELATIONSHIP_TYPES, IOC_TYPE_LABELS } from '../../types';
 import { AttributionComboInput } from './AttributionComboInput';
 import { getEffectiveClsLevels } from '../../lib/classification';
+import { refangToDefanged } from '../../lib/ioc-extractor';
 import { cn } from '../../lib/utils';
 
 export interface ThreatIntelConfigProps {
@@ -21,6 +22,7 @@ interface IOCItemProps {
   attributionActors?: string[];
   threatIntelConfig?: ThreatIntelConfigProps;
   allIOCs?: IOCEntry[];
+  defanged?: boolean;
 }
 
 function getSubtypesForType(type: IOCType, config?: Record<string, string[]>): string[] {
@@ -49,7 +51,9 @@ function getValidTargetTypes(relType: string, allDefs: Record<string, IOCRelatio
   return def.targetTypes;
 }
 
-export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors = [], threatIntelConfig, allIOCs = [] }: IOCItemProps) {
+const NETWORK_IOC_TYPES = new Set<IOCType>(['url', 'domain', 'ipv4', 'ipv6', 'email']);
+
+export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors = [], threatIntelConfig, allIOCs = [], defanged }: IOCItemProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [addingRelationship, setAddingRelationship] = useState(false);
@@ -59,8 +63,10 @@ export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
+  const displayValue = defanged && NETWORK_IOC_TYPES.has(ioc.type) ? refangToDefanged(ioc.value) : ioc.value;
+
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(ioc.value);
+    await navigator.clipboard.writeText(displayValue);
     setCopied(true);
     clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopied(false), 1500);
@@ -125,8 +131,8 @@ export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
 
-        <span className="font-mono text-xs text-gray-200 truncate flex-1" title={ioc.value}>
-          {ioc.value}
+        <span className="font-mono text-xs text-gray-200 truncate flex-1" title={displayValue}>
+          {displayValue}
         </span>
 
         <button

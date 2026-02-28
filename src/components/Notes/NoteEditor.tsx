@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, Upload, Briefcase } from 'lucide-react';
-import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings } from '../../types';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Shield, ShieldOff, Upload, Briefcase, MessageSquare } from 'lucide-react';
+import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
+import { nanoid } from 'nanoid';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { getEffectiveClsLevels } from '../../lib/classification';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -15,7 +16,7 @@ import { useCloudSync } from '../../hooks/useCloudSync';
 import { useResizable } from '../../hooks/useResizable';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
 import { useAutoIOCExtraction } from '../../hooks/useAutoIOCExtraction';
-import { wordCount, formatFullDate, cn, isSafeUrl } from '../../lib/utils';
+import { wordCount, formatFullDate, formatDate, cn, isSafeUrl } from '../../lib/utils';
 
 interface NoteEditorProps {
   note: Note;
@@ -64,6 +65,9 @@ export function NoteEditor({
   const [showIOCPanel, setShowIOCPanel] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareMessage, setShareMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [defangPreview, setDefangPreview] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(false);
+  const [annotationText, setAnnotationText] = useState('');
   const cloud = useCloudSync(externalSettings?.backupDestinations);
   const logActivity = useLogActivity();
   const titleRef = useRef<HTMLInputElement>(null);
@@ -440,6 +444,31 @@ export function NoteEditor({
           )}
         </button>
 
+        {showPreview && (
+          <button
+            onClick={() => setDefangPreview(!defangPreview)}
+            className={cn('p-1.5 rounded', defangPreview ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+            title={defangPreview ? 'Show original IOCs' : 'Defang IOCs in preview'}
+            aria-label="Toggle defanged IOC display"
+          >
+            <ShieldOff size={16} />
+          </button>
+        )}
+
+        <button
+          onClick={() => setShowAnnotations(!showAnnotations)}
+          className={cn('p-1.5 rounded flex items-center gap-1', showAnnotations ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+          title="Annotations"
+          aria-label="Toggle annotations panel"
+        >
+          <MessageSquare size={16} />
+          {(note.annotations?.length ?? 0) > 0 && (
+            <span className="text-[10px] bg-accent/20 text-accent px-1 rounded-full">
+              {note.annotations!.length}
+            </span>
+          )}
+        </button>
+
         {cloud.hasDestinations && (
           <div className="relative">
             <button
@@ -572,7 +601,7 @@ export function NoteEditor({
               style={editorMode === 'split' ? { width: `${(1 - editorPreview.ratio) * 100}%` } : { flex: 1 }}
             >
               {content ? (
-                <MarkdownPreview content={content} />
+                <MarkdownPreview content={content} defanged={defangPreview} />
               ) : (
                 <p className="text-gray-600 text-sm italic">Nothing to preview</p>
               )}
@@ -617,6 +646,60 @@ export function NoteEditor({
           </>
         )}
       </div>
+
+      {/* Annotations Panel */}
+      {showAnnotations && (
+        <div className="border-t border-gray-800 shrink-0 max-h-48 overflow-y-auto">
+          <div className="px-3 py-2 space-y-2">
+            {(note.annotations || []).length === 0 && (
+              <p className="text-xs text-gray-600 italic">No annotations yet</p>
+            )}
+            {(note.annotations || []).map((ann) => (
+              <div key={ann.id} className="flex items-start gap-2 text-xs">
+                <span className="text-gray-300 flex-1">{ann.text}</span>
+                <span className="text-gray-600 shrink-0">{formatDate(ann.createdAt)}</span>
+                <button
+                  onClick={() => {
+                    const updated = (note.annotations || []).filter((a) => a.id !== ann.id);
+                    onUpdate(note.id, { annotations: updated });
+                  }}
+                  className="text-gray-600 hover:text-red-400 shrink-0"
+                  aria-label="Delete annotation"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2">
+              <input
+                value={annotationText}
+                onChange={(e) => setAnnotationText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && annotationText.trim()) {
+                    const newAnnotation: NoteAnnotation = { id: nanoid(), text: annotationText.trim(), createdAt: Date.now() };
+                    onUpdate(note.id, { annotations: [...(note.annotations || []), newAnnotation] });
+                    setAnnotationText('');
+                  }
+                }}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                placeholder="Add annotation..."
+              />
+              <button
+                onClick={() => {
+                  if (!annotationText.trim()) return;
+                  const newAnnotation: NoteAnnotation = { id: nanoid(), text: annotationText.trim(), createdAt: Date.now() };
+                  onUpdate(note.id, { annotations: [...(note.annotations || []), newAnnotation] });
+                  setAnnotationText('');
+                }}
+                disabled={!annotationText.trim()}
+                className="px-2 py-1 rounded bg-accent/20 text-accent text-xs hover:bg-accent/30 disabled:opacity-40"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-t border-gray-800 flex items-center gap-2 sm:gap-4 text-xs text-gray-500 shrink-0 flex-wrap">

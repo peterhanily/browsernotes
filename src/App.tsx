@@ -691,6 +691,13 @@ function AppInner() {
     [getFilteredWhiteboards, selectedFolderId, selectedTag]
   );
 
+  // Auto-deselect whiteboard when trashed/archived/filtered out
+  useEffect(() => {
+    if (selectedWhiteboardId && !filteredWhiteboards.find((w) => w.id === selectedWhiteboardId)) {
+      setSelectedWhiteboardId(undefined);
+    }
+  }, [selectedWhiteboardId, filteredWhiteboards]);
+
   // Filtered standalone IOCs
   const filteredStandaloneIOCs = useMemo(
     () => standaloneIOCsHook.getFilteredIOCs({
@@ -790,14 +797,14 @@ function AppInner() {
 
   // Selected note
   const selectedNote = useMemo(
-    () => notes.notes.find((n) => n.id === selectedNoteId),
-    [notes.notes, selectedNoteId]
+    () => filteredNotes.find((n) => n.id === selectedNoteId),
+    [filteredNotes, selectedNoteId]
   );
 
   // Auto-deselect when selected note is no longer in filtered list
   // Fixes stale editor after trash, delete, archive, restore, tag change, etc.
   useEffect(() => {
-    if (selectedNoteId && filteredNotes.length > 0 && !filteredNotes.find((n) => n.id === selectedNoteId)) {
+    if (selectedNoteId && !filteredNotes.find((n) => n.id === selectedNoteId)) {
       setSelectedNoteId(undefined);
     }
   }, [selectedNoteId, filteredNotes]);

@@ -24,7 +24,7 @@ import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
-import type { ViewMode, SortOption, EditorMode, Note, TaskViewMode, IOCType, StandaloneIOC } from './types';
+import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, StandaloneIOC } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 import { DashboardView } from './components/Dashboard/DashboardView';
 import { FileText } from 'lucide-react';
@@ -121,8 +121,16 @@ function AppInner() {
 
   const activityLog = useActivityLog();
 
-  // Share receiver state
+  // Share receiver state — listen for hash changes to support re-navigation
   const [shareData, setShareData] = useState<string | null>(initialShareData);
+  useEffect(() => {
+    const handleHashChange = () => {
+      const data = parseShareHash();
+      if (data) setShareData(data);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Mobile exec mode
   const isMobile = useIsMobile();
@@ -878,6 +886,43 @@ function AppInner() {
     setShareLinkPayload({ v: 1, s: 'investigation', t: Date.now(), d: bundle });
   }, [folders, notes.notes, tasks.tasks, timeline.events, timelines, whiteboards, standaloneIOCsHook.iocs, tags]);
 
+  const handleSaveSharedPayload = useCallback(async (payload: SharePayload) => {
+    if (payload.s === 'investigation') {
+      const bundle = payload.d as InvestigationBundle;
+      await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.timelines, db.tags], async () => {
+        await db.folders.put(bundle.folder);
+        await db.notes.bulkPut(bundle.notes);
+        await db.tasks.bulkPut(bundle.tasks);
+        await db.timelineEvents.bulkPut(bundle.events);
+        await db.whiteboards.bulkPut(bundle.whiteboards);
+        await db.standaloneIOCs.bulkPut(bundle.iocs);
+        await db.timelines.bulkPut(bundle.timelines);
+        await db.tags.bulkPut(bundle.tags);
+      });
+      reloadFolders();
+      notes.reload();
+      tasks.reload();
+      timeline.reload();
+      reloadTimelines();
+      reloadWhiteboards();
+      standaloneIOCsHook.reload();
+      reloadTags();
+      addToast('success', `Saved investigation "${bundle.folder.name}" with all entities`);
+    } else if (payload.s === 'note') {
+      await db.notes.put(payload.d as Note);
+      notes.reload();
+      addToast('success', 'Note saved to ThreatCaddy');
+    } else if (payload.s === 'task') {
+      await db.tasks.put(payload.d as Task);
+      tasks.reload();
+      addToast('success', 'Task saved to ThreatCaddy');
+    } else if (payload.s === 'event') {
+      await db.timelineEvents.put(payload.d as TimelineEvent);
+      timeline.reload();
+      addToast('success', 'Event saved to ThreatCaddy');
+    }
+  }, [notes, tasks, timeline, reloadFolders, reloadTimelines, reloadWhiteboards, standaloneIOCsHook, reloadTags, addToast]);
+
   const [showDataImport, setShowDataImport] = useState(false);
 
   const handleDataImportComplete = useCallback((result: ImportResult) => {
@@ -1153,6 +1198,7 @@ function AppInner() {
           setShareData(null);
           history.replaceState(null, '', location.pathname + location.search);
         }}
+        onSave={handleSaveSharedPayload}
       />
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Shield, Lock, X, AlertCircle } from 'lucide-react';
+import { Shield, Lock, X, AlertCircle, Download, Check } from 'lucide-react';
 import { isEncryptedShare, decodeSharePayload } from '../../lib/share';
 import type { SharePayload } from '../../lib/share';
 import type { Note, Task, TimelineEvent } from '../../types';
@@ -14,6 +14,7 @@ interface ShareReceiverProps {
   encodedData: string;
   theme: 'dark' | 'light';
   onDismiss: () => void;
+  onSave?: (payload: SharePayload) => Promise<void>;
 }
 
 type ReceiverState =
@@ -42,13 +43,14 @@ const SCOPE_LABELS: Record<string, string> = {
   investigation: 'Investigation',
 };
 
-export function ShareReceiver({ encodedData, theme, onDismiss }: ShareReceiverProps) {
+export function ShareReceiver({ encodedData, theme, onDismiss, onSave }: ShareReceiverProps) {
   const encrypted = useMemo(() => isEncryptedShare(encodedData), [encodedData]);
   const [password, setPassword] = useState('');
   const [state, setState] = useState<ReceiverState>(
     encrypted ? { phase: 'password-prompt' } : { phase: 'decoding' },
   );
   const [bundleDrill, setBundleDrill] = useState<BundleDrill>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Auto-decode unencrypted shares on mount
   const decodedRef = useRef(false);
@@ -72,7 +74,16 @@ export function ShareReceiver({ encodedData, theme, onDismiss }: ShareReceiverPr
     }
   }, [encodedData, password]);
 
-  const noop = useCallback(() => { /* no-op back for single-entity views */ }, []);
+  const handleSave = useCallback(async () => {
+    if (!onSave || state.phase !== 'display' || saveState !== 'idle') return;
+    setSaveState('saving');
+    try {
+      await onSave(state.payload);
+      setSaveState('saved');
+    } catch {
+      setSaveState('idle');
+    }
+  }, [onSave, state, saveState]);
 
   const renderPayload = (payload: SharePayload) => {
     // Investigation bundle with drill-down
@@ -196,14 +207,14 @@ export function ShareReceiver({ encodedData, theme, onDismiss }: ShareReceiverPr
       );
     }
 
-    // Single entity views
+    // Single entity views — Back dismisses the share view
     switch (payload.s) {
       case 'note':
-        return <ExecNoteView note={payload.d as Note} allNotes={[]} onBack={noop} />;
+        return <ExecNoteView note={payload.d as Note} allNotes={[]} onBack={onDismiss} />;
       case 'task':
-        return <ExecTaskView task={payload.d as Task} onBack={noop} />;
+        return <ExecTaskView task={payload.d as Task} onBack={onDismiss} />;
       case 'event':
-        return <ExecEventView event={payload.d as TimelineEvent} onBack={noop} />;
+        return <ExecEventView event={payload.d as TimelineEvent} onBack={onDismiss} />;
       default:
         return <p className="text-sm text-text-muted">Unsupported share type: {payload.s}</p>;
     }
@@ -223,9 +234,26 @@ export function ShareReceiver({ encodedData, theme, onDismiss }: ShareReceiverPr
             SHARED
           </span>
         </div>
-        <button onClick={onDismiss} className="p-2 rounded-lg text-text-muted active:bg-bg-hover" title="Close">
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {onSave && state.phase === 'display' && (
+            <button
+              onClick={handleSave}
+              disabled={saveState !== 'idle'}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                saveState === 'saved'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-accent/10 text-accent active:bg-accent/20 disabled:opacity-50',
+              )}
+            >
+              {saveState === 'saved' ? <Check size={14} /> : <Download size={14} />}
+              {saveState === 'idle' ? 'Save to ThreatCaddy' : saveState === 'saving' ? 'Saving...' : 'Saved'}
+            </button>
+          )}
+          <button onClick={onDismiss} className="p-2 rounded-lg text-text-muted active:bg-bg-hover" title="Close">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Content */}

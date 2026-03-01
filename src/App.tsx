@@ -1032,7 +1032,7 @@ function AppInner() {
     onShowTrash: setShowTrash,
     showArchive,
     onShowArchive: setShowArchive,
-    onCreateFolder: (name: string) => loggedCreateFolder(name),
+    onCreateFolder: async (name: string) => { const f = await loggedCreateFolder(name); setSelectedFolderId(f.id); setSelectedTag(undefined); setShowTrash(false); setShowArchive(false); },
     onDeleteFolder: (id: string) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
     onTrashFolderContents: (id: string) => { loggedTrashFolderContents(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } },
     onArchiveFolder: (id: string) => { loggedArchiveFolder(id); },
@@ -1174,6 +1174,7 @@ function AppInner() {
           <DashboardView
             links={settings.quickLinks ?? DEFAULT_QUICK_LINKS}
             onUpdateLinks={(links) => updateSettings({ quickLinks: links })}
+            onViewChange={navigateTo}
           />
         ) : activeView === 'ioc-stats' ? (
           <div className="flex-1 flex flex-col overflow-y-auto">
@@ -1361,7 +1362,7 @@ function AppInner() {
       {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-          <div className="relative h-full w-60 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="relative h-full w-[260px] shrink-0" onClick={(e) => e.stopPropagation()}>
             <Sidebar
               {...sidebarProps}
               collapsed={false}
@@ -1435,6 +1436,7 @@ function AppInner() {
         scopedTasks={investigationTasks}
         scopedTimelineEvents={investigationTimelineEvents}
         scopedWhiteboards={investigationWhiteboards}
+        folders={folders}
       />
 
       {editingFolder && (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
-  Archive, ChevronDown, ChevronRight, Plus, X, Settings as SettingsIcon,
+  FileText, ListChecks, Clock, Trash2, Briefcase,
+  Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
   LayoutDashboard,
 } from 'lucide-react';
@@ -9,7 +9,8 @@ import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, Investigat
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { Modal } from '../Common/Modal';
 import { OperationNameGenerator } from '../Common/OperationNameGenerator';
-import { cn } from '../../lib/utils';
+import { InvestigationCard } from './InvestigationCard';
+import { cn, formatDate } from '../../lib/utils';
 
 interface SidebarProps {
   activeView: ViewMode;
@@ -60,6 +61,8 @@ interface SidebarProps {
   investigationScopedCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
 }
 
+type SegmentedFilter = 'all' | InvestigationStatus;
+
 export function Sidebar({
   activeView,
   onViewChange,
@@ -104,18 +107,19 @@ export function Sidebar({
   onRenameTag,
   onDeleteTag,
   onEditFolder,
-  folderStatusFilter = ['active'],
+  // folderStatusFilter — managed internally via segmentedFilter state
   onFolderStatusFilterChange,
   investigationScopedCounts,
 }: SidebarProps) {
-  const [foldersOpen, setFoldersOpen] = useState(true);
+  const [investigationsListOpen, setInvestigationsListOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showNameGenerator, setShowNameGenerator] = useState(false);
 
   const [timelinesOpen, setTimelinesOpen] = useState(true);
   const [newTimelineName, setNewTimelineName] = useState('');
@@ -134,7 +138,11 @@ export function Sidebar({
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editTagName, setEditTagName] = useState('');
   const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
-  const [showNameGenerator, setShowNameGenerator] = useState(false);
+
+  const [segmentedFilter, setSegmentedFilter] = useState<SegmentedFilter>('all');
+
+  // Derived state
+  const selectedFolder = folders.find((f) => f.id === selectedFolderId);
 
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
@@ -205,15 +213,32 @@ export function Sidebar({
     onNavigate?.();
   };
 
+  const handleSegmentedFilterChange = (filter: SegmentedFilter) => {
+    setSegmentedFilter(filter);
+    if (onFolderStatusFilterChange) {
+      if (filter === 'all') {
+        onFolderStatusFilterChange(['active', 'closed', 'archived']);
+      } else {
+        onFolderStatusFilterChange([filter]);
+      }
+    }
+  };
+
+  // Filtered folders for the investigation list
+  const filteredFolders = folders.filter((f) => {
+    if (segmentedFilter === 'all') return true;
+    return (f.status || 'active') === segmentedFilter;
+  });
+
   // View items for collapsed icon rail
-  const collapsedViewItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; dataTour?: string }[] = [
+  const collapsedViewItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
     { view: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { view: 'notes', icon: FileText, label: 'Notes', badge: investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total },
-    { view: 'tasks', icon: ListChecks, label: 'Tasks', badge: investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total, dataTour: 'tasks' },
-    { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, dataTour: 'timeline' },
-    { view: 'graph', icon: Network, label: 'Graph' },
-    { view: 'ioc-stats', icon: Search, label: 'IOC Stats', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined },
+    { view: 'notes', icon: FileText, label: 'Notes', badge: investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total, badgeColor: 'bg-accent-blue' },
+    { view: 'tasks', icon: ListChecks, label: 'Tasks', badge: investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total, badgeColor: 'bg-accent-amber', dataTour: 'tasks' },
+    { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
     { view: 'whiteboard', icon: PenTool, label: 'Whiteboards', badge: investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount, dataTour: 'whiteboards' },
+    { view: 'ioc-stats', icon: Search, label: 'IOC Stats', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
+    { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
   ];
 
@@ -221,7 +246,7 @@ export function Sidebar({
   if (collapsed) {
     return (
       <aside
-        className="w-12 border-r border-gray-800 sidebar-glass flex flex-col items-center py-2 gap-0.5 h-full shrink-0 overflow-y-auto overflow-x-hidden"
+        className="w-12 border-r border-border-subtle sidebar-glass flex flex-col items-center py-2 gap-0.5 h-full shrink-0 overflow-y-auto overflow-x-hidden"
         role="navigation"
         aria-label="Main navigation"
         data-tour="sidebar-nav"
@@ -239,7 +264,13 @@ export function Sidebar({
         ))}
 
         <div className="flex-1" />
-        <div className="w-6 border-t border-gray-700 my-1" />
+        <div className="w-6 border-t border-border-subtle my-1" />
+
+        <CollapsedIcon
+          icon={SettingsIcon}
+          label="Settings"
+          onClick={() => nav(onOpenSettings)}
+        />
 
         <CollapsedIcon
           icon={Archive}
@@ -256,302 +287,294 @@ export function Sidebar({
           onClick={() => nav(() => { onShowTrash(!showTrash); onShowArchive(false); onFolderSelect(undefined); onTagSelect(undefined); })}
         />
         <CollapsedIcon
-          icon={SettingsIcon}
-          label="Settings"
-          onClick={() => nav(onOpenSettings)}
+          icon={PanelLeft}
+          label="Expand sidebar"
+          onClick={onToggleCollapsed}
         />
-        <div className="mt-1">
-          <CollapsedIcon
-            icon={PanelLeft}
-            label="Expand sidebar"
-            onClick={onToggleCollapsed}
-          />
-        </div>
       </aside>
     );
   }
 
   // --- Expanded: full sidebar ---
   return (
-    <aside className="w-[200px] border-r border-gray-800 sidebar-glass flex flex-col h-full shrink-0 overflow-hidden" role="navigation" aria-label="Main navigation">
-      <div className="flex items-center justify-between p-3 border-b border-gray-800">
-        <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Navigate</span>
-        <button onClick={onToggleCollapsed} className="p-1 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300" aria-label="Collapse sidebar" title="Collapse sidebar">
+    <aside className="w-[260px] border-r border-border-subtle sidebar-glass flex flex-col h-full shrink-0 overflow-hidden" role="navigation" aria-label="Main navigation">
+      {/* 1. HEADER */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle">
+        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Investigations</span>
+        <button onClick={onToggleCollapsed} className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors" aria-label="Collapse sidebar" title="Collapse sidebar">
           <PanelLeftClose size={16} />
         </button>
       </div>
 
-      <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto p-2 space-y-1" aria-label="Views">
-        {/* Investigations — at the top for fast switching */}
-        <div data-tour="tags-folders">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setFoldersOpen(!foldersOpen)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFoldersOpen(!foldersOpen); } }}
-            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
-            aria-expanded={foldersOpen}
-          >
-            {foldersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            Investigations
-            <span className="ml-auto flex items-center gap-0.5">
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNameGenerator(true); }}
-                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                aria-label="Generate investigation name"
-                title="Generate investigation name"
-              >
-                <Dices size={14} />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNewFolder(true); }}
-                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                aria-label="Create investigation"
-                title="Create investigation"
-              >
-                <Plus size={14} />
-              </button>
-            </span>
-          </div>
+      {/* 2. ALL INVESTIGATIONS TOGGLE */}
+      <div className="px-2 pt-1.5">
+        <button
+          onClick={() => setInvestigationsListOpen(!investigationsListOpen)}
+          className="flex items-center justify-center gap-1 w-full py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+          aria-expanded={investigationsListOpen}
+        >
+          All Investigations
+          <ChevronDown
+            size={12}
+            className="transition-transform duration-200"
+            style={{ transform: investigationsListOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          />
+        </button>
 
-          {foldersOpen && (
-            <div className="mt-1 space-y-0.5">
-              {/* Status filter chips */}
-              {onFolderStatusFilterChange && (
-                <div className="flex gap-1 px-2 pb-1">
-                  {(['active', 'closed', 'archived'] as InvestigationStatus[]).map((s) => {
-                    const count = folders.filter((f) => (f.status || 'active') === s).length;
-                    const isActive = folderStatusFilter.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => {
-                          const next = isActive
-                            ? folderStatusFilter.filter((x) => x !== s)
-                            : [...folderStatusFilter, s];
-                          onFolderStatusFilterChange(next.length > 0 ? next : ['active']);
-                        }}
-                        className={cn(
-                          'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
-                          isActive ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-                        )}
-                      >
-                        {s.charAt(0).toUpperCase() + s.slice(1)} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {showNewFolder && (
-                <div className="flex items-center gap-1 px-2">
-                  <input
-                    autoFocus
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') setShowNewFolder(false); }}
-                    placeholder="Investigation name"
-                    aria-label="New investigation name"
-                    className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                  />
-                  <button onClick={handleCreateFolder} className="text-accent hover:text-accent-hover" aria-label="Confirm create investigation" title="Create investigation">
-                    <Plus size={14} />
-                  </button>
-                  <button onClick={() => setShowNewFolder(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-              {/* "All" item — click to deselect investigation */}
-              <SidebarItem
-                compact
-                icon={<Briefcase size={14} />}
-                label="All Items"
-                active={!selectedFolderId}
-                onClick={() => nav(() => { onFolderSelect(undefined); onTagSelect(undefined); onShowTrash(false); onShowArchive(false); })}
-              />
-              {folders
-                .filter((f) => folderStatusFilter.includes(f.status || 'active'))
-                .map((folder) => (
-                <div
-                  key={folder.id}
+        <div
+          className="overflow-hidden transition-all duration-250 ease-in-out"
+          style={{
+            maxHeight: investigationsListOpen ? '400px' : '0px',
+            opacity: investigationsListOpen ? 1 : 0,
+          }}
+        >
+          {/* Segmented filter */}
+          {onFolderStatusFilterChange && (
+            <div className="flex gap-0.5 p-0.5 bg-bg-deep rounded-lg mb-1.5 mt-1">
+              {(['all', 'active', 'closed', 'archived'] as SegmentedFilter[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSegmentedFilterChange(s)}
                   className={cn(
-                    'group relative rounded-lg transition-colors',
-                    dragOverFolderId === folder.id && 'bg-accent/15',
-                    (folder.status === 'closed' || folder.status === 'archived') && 'opacity-60'
+                    'flex-1 px-1 py-0.5 rounded text-[10px] font-medium transition-colors',
+                    segmentedFilter === s
+                      ? 'bg-bg-active text-text-primary'
+                      : 'text-text-muted hover:text-text-secondary'
                   )}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverFolderId(folder.id); }}
-                  onDragLeave={() => setDragOverFolderId(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOverFolderId(null);
-                    const noteId = e.dataTransfer.getData('text/plain');
-                    if (noteId && onMoveNoteToFolder) onMoveNoteToFolder(noteId, folder.id);
-                  }}
                 >
-                  {editingFolder === folder.id ? (
-                    <div className="flex items-center gap-1 px-2">
-                      <input
-                        autoFocus
-                        value={editFolderName}
-                        onChange={(e) => setEditFolderName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
-                        aria-label="Rename investigation"
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  ) : (
-                    <SidebarItem
-                      compact
-                      icon={<Briefcase size={14} style={{ color: folder.color }} />}
-                      label={folder.name}
-                      active={selectedFolderId === folder.id}
-                      onClick={() => nav(() => {
-                        // Toggle: clicking selected investigation deselects it
-                        if (selectedFolderId === folder.id) {
-                          onFolderSelect(undefined);
-                        } else {
-                          onFolderSelect(folder.id);
-                        }
-                        onTagSelect(undefined); onShowTrash(false); onShowArchive(false);
-                      })}
-                      onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
-                      actions={
-                        <span className="flex items-center gap-px">
-                          {onEditFolder && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
-                              aria-label={`Edit investigation ${folder.name}`}
-                              title="Edit investigation"
-                            >
-                              <Info size={10} />
-                            </button>
-                          )}
-                          {(folder.status || 'active') !== 'archived' ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onArchiveFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-amber-400"
-                              aria-label={`Archive investigation ${folder.name}`}
-                              title="Archive investigation"
-                            >
-                              <Archive size={10} />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onUnarchiveFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-green-400"
-                              aria-label={`Unarchive investigation ${folder.name}`}
-                              title="Unarchive investigation"
-                            >
-                              <RotateCcw size={10} />
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
-                            aria-label={`Delete investigation ${folder.name}`}
-                            title="Delete investigation"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      }
-                    />
-                  )}
-                </div>
+                  {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
               ))}
             </div>
           )}
-        </div>
 
-        {/* Divider */}
-        <div className="mx-2 my-1.5 border-t border-gray-800" />
-
-        {/* Views */}
-        <div className="space-y-0.5">
-          <SidebarItem
-            icon={<LayoutDashboard size={16} />}
-            label="Dashboard"
-            active={activeView === 'dashboard' && !showTrash && !showArchive}
-            onClick={() => nav(() => navToView('dashboard'))}
-          />
-          <SidebarItem
-            icon={<FileText size={16} />}
-            label="Notes"
-            count={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
-            active={activeView === 'notes' && !showTrash && !showArchive}
-            onClick={() => nav(() => navToView('notes'))}
-          />
-          <div data-tour="tasks">
-            <SidebarItem
-              icon={<ListChecks size={16} />}
-              label="Tasks"
-              count={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
-              active={activeView === 'tasks'}
-              onClick={() => nav(() => navToView('tasks'))}
+          {/* Investigation list */}
+          <div className="space-y-0.5 max-h-[300px] overflow-y-auto" data-tour="tags-folders">
+            {/* "All Items" — click to deselect investigation */}
+            <NavItem
+              compact
+              icon={<Briefcase size={14} />}
+              label="View All"
+              active={!selectedFolderId}
+              onClick={() => nav(() => { onFolderSelect(undefined); onTagSelect(undefined); onShowTrash(false); onShowArchive(false); })}
             />
-          </div>
-          <div data-tour="timeline">
-            <SidebarItem
-              icon={<Clock size={16} />}
-              label="Timeline"
-              count={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
-              active={activeView === 'timeline'}
-              onClick={() => nav(() => navToView('timeline'))}
-            />
-          </div>
-          <SidebarItem
-            icon={<Network size={16} />}
-            label="Graph"
-            active={activeView === 'graph'}
-            onClick={() => nav(() => navToView('graph'))}
-          />
-          <SidebarItem
-            icon={<Search size={16} />}
-            label="IOC Stats"
-            count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
-            active={activeView === 'ioc-stats'}
-            onClick={() => nav(() => navToView('ioc-stats'))}
-          />
-          <div data-tour="whiteboards">
-            <SidebarItem
-              icon={<PenTool size={16} />}
-              label="Whiteboards"
-              count={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
-              active={activeView === 'whiteboard'}
-              onClick={() => nav(() => navToView('whiteboard'))}
-            />
-          </div>
-          <div data-tour="activity">
-            <SidebarItem
-              icon={<Activity size={16} />}
-              label="Activity"
-              active={activeView === 'activity'}
-              onClick={() => nav(() => navToView('activity'))}
-            />
+            {filteredFolders.map((folder) => (
+              <div
+                key={folder.id}
+                className={cn(
+                  'group relative rounded-lg transition-colors',
+                  dragOverFolderId === folder.id && 'bg-purple/15',
+                  (folder.status === 'closed' || folder.status === 'archived') && 'opacity-60'
+                )}
+                onDragOver={(e) => { e.preventDefault(); setDragOverFolderId(folder.id); }}
+                onDragLeave={() => setDragOverFolderId(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverFolderId(null);
+                  const noteId = e.dataTransfer.getData('text/plain');
+                  if (noteId && onMoveNoteToFolder) onMoveNoteToFolder(noteId, folder.id);
+                }}
+              >
+                {editingFolder === folder.id ? (
+                  <div className="flex items-center gap-1 px-2">
+                    <input
+                      autoFocus
+                      value={editFolderName}
+                      onChange={(e) => setEditFolderName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
+                      aria-label="Rename investigation"
+                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
+                    />
+                  </div>
+                ) : (
+                  <InvestigationListItem
+                    folder={folder}
+                    active={selectedFolderId === folder.id}
+                    onClick={() => nav(() => {
+                      if (selectedFolderId === folder.id) {
+                        onFolderSelect(undefined);
+                      } else {
+                        onFolderSelect(folder.id);
+                      }
+                      onTagSelect(undefined); onShowTrash(false); onShowArchive(false);
+                    })}
+                    onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
+                    onInfo={onEditFolder ? () => onEditFolder(folder.id) : undefined}
+                    onArchive={(folder.status || 'active') !== 'archived' ? () => onArchiveFolder(folder.id) : undefined}
+                    onUnarchive={(folder.status || 'active') === 'archived' ? () => onUnarchiveFolder(folder.id) : undefined}
+                    onDelete={() => setDeletingFolderId(folder.id)}
+                  />
+                )}
+              </div>
+            ))}
+            {filteredFolders.length === 0 && (
+              <p className="px-2 py-1 text-[10px] text-text-muted font-mono">No investigations</p>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* 3. NEW INVESTIGATION ROW */}
+      <div className="px-2 pt-1.5">
+        {showNewFolder ? (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
+              placeholder="Investigation name"
+              aria-label="New investigation name"
+              className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple"
+            />
+            <button onClick={handleCreateFolder} className="text-purple hover:text-accent-hover" aria-label="Create investigation" title="Create">
+              <Plus size={14} />
+            </button>
+            <button onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setShowNewFolder(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-purple text-white text-xs font-medium hover:brightness-110 transition-all"
+            >
+              <Plus size={14} />
+              New
+            </button>
+            <button
+              onClick={() => setShowNameGenerator(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 transition-colors"
+              title="Generate investigation name"
+              aria-label="Generate investigation name"
+            >
+              <Dices size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4. ACTIVE INVESTIGATION CARD */}
+      <div className="px-2 pt-2">
+        {selectedFolder && onEditFolder ? (
+          <InvestigationCard
+            folder={selectedFolder}
+            counts={{
+              notes: investigationScopedCounts?.notes ?? 0,
+              tasks: investigationScopedCounts?.tasks ?? 0,
+              events: investigationScopedCounts?.events ?? 0,
+              whiteboards: investigationScopedCounts?.whiteboards ?? 0,
+              iocs: investigationScopedCounts?.iocs ?? 0,
+            }}
+            onEditFolder={onEditFolder}
+          />
+        ) : (
+          <div className="font-mono text-[11px] text-text-muted px-1">
+            Viewing all
+          </div>
+        )}
+      </div>
+
+      {/* 5. NAVIGATION */}
+      <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto px-2 pt-2 space-y-0.5" aria-label="Views">
+        <NavItem
+          icon={<LayoutDashboard size={16} />}
+          label="Dashboard"
+          active={activeView === 'dashboard' && !showTrash && !showArchive}
+          onClick={() => nav(() => navToView('dashboard'))}
+        />
+        <NavItem
+          icon={<FileText size={16} />}
+          label="Notes"
+          badge={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
+          badgeColor="bg-accent-blue/15 text-accent-blue"
+          active={activeView === 'notes' && !showTrash && !showArchive}
+          onClick={() => nav(() => navToView('notes'))}
+        />
+        <div data-tour="tasks">
+          <NavItem
+            icon={<ListChecks size={16} />}
+            label="Tasks"
+            badge={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
+            badgeColor="bg-accent-amber/15 text-accent-amber"
+            active={activeView === 'tasks'}
+            onClick={() => nav(() => navToView('tasks'))}
+          />
+        </div>
+        <div data-tour="timeline">
+          <NavItem
+            icon={<Clock size={16} />}
+            label="Timeline"
+            badge={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
+            badgeColor="bg-accent-green/15 text-accent-green"
+            active={activeView === 'timeline'}
+            onClick={() => nav(() => navToView('timeline'))}
+          />
+        </div>
+        <div data-tour="whiteboards">
+          <NavItem
+            icon={<PenTool size={16} />}
+            label="Whiteboards"
+            badge={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
+            active={activeView === 'whiteboard'}
+            onClick={() => nav(() => navToView('whiteboard'))}
+          />
+        </div>
+
+        {/* 6px gap between Whiteboards and IOC Stats */}
+        <div className="h-1.5" />
+
+        <NavItem
+          icon={<Search size={16} />}
+          label="IOC Stats"
+          badge={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
+          badgeColor="bg-accent-green/15 text-accent-green"
+          active={activeView === 'ioc-stats'}
+          onClick={() => nav(() => navToView('ioc-stats'))}
+        />
+        <NavItem
+          icon={<Network size={16} />}
+          label="Graph"
+          active={activeView === 'graph'}
+          onClick={() => nav(() => navToView('graph'))}
+        />
+        <div data-tour="activity">
+          <NavItem
+            icon={<Activity size={16} />}
+            label="Activity"
+            active={activeView === 'activity'}
+            onClick={() => nav(() => navToView('activity'))}
+          />
+        </div>
+
+        {/* 6. CONTEXTUAL SUB-LISTS */}
+
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
           <div className="pt-1">
-            <div className="mx-2 mb-1.5 border-t border-gray-800" />
+            <div className="mx-0 mb-1.5 border-t border-border-subtle" />
             <div
               role="button"
               tabIndex={0}
               onClick={() => setWhiteboardsOpen(!whiteboardsOpen)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWhiteboardsOpen(!whiteboardsOpen); } }}
-              className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
+              className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
               aria-expanded={whiteboardsOpen}
             >
-              {whiteboardsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <ChevronDown
+                size={12}
+                className="transition-transform duration-200"
+                style={{ transform: whiteboardsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+              />
               Whiteboards
               <button
                 onClick={(e) => { e.stopPropagation(); setShowNewWhiteboard(true); }}
-                className="ml-auto p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                className="ml-auto p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
                 aria-label="Create whiteboard"
                 title="Create whiteboard"
               >
-                <Plus size={14} />
+                <Plus size={12} />
               </button>
             </div>
 
@@ -566,12 +589,12 @@ export function Sidebar({
                       onKeyDown={(e) => { if (e.key === 'Enter') handleCreateWhiteboard(); if (e.key === 'Escape') setShowNewWhiteboard(false); }}
                       placeholder="Whiteboard name"
                       aria-label="New whiteboard name"
-                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
                     />
-                    <button onClick={handleCreateWhiteboard} className="text-accent hover:text-accent-hover" aria-label="Confirm create whiteboard" title="Create whiteboard">
+                    <button onClick={handleCreateWhiteboard} className="text-purple hover:text-accent-hover" aria-label="Confirm create whiteboard" title="Create whiteboard">
                       <Plus size={14} />
                     </button>
-                    <button onClick={() => setShowNewWhiteboard(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
+                    <button onClick={() => setShowNewWhiteboard(false)} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
                       <X size={14} />
                     </button>
                   </div>
@@ -586,11 +609,11 @@ export function Sidebar({
                           onChange={(e) => setEditWhiteboardName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') handleRenameWhiteboard(wb.id); if (e.key === 'Escape') setEditingWhiteboard(null); }}
                           aria-label="Rename whiteboard"
-                          className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                          className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
                         />
                       </div>
                     ) : (
-                      <SidebarItem
+                      <NavItem
                         compact
                         icon={<PenTool size={14} />}
                         label={wb.name}
@@ -600,7 +623,7 @@ export function Sidebar({
                         actions={
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeletingWhiteboardId(wb.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
                             aria-label={`Delete whiteboard ${wb.name}`}
                             title="Delete whiteboard"
                           >
@@ -615,27 +638,32 @@ export function Sidebar({
             )}
           </div>
         )}
+
         {/* Timelines — only in timeline view */}
         {activeView === 'timeline' && (
           <div className="pt-1">
-            <div className="mx-2 mb-1.5 border-t border-gray-800" />
+            <div className="mx-0 mb-1.5 border-t border-border-subtle" />
             <div
               role="button"
               tabIndex={0}
               onClick={() => setTimelinesOpen(!timelinesOpen)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTimelinesOpen(!timelinesOpen); } }}
-              className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
+              className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
               aria-expanded={timelinesOpen}
             >
-              {timelinesOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <ChevronDown
+                size={12}
+                className="transition-transform duration-200"
+                style={{ transform: timelinesOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+              />
               Timelines
               <button
                 onClick={(e) => { e.stopPropagation(); setShowNewTimeline(true); }}
-                className="ml-auto p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                className="ml-auto p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
                 aria-label="Create timeline"
                 title="Create timeline"
               >
-                <Plus size={14} />
+                <Plus size={12} />
               </button>
             </div>
 
@@ -650,21 +678,21 @@ export function Sidebar({
                       onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTimeline(); if (e.key === 'Escape') setShowNewTimeline(false); }}
                       placeholder="Timeline name"
                       aria-label="New timeline name"
-                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
                     />
-                    <button onClick={handleCreateTimeline} className="text-accent hover:text-accent-hover" aria-label="Confirm create timeline" title="Create timeline">
+                    <button onClick={handleCreateTimeline} className="text-purple hover:text-accent-hover" aria-label="Confirm create timeline" title="Create timeline">
                       <Plus size={14} />
                     </button>
-                    <button onClick={() => setShowNewTimeline(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
+                    <button onClick={() => setShowNewTimeline(false)} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
                       <X size={14} />
                     </button>
                   </div>
                 )}
-                <SidebarItem
+                <NavItem
                   compact
                   icon={<Clock size={14} />}
                   label="All Events"
-                  count={timelineCounts?.total}
+                  badge={timelineCounts?.total}
                   active={!selectedTimelineId}
                   onClick={() => nav(() => { onTimelineSelect?.(undefined); })}
                 />
@@ -678,22 +706,22 @@ export function Sidebar({
                           onChange={(e) => setEditTimelineName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTimeline(tl.id); if (e.key === 'Escape') setEditingTimeline(null); }}
                           aria-label="Rename timeline"
-                          className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                          className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
                         />
                       </div>
                     ) : (
-                      <SidebarItem
+                      <NavItem
                         compact
                         icon={<Clock size={14} style={{ color: tl.color }} />}
                         label={tl.name}
-                        count={timelineEventCounts[tl.id] || 0}
+                        badge={timelineEventCounts[tl.id] || 0}
                         active={selectedTimelineId === tl.id}
                         onClick={() => nav(() => { onTimelineSelect?.(tl.id); })}
                         onDoubleClick={() => { setEditingTimeline(tl.id); setEditTimelineName(tl.name); }}
                         actions={
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeletingTimelineId(tl.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
                             aria-label={`Delete timeline ${tl.name}`}
                             title="Delete timeline"
                           >
@@ -709,140 +737,155 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Divider */}
-        <div className="mx-2 my-1.5 border-t border-gray-800" />
-
-        {/* Tags */}
-        <div>
+        {/* 7. TAGS */}
+        <div className="pt-1">
+          <div className="mx-0 mb-1 border-t border-border-subtle" />
           <div
             role="button"
             tabIndex={0}
             onClick={() => setTagsOpen(!tagsOpen)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTagsOpen(!tagsOpen); } }}
-            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
+            className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
             aria-expanded={tagsOpen}
           >
-            {tagsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <ChevronDown
+              size={12}
+              className="transition-transform duration-200"
+              style={{ transform: tagsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+            />
             Tags
           </div>
 
           {tagsOpen && (
-            <div className="mt-1 space-y-0.5">
+            <div className="mt-1 flex flex-wrap gap-1 px-2" data-tour="tags-folders">
               {tags.map((tag) => (
                 <div key={tag.id} className="group relative">
                   {editingTag === tag.id ? (
-                    <div className="flex items-center gap-1 px-2">
-                      <input
-                        autoFocus
-                        value={editTagName}
-                        onChange={(e) => setEditTagName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTag(tag.id); if (e.key === 'Escape') setEditingTag(null); }}
-                        aria-label="Rename tag"
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                      />
-                    </div>
+                    <input
+                      autoFocus
+                      value={editTagName}
+                      onChange={(e) => setEditTagName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTag(tag.id); if (e.key === 'Escape') setEditingTag(null); }}
+                      aria-label="Rename tag"
+                      className="bg-bg-deep border border-border-medium rounded px-2 py-0.5 text-xs text-text-primary focus:outline-none focus:border-purple w-24"
+                    />
                   ) : (
-                    <SidebarItem
-                      compact
-                      icon={<Tag size={12} style={{ color: tag.color }} />}
-                      label={`#${tag.name}`}
-                      active={selectedTag === tag.name}
+                    <button
                       onClick={() => nav(() => { onTagSelect(tag.name); onFolderSelect(undefined); onShowTrash(false); onShowArchive(false); })}
                       onDoubleClick={() => { setEditingTag(tag.id); setEditTagName(tag.name); }}
-                      actions={
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeletingTagId(tag.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
-                          aria-label={`Delete tag ${tag.name}`}
-                          title="Delete tag"
-                        >
-                          <X size={12} />
-                        </button>
-                      }
-                    />
+                      className={cn(
+                        'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors',
+                        selectedTag === tag.name
+                          ? 'bg-purple/20 text-purple'
+                          : 'bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+                      )}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                      {tag.name}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeletingTagId(tag.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-0 hover:text-red-400 transition-all"
+                        aria-label={`Delete tag ${tag.name}`}
+                        title="Delete tag"
+                      >
+                        <X size={10} />
+                      </button>
+                    </button>
                   )}
                 </div>
               ))}
               {tags.length === 0 && (
-                <p className="px-4 py-1 text-xs text-gray-600">No tags yet</p>
+                <p className="text-[10px] text-text-muted font-mono">No tags yet</p>
               )}
             </div>
           )}
         </div>
-
-        {/* Divider */}
-        <div className="mx-2 my-1.5 border-t border-gray-800" />
-
-        {/* Special */}
-        <div className="space-y-0.5">
-          <SidebarItem
-            icon={<Archive size={16} />}
-            label="Archive"
-            count={noteCounts.archived}
-            active={showArchive}
-            onClick={() => nav(() => { onShowArchive(!showArchive); onShowTrash(false); onFolderSelect(undefined); onTagSelect(undefined); })}
-          />
-          <SidebarItem
-            icon={<Trash2 size={16} />}
-            label="Trash"
-            count={noteCounts.trashed}
-            active={showTrash}
-            onClick={() => nav(() => { onShowTrash(!showTrash); onShowArchive(false); onFolderSelect(undefined); onTagSelect(undefined); })}
-          />
-        </div>
       </nav>
 
-      <div className="border-t border-gray-800 p-2 space-y-0.5">
-        <SidebarItem
-          icon={<SettingsIcon size={16} />}
-          label="Settings"
+      {/* 8. FOOTER */}
+      <div className="border-t border-border-subtle px-2 py-2 flex items-center gap-1">
+        <button
           onClick={() => nav(onOpenSettings)}
-        />
-
-        {/* Links — visible on mobile (md:hidden) since header hides them on mobile */}
-        <div className="md:hidden pt-2 space-y-0.5">
-          <a
-            href="https://github.com/peterhanily/threatcaddy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
-          >
-            <Github size={16} />
-            <span>GitHub</span>
-          </a>
-          <a
-            href="./threatcaddy-standalone.html"
-            download
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
-          >
-            <Download size={16} />
-            <span>Download Standalone</span>
-          </a>
-          <a
-            href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
-          >
-            <Chrome size={16} />
-            <span>Extension</span>
-          </a>
-        </div>
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+        >
+          <SettingsIcon size={14} />
+          <span>Settings</span>
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={() => nav(() => { onShowArchive(!showArchive); onShowTrash(false); onFolderSelect(undefined); onTagSelect(undefined); })}
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-1 rounded-lg text-xs transition-colors',
+            showArchive ? 'bg-bg-active text-purple' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary'
+          )}
+          title="Archive"
+          aria-label="Archive"
+        >
+          <Archive size={14} />
+          {noteCounts.archived > 0 && (
+            <span className="font-mono text-[10px]">{noteCounts.archived}</span>
+          )}
+        </button>
+        <button
+          onClick={() => nav(() => { onShowTrash(!showTrash); onShowArchive(false); onFolderSelect(undefined); onTagSelect(undefined); })}
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-1 rounded-lg text-xs transition-colors',
+            showTrash ? 'bg-bg-active text-purple' : 'text-text-muted hover:bg-bg-hover hover:text-text-primary'
+          )}
+          title="Trash"
+          aria-label="Trash"
+        >
+          <Trash2 size={14} />
+          {noteCounts.trashed > 0 && (
+            <span className="font-mono text-[10px]">{noteCounts.trashed}</span>
+          )}
+        </button>
       </div>
 
+      {/* Mobile-only links */}
+      <div className="md:hidden border-t border-border-subtle px-2 py-2 space-y-0.5">
+        <a
+          href="https://github.com/peterhanily/threatcaddy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+        >
+          <Github size={16} />
+          <span>GitHub</span>
+        </a>
+        <a
+          href="./threatcaddy-standalone.html"
+          download
+          className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+        >
+          <Download size={16} />
+          <span>Download Standalone</span>
+        </a>
+        <a
+          href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+        >
+          <Chrome size={16} />
+          <span>Extension</span>
+        </a>
+      </div>
+
+      {/* Dialogs */}
       <Modal
         open={deletingFolderId !== null}
         onClose={() => setDeletingFolderId(null)}
         title="Delete Investigation"
       >
-        <p className="text-sm text-gray-400 mb-4">What should happen to the items inside this investigation?</p>
+        <p className="text-sm text-text-secondary mb-4">What should happen to the items inside this investigation?</p>
         <div className="space-y-2">
           <button
-            className="w-full text-left px-4 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+            className="w-full text-left px-4 py-3 rounded-lg bg-bg-raised hover:bg-bg-hover transition-colors"
             onClick={() => { if (deletingFolderId) { onDeleteFolder(deletingFolderId); setDeletingFolderId(null); } }}
           >
-            <div className="text-sm font-medium text-gray-200">Remove folder only</div>
-            <div className="text-xs text-gray-400 mt-0.5">Items move back to All Items</div>
+            <div className="text-sm font-medium text-text-primary">Remove folder only</div>
+            <div className="text-xs text-text-secondary mt-0.5">Items move back to All Items</div>
           </button>
           <button
             className="w-full text-left px-4 py-3 rounded-lg bg-red-600/15 hover:bg-red-600/25 transition-colors"
@@ -854,7 +897,7 @@ export function Sidebar({
         </div>
         <div className="flex justify-end mt-4">
           <button
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-xs text-text-muted hover:text-text-primary transition-colors"
             onClick={() => setDeletingFolderId(null)}
           >
             Cancel
@@ -901,10 +944,12 @@ export function Sidebar({
   );
 }
 
-const SidebarItem = React.memo(function SidebarItem({
+/* ─── NavItem: flat nav item with accent glow bar ─── */
+const NavItem = React.memo(function NavItem({
   icon,
   label,
-  count,
+  badge,
+  badgeColor,
   active,
   onClick,
   onDoubleClick,
@@ -913,7 +958,8 @@ const SidebarItem = React.memo(function SidebarItem({
 }: {
   icon: React.ReactNode;
   label: string;
-  count?: number;
+  badge?: number;
+  badgeColor?: string;
   active?: boolean;
   onClick: () => void;
   onDoubleClick?: () => void;
@@ -928,27 +974,125 @@ const SidebarItem = React.memo(function SidebarItem({
       onDoubleClick={onDoubleClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
       className={cn(
-        'flex items-center w-full rounded-lg transition-colors group cursor-pointer',
-        compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-sm',
+        'flex items-center w-full rounded-lg transition-colors group cursor-pointer relative',
+        compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-[13px] font-medium',
         active
-          ? 'bg-accent/15 text-accent'
-          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+          ? 'bg-bg-active text-text-primary'
+          : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
       )}
     >
+      {active && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-purple"
+          style={{ boxShadow: '0 0 8px 1px var(--color-purple)' }}
+        />
+      )}
       {icon}
       <span className="truncate flex-1 text-left">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="text-xs text-gray-500 tabular-nums">{count}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className={cn(
+          'font-mono text-[10px] px-1.5 py-0 rounded-full',
+          badgeColor || 'bg-bg-raised text-text-muted'
+        )}>
+          {badge > 999 ? '999+' : badge}
+        </span>
       )}
       {actions}
     </div>
   );
 });
 
-function formatBadge(n: number): string {
-  return n > 999 ? '999+' : String(n);
-}
+/* ─── InvestigationListItem: compact item for the investigations dropdown ─── */
+const InvestigationListItem = React.memo(function InvestigationListItem({
+  folder,
+  active,
+  onClick,
+  onDoubleClick,
+  onInfo,
+  onArchive,
+  onUnarchive,
+  onDelete,
+}: {
+  folder: Folder;
+  active?: boolean;
+  onClick: () => void;
+  onDoubleClick?: () => void;
+  onInfo?: () => void;
+  onArchive?: () => void;
+  onUnarchive?: () => void;
+  onDelete: () => void;
+}) {
+  const status = folder.status || 'active';
+  const statusColor = status === 'active'
+    ? 'bg-accent-green'
+    : status === 'archived'
+      ? 'bg-accent-amber'
+      : 'bg-text-muted';
 
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      className={cn(
+        'flex items-center gap-2 w-full rounded-lg px-2 py-1 cursor-pointer transition-colors group',
+        active
+          ? 'bg-bg-active text-text-primary'
+          : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+      )}
+    >
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusColor)} />
+      <span className="truncate flex-1 text-left text-[12px]">{folder.name}</span>
+      <span className="font-mono text-[10px] text-text-muted shrink-0">
+        {formatDate(folder.createdAt)}
+      </span>
+      <span className="flex items-center gap-px shrink-0">
+        {onInfo && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onInfo(); }}
+            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-all"
+            aria-label={`Edit investigation ${folder.name}`}
+            title="Edit investigation"
+          >
+            <Info size={10} />
+          </button>
+        )}
+        {onArchive && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onArchive(); }}
+            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-amber-400 transition-all"
+            aria-label={`Archive investigation ${folder.name}`}
+            title="Archive investigation"
+          >
+            <Archive size={10} />
+          </button>
+        )}
+        {onUnarchive && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUnarchive(); }}
+            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-green-400 transition-all"
+            aria-label={`Unarchive investigation ${folder.name}`}
+            title="Unarchive investigation"
+          >
+            <RotateCcw size={10} />
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
+          aria-label={`Delete investigation ${folder.name}`}
+          title="Delete investigation"
+        >
+          <X size={10} />
+        </button>
+      </span>
+    </div>
+  );
+});
+
+/* ─── CollapsedIcon: icon button for collapsed sidebar rail ─── */
 const CollapsedIcon = React.memo(function CollapsedIcon({
   icon: Icon,
   label,
@@ -971,19 +1115,25 @@ const CollapsedIcon = React.memo(function CollapsedIcon({
         className={cn(
           'w-9 h-9 flex items-center justify-center rounded-lg transition-colors relative',
           active
-            ? 'bg-accent/15 text-accent'
-            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+            ? 'bg-bg-active text-purple'
+            : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
         )}
         aria-label={label}
       >
+        {active && (
+          <span
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-purple"
+            style={{ boxShadow: '0 0 8px 1px var(--color-purple)' }}
+          />
+        )}
         <Icon size={18} />
         {badge !== undefined && badge > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-accent/80 text-[9px] font-medium text-white flex items-center justify-center px-1 leading-none">
-            {formatBadge(badge)}
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-purple/80 text-[9px] font-medium text-white flex items-center justify-center px-1 leading-none">
+            {badge > 999 ? '999+' : badge}
           </span>
         )}
       </button>
-      <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded bg-gray-900 border border-gray-700 text-xs text-gray-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+      <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded bg-bg-raised border border-border-medium text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
         {label}
       </div>
     </div>

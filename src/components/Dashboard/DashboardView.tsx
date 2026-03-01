@@ -1,16 +1,27 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, ListChecks, Clock, PenTool, Search, Network, Activity } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import type { QuickLink } from '../../types';
+import type { QuickLink, ViewMode } from '../../types';
 import { QuickLinkForm } from './QuickLinkForm';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
+
+const INTERNAL_TOOLS: { view: ViewMode; label: string; description: string; icon: typeof FileText; color: string }[] = [
+  { view: 'notes', label: 'Notes', description: 'Investigation notes & IOC extraction', icon: FileText, color: '#38bdf8' },
+  { view: 'tasks', label: 'Tasks', description: 'Task board with kanban & list views', icon: ListChecks, color: '#fbbf24' },
+  { view: 'timeline', label: 'Timeline', description: 'Chronological event tracking', icon: Clock, color: '#4ade80' },
+  { view: 'whiteboard', label: 'Whiteboards', description: 'Visual diagramming & collaboration', icon: PenTool, color: '#a855f7' },
+  { view: 'ioc-stats', label: 'IOC Stats', description: 'Indicator of compromise analytics', icon: Search, color: '#10b981' },
+  { view: 'graph', label: 'Graph', description: 'Relationship & link analysis', icon: Network, color: '#6366f1' },
+  { view: 'activity', label: 'Activity', description: 'Audit log of all actions', icon: Activity, color: '#f472b6' },
+];
 
 interface DashboardViewProps {
   links: QuickLink[];
   onUpdateLinks: (links: QuickLink[]) => void;
+  onViewChange?: (view: ViewMode) => void;
 }
 
-export function DashboardView({ links, onUpdateLinks }: DashboardViewProps) {
+export function DashboardView({ links, onUpdateLinks, onViewChange }: DashboardViewProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<QuickLink | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -127,6 +138,34 @@ export function DashboardView({ links, onUpdateLinks }: DashboardViewProps) {
             <span className="text-4xl mb-3">{'\uD83D\uDD17'}</span>
             <p className="text-lg font-medium">No quick links</p>
             <p className="text-sm mt-1">Add links to your favorite threat intel tools</p>
+          </div>
+        )}
+
+        {/* Internal Tools */}
+        {onViewChange && (
+          <div className="mt-8">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">ThreatCaddy Tools</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {INTERNAL_TOOLS.map((tool) => {
+                const Icon = tool.icon;
+                return (
+                  <button
+                    key={tool.view}
+                    onClick={() => onViewChange(tool.view)}
+                    className="group rounded-lg border border-gray-800 bg-gray-900/50 p-3 cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:border-gray-700 text-left"
+                    style={{
+                      borderLeftWidth: '3px',
+                      borderLeftColor: tool.color,
+                      background: `linear-gradient(135deg, ${tool.color}08, transparent)`,
+                    }}
+                  >
+                    <Icon size={18} style={{ color: tool.color }} className="mb-1.5" />
+                    <h4 className="text-sm font-medium text-gray-200 group-hover:text-gray-100 transition-colors">{tool.label}</h4>
+                    <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">{tool.description}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

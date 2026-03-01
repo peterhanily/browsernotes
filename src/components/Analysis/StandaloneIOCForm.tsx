@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import type { StandaloneIOC, IOCType, ConfidenceLevel, Folder, Tag, IOCRelationship } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, DEFAULT_CLS_LEVELS, DEFAULT_RELATIONSHIP_TYPES } from '../../types';
@@ -68,6 +68,17 @@ export function StandaloneIOCForm({ open, onClose, onSubmit, folders, defaultFol
       setNewRelTarget('');
     }
   }, [open, editingIOC, defaultFolderId]);
+
+  // Close on Escape key
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open, handleEscape]);
 
   if (!open) return null;
 

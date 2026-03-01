@@ -15,6 +15,7 @@ interface QueryMessage {
   type: 'query';
   id: number;
   query: SearchQuery;
+  folderId?: string;
 }
 
 type WorkerMessage = DataMessage | QueryMessage;
@@ -35,7 +36,12 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     cachedTimelineEvents = msg.timelineEvents;
     cachedWhiteboards = msg.whiteboards;
   } else if (msg.type === 'query') {
-    const result = unifiedSearch(cachedNotes, cachedTasks, cachedClipsFolderId, msg.query, cachedTimelineEvents, cachedWhiteboards);
+    const fid = msg.folderId;
+    const notes = fid ? cachedNotes.filter((n) => n.folderId === fid) : cachedNotes;
+    const tasks = fid ? cachedTasks.filter((t) => t.folderId === fid) : cachedTasks;
+    const events = fid && cachedTimelineEvents ? cachedTimelineEvents.filter((e) => e.folderId === fid) : cachedTimelineEvents;
+    const wbs = fid && cachedWhiteboards ? cachedWhiteboards.filter((w) => w.folderId === fid) : cachedWhiteboards;
+    const result = unifiedSearch(notes, tasks, cachedClipsFolderId, msg.query, events, wbs);
     self.postMessage({ id: msg.id, result });
   }
 };

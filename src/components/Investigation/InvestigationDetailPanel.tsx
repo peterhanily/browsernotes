@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Briefcase, FileBarChart } from 'lucide-react';
 import type { Folder, InvestigationStatus, ClosureResolution } from '../../types';
 import { NOTE_COLORS, CLOSURE_RESOLUTION_LABELS } from '../../types';
@@ -67,6 +67,16 @@ export function InvestigationDetailPanel({
     const tl = await onCreateTimeline(folder.name);
     onUpdate(folder.id, { timelineId: tl.id });
   };
+
+  // Close on Escape key
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, X, FileText, Paperclip, ListChecks, Clock, PenTool, Save } from 'lucide-react';
+import { Search, X, FileText, Paperclip, ListChecks, Clock, PenTool, Save, Briefcase, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatDate } from '../../lib/utils';
 import { unifiedSearch, type SearchMode, type SearchResult, type SearchResultType, type UnifiedSearchResult } from '../../lib/search';
 import { useSavedSearches } from '../../hooks/useSavedSearches';
-import type { Note, Task, TimelineEvent, Whiteboard } from '../../types';
+import type { Note, Task, TimelineEvent, Whiteboard, Folder } from '../../types';
 import SearchWorker from '../../workers/search.worker?worker';
 
 interface SearchOverlayProps {
@@ -24,6 +24,7 @@ interface SearchOverlayProps {
   scopedTasks?: Task[];
   scopedTimelineEvents?: TimelineEvent[];
   scopedWhiteboards?: Whiteboard[];
+  folders?: Folder[];
 }
 
 const TYPE_ICONS: Record<SearchResultType, typeof FileText> = {
@@ -54,18 +55,19 @@ export function SearchOverlay({
   whiteboards,
   onNavigateToTimeline,
   onNavigateToWhiteboard,
-  selectedFolderId,
-  scopedNotes,
-  scopedTasks,
-  scopedTimelineEvents,
-  scopedWhiteboards,
+  // selectedFolderId, scopedNotes, scopedTasks, scopedTimelineEvents, scopedWhiteboards — kept in interface for backwards compat
+  folders = [],
 }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<SearchMode>('simple');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [searchScope, setSearchScope] = useState<'investigation' | 'all'>('investigation');
+  const [searchFolderId, setSearchFolderId] = useState<string | undefined>(undefined);
+  const [folderQuery, setFolderQuery] = useState('');
+  const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const folderDropdownRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(undefined);
   const { searches, saveSearch, deleteSearch, clearAll } = useSavedSearches();
@@ -86,16 +88,33 @@ export function SearchOverlay({
       setQuery('');
       setDebouncedQuery('');
       setActiveIndex(0);
-      setSearchScope('investigation');
+      setSearchFolderId(undefined);
+      setFolderQuery('');
+      setFolderDropdownOpen(false);
     }
     return () => { if (rafRef.current !== undefined) cancelAnimationFrame(rafRef.current); };
   }, [open]);
 
-  // Determine effective arrays based on scope
-  const effectiveNotes = selectedFolderId && searchScope === 'investigation' && scopedNotes ? scopedNotes : notes;
-  const effectiveTasks = selectedFolderId && searchScope === 'investigation' && scopedTasks ? scopedTasks : tasks;
-  const effectiveEvents = selectedFolderId && searchScope === 'investigation' && scopedTimelineEvents ? scopedTimelineEvents : timelineEvents;
-  const effectiveWhiteboards = selectedFolderId && searchScope === 'investigation' && scopedWhiteboards ? scopedWhiteboards : whiteboards;
+  // Close folder dropdown on outside click
+  useEffect(() => {
+    if (!folderDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (folderDropdownRef.current && !folderDropdownRef.current.contains(e.target as Node)) {
+        setFolderDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [folderDropdownOpen]);
+
+  // Filtered folders for autocomplete
+  const filteredFolders = useMemo(() => {
+    if (!folderQuery.trim()) return folders.filter((f) => (f.status || 'active') !== 'archived');
+    const q = folderQuery.toLowerCase();
+    return folders.filter((f) => f.name.toLowerCase().includes(q));
+  }, [folders, folderQuery]);
+
+  const selectedSearchFolder = searchFolderId ? folders.find((f) => f.id === searchFolderId) : undefined;
 
   // Worker-based search
   const workerRef = useRef<Worker | null>(null);
@@ -119,20 +138,20 @@ export function SearchOverlay({
     return () => { workerRef.current?.terminate(); };
   }, []);
 
-  // Send data to worker when arrays change (heavy clone happens only on data change, not per keystroke)
+  // Send data to worker when source arrays change (heavy clone happens only on real data change, not scope change)
   useEffect(() => {
     if (!workerRef.current || !workerSupported.current) return;
     workerRef.current.postMessage({
       type: 'data',
-      notes: effectiveNotes,
-      tasks: effectiveTasks,
+      notes,
+      tasks,
       clipsFolderId,
-      timelineEvents: effectiveEvents,
-      whiteboards: effectiveWhiteboards,
+      timelineEvents,
+      whiteboards,
     });
-  }, [effectiveNotes, effectiveTasks, clipsFolderId, effectiveEvents, effectiveWhiteboards]);
+  }, [notes, tasks, clipsFolderId, timelineEvents, whiteboards]);
 
-  // Post lightweight query to worker when search changes
+  // Post lightweight query to worker when search or scope changes
   useEffect(() => {
     if (!debouncedQuery.trim()) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clearing results when query is empty
@@ -141,12 +160,17 @@ export function SearchOverlay({
     }
     const id = ++requestIdRef.current;
     if (workerRef.current && workerSupported.current) {
-      workerRef.current.postMessage({ type: 'query', id, query: { mode, raw: debouncedQuery } });
+      workerRef.current.postMessage({ type: 'query', id, query: { mode, raw: debouncedQuery }, folderId: searchFolderId });
     } else {
-      // Fallback: direct call (standalone/CSP issues)
-      setSearchResult(unifiedSearch(effectiveNotes, effectiveTasks, clipsFolderId, { mode, raw: debouncedQuery }, effectiveEvents, effectiveWhiteboards));
+      // Fallback: direct call (standalone/CSP issues) — filter inline
+      const fid = searchFolderId;
+      const n = fid ? notes.filter((x) => x.folderId === fid) : notes;
+      const t = fid ? tasks.filter((x) => x.folderId === fid) : tasks;
+      const ev = fid && timelineEvents ? timelineEvents.filter((x) => x.folderId === fid) : timelineEvents;
+      const wb = fid && whiteboards ? whiteboards.filter((x) => x.folderId === fid) : whiteboards;
+      setSearchResult(unifiedSearch(n, t, clipsFolderId, { mode, raw: debouncedQuery }, ev, wb));
     }
-  }, [effectiveNotes, effectiveTasks, clipsFolderId, mode, debouncedQuery, effectiveEvents, effectiveWhiteboards]);
+  }, [notes, tasks, clipsFolderId, mode, debouncedQuery, timelineEvents, whiteboards, searchFolderId]);
 
   const { results, error } = searchResult;
 
@@ -179,6 +203,15 @@ export function SearchOverlay({
   }, [onNavigateToNote, onNavigateToTask, onNavigateToTimeline, onNavigateToWhiteboard, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't intercept keys when the folder dropdown is open
+    if (folderDropdownOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setFolderDropdownOpen(false);
+      }
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIndex((prev) => Math.min(prev + 1, flatResults.length - 1));
@@ -192,7 +225,7 @@ export function SearchOverlay({
       e.preventDefault();
       onClose();
     }
-  }, [flatResults, activeIndex, handleSelect, onClose]);
+  }, [flatResults, activeIndex, handleSelect, onClose, folderDropdownOpen]);
 
   // Scroll active result into view
   useEffect(() => {
@@ -238,7 +271,7 @@ export function SearchOverlay({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Overlay panel */}
-      <div className="relative w-full max-w-2xl mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col max-h-[70vh] overflow-hidden">
+      <div className="relative w-full max-w-2xl mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col max-h-[70vh]">
         {/* Header: mode toggle + input */}
         <div className="p-3 border-b border-gray-800">
           <div className="flex items-center gap-2 mb-2">
@@ -260,18 +293,68 @@ export function SearchOverlay({
               ))}
             </div>
 
-            {/* Scope toggle */}
-            {selectedFolderId && (
-              <label className="flex items-center gap-1.5 shrink-0 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={searchScope === 'all'}
-                  onChange={(e) => setSearchScope(e.target.checked ? 'all' : 'investigation')}
-                  className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
-                />
-                <span className="text-[10px] text-gray-400 whitespace-nowrap">Search all</span>
-              </label>
-            )}
+            {/* Investigation scope picker */}
+            <div className="relative shrink-0" ref={folderDropdownRef}>
+              <button
+                onClick={() => { setFolderDropdownOpen(!folderDropdownOpen); setTimeout(() => folderInputRef.current?.focus(), 50); }}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors max-w-[160px]',
+                  searchFolderId
+                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    : 'border-gray-700 text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                )}
+                title={selectedSearchFolder ? `Scoped to: ${selectedSearchFolder.name}` : 'Search all investigations'}
+              >
+                <Briefcase size={12} />
+                <span className="truncate">{selectedSearchFolder?.name || 'All'}</span>
+                <ChevronDown size={10} className={cn('transition-transform', folderDropdownOpen && 'rotate-180')} />
+              </button>
+
+              {folderDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-56 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="p-1.5">
+                    <input
+                      ref={folderInputRef}
+                      value={folderQuery}
+                      onChange={(e) => setFolderQuery(e.target.value)}
+                      placeholder="Filter investigations..."
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    <button
+                      onClick={() => { setSearchFolderId(undefined); setFolderQuery(''); setFolderDropdownOpen(false); }}
+                      className={cn(
+                        'w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2',
+                        !searchFolderId ? 'bg-accent/10 text-accent' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      )}
+                    >
+                      <Briefcase size={12} />
+                      All Investigations
+                    </button>
+                    {filteredFolders.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => { setSearchFolderId(f.id); setFolderQuery(''); setFolderDropdownOpen(false); }}
+                        className={cn(
+                          'w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 min-w-0',
+                          searchFolderId === f.id ? 'bg-accent/10 text-accent' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                        )}
+                      >
+                        <span className={cn(
+                          'w-1.5 h-1.5 rounded-full shrink-0',
+                          (f.status || 'active') === 'active' ? 'bg-green-400' : (f.status === 'archived' ? 'bg-amber-400' : 'bg-gray-500')
+                        )} />
+                        <span className="truncate">{f.name}</span>
+                      </button>
+                    ))}
+                    {filteredFolders.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-600">No matches</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Search input */}
             <div className="relative flex-1">
@@ -326,7 +409,7 @@ export function SearchOverlay({
         </div>
 
         {/* Results */}
-        <div ref={resultsRef} className="flex-1 overflow-y-auto">
+        <div ref={resultsRef} className="flex-1 overflow-y-auto min-h-0">
           {debouncedQuery && results.length === 0 && !error && (
             <div className="p-8 text-center text-gray-500 text-sm">
               No results found for "{debouncedQuery}"

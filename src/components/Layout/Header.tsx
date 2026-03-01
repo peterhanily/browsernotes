@@ -19,7 +19,7 @@ interface HeaderProps {
   onImportData?: () => void;
   onToggleSidebar: () => void;
   onMobileMenuToggle: () => void;
-  sidebarCollapsed: boolean;
+  sidebarCollapsed?: boolean;
   onQuickSave: () => void;
   onQuickLoad: (file: File) => void;
   onStartTour?: () => void;
@@ -41,7 +41,6 @@ export function Header({
   onImportData,
   onToggleSidebar,
   onMobileMenuToggle,
-  sidebarCollapsed,
   onQuickSave,
   onQuickLoad,
   onStartTour,
@@ -59,7 +58,7 @@ export function Header({
   return (
     <header data-tour="header" className={cn("h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative", screenshareMaxLevel && "pt-0.5")}>
       {screenshareMaxLevel && <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500" />}
-      {/* Mobile menu button - always visible on mobile */}
+      {/* Mobile: toggle mobile overlay sidebar */}
       <button
         onClick={onMobileMenuToggle}
         className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors md:hidden"
@@ -68,17 +67,15 @@ export function Header({
       >
         <Menu size={20} />
       </button>
-      {/* Desktop sidebar toggle - visible when sidebar is collapsed */}
-      {sidebarCollapsed && (
-        <button
-          onClick={onToggleSidebar}
-          className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors hidden md:block"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
-        >
-          <Menu size={20} />
-        </button>
-      )}
+      {/* Desktop: always-visible sidebar toggle */}
+      <button
+        onClick={onToggleSidebar}
+        className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors hidden md:block"
+        aria-label="Toggle sidebar"
+        title="Toggle sidebar"
+      >
+        <Menu size={20} />
+      </button>
 
       {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
         <div className="flex items-center gap-1.5 sm:gap-2.5 mr-1 sm:mr-2">

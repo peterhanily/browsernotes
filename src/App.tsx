@@ -1175,6 +1175,18 @@ function AppInner() {
             links={settings.quickLinks ?? DEFAULT_QUICK_LINKS}
             onUpdateLinks={(links) => updateSettings({ quickLinks: links })}
             onViewChange={navigateTo}
+            folders={folders}
+            allNotes={notes.notes}
+            allTasks={tasks.tasks}
+            allEvents={timeline.events}
+            allWhiteboards={whiteboards}
+            allIOCs={standaloneIOCsHook.iocs}
+            onFolderSelect={(id) => {
+              setSelectedFolderId(id);
+              setShowTrash(false);
+              setShowArchive(false);
+              setSelectedTag(undefined);
+            }}
           />
         ) : activeView === 'ioc-stats' ? (
           <div className="flex-1 flex flex-col overflow-y-auto">

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import type { Task } from '../../types';
 import { PRIORITY_COLORS } from '../../types';
 import { renderMarkdown } from '../../lib/markdown';
@@ -8,6 +8,7 @@ import { formatFullDate, isOverdue, cn } from '../../lib/utils';
 interface ExecTaskViewProps {
   task: Task;
   onBack: () => void;
+  onShare?: () => void;
 }
 
 const STATUS_BADGE: Record<string, { label: string; bg: string; text: string }> = {
@@ -16,7 +17,7 @@ const STATUS_BADGE: Record<string, { label: string; bg: string; text: string }> 
   'done':        { label: 'Done',        bg: 'bg-accent-green/20', text: 'text-accent-green' },
 };
 
-export function ExecTaskView({ task, onBack }: ExecTaskViewProps) {
+export function ExecTaskView({ task, onBack, onShare }: ExecTaskViewProps) {
   const descHtml = useMemo(
     () => task.description ? renderMarkdown(task.description) : null,
     [task.description],
@@ -27,10 +28,17 @@ export function ExecTaskView({ task, onBack }: ExecTaskViewProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
-        <ArrowLeft size={18} />
-        <span className="text-sm">Back</span>
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back</span>
+        </button>
+        {onShare && (
+          <button onClick={onShare} className="p-2 rounded-lg text-text-muted active:bg-bg-hover" title="Share task">
+            <Share2 size={16} />
+          </button>
+        )}
+      </div>
 
       <h2 className="text-lg font-bold text-text-primary">{task.title || 'Untitled'}</h2>
 

@@ -113,6 +113,21 @@ export function ExecDashboard({
     setSharePayload({ v: 1, s: 'investigation', t: Date.now(), d: bundle });
   }, [drillDown, folders, allNotes, allTasks, allEvents, allTimelines, allWhiteboards, allIOCs, allTags]);
 
+  const handleShareNote = useCallback((noteId: string) => {
+    const note = allNotes.find((n) => n.id === noteId);
+    if (note) setSharePayload({ v: 1, s: 'note', t: Date.now(), d: note });
+  }, [allNotes]);
+
+  const handleShareTask = useCallback((taskId: string) => {
+    const task = allTasks.find((t) => t.id === taskId);
+    if (task) setSharePayload({ v: 1, s: 'task', t: Date.now(), d: task });
+  }, [allTasks]);
+
+  const handleShareEvent = useCallback((eventId: string) => {
+    const event = allEvents.find((e) => e.id === eventId);
+    if (event) setSharePayload({ v: 1, s: 'event', t: Date.now(), d: event });
+  }, [allEvents]);
+
   const activeFolders = folders.filter((f) => (f.status || 'active') === 'active');
 
   const drillFolder = useMemo(
@@ -172,7 +187,7 @@ export function ExecDashboard({
       case 'noteDetail': {
         const note = allNotes.find((n) => n.id === drillDown.noteId);
         return note ? (
-          <ExecNoteView note={note} allNotes={allNotes} onBack={handleBack} />
+          <ExecNoteView note={note} allNotes={allNotes} onBack={handleBack} onShare={() => handleShareNote(note.id)} />
         ) : null;
       }
 
@@ -194,7 +209,7 @@ export function ExecDashboard({
 
       case 'taskDetail': {
         const task = allTasks.find((t) => t.id === drillDown.taskId);
-        return task ? <ExecTaskView task={task} onBack={handleBack} /> : null;
+        return task ? <ExecTaskView task={task} onBack={handleBack} onShare={() => handleShareTask(task.id)} /> : null;
       }
 
       case 'eventList':
@@ -215,7 +230,7 @@ export function ExecDashboard({
 
       case 'eventDetail': {
         const event = allEvents.find((e) => e.id === drillDown.eventId);
-        return event ? <ExecEventView event={event} onBack={handleBack} /> : null;
+        return event ? <ExecEventView event={event} onBack={handleBack} onShare={() => handleShareEvent(event.id)} /> : null;
       }
 
       case 'whiteboardList':

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import type { TimelineEvent } from '../../types';
@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css';
 interface ExecEventViewProps {
   event: TimelineEvent;
   onBack: () => void;
+  onShare?: () => void;
 }
 
 const iconCache = new Map<string, L.Icon>();
@@ -31,7 +32,7 @@ function getMarkerIcon(color: string): L.Icon {
   return icon;
 }
 
-export function ExecEventView({ event, onBack }: ExecEventViewProps) {
+export function ExecEventView({ event, onBack, onShare }: ExecEventViewProps) {
   const typeInfo = TIMELINE_EVENT_TYPE_LABELS[event.eventType];
   const confInfo = CONFIDENCE_LEVELS[event.confidence];
 
@@ -42,10 +43,17 @@ export function ExecEventView({ event, onBack }: ExecEventViewProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
-        <ArrowLeft size={18} />
-        <span className="text-sm">Back</span>
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back</span>
+        </button>
+        {onShare && (
+          <button onClick={onShare} className="p-2 rounded-lg text-text-muted active:bg-bg-hover" title="Share event">
+            <Share2 size={16} />
+          </button>
+        )}
+      </div>
 
       <h2 className="text-lg font-bold text-text-primary">{event.title || 'Untitled'}</h2>
 

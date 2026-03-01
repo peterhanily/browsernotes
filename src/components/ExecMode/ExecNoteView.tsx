@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import type { Note } from '../../types';
 import { renderMarkdown } from '../../lib/markdown';
 import { formatFullDate } from '../../lib/utils';
@@ -8,9 +8,10 @@ interface ExecNoteViewProps {
   note: Note;
   allNotes: Note[];
   onBack: () => void;
+  onShare?: () => void;
 }
 
-export function ExecNoteView({ note, allNotes, onBack }: ExecNoteViewProps) {
+export function ExecNoteView({ note, allNotes, onBack, onShare }: ExecNoteViewProps) {
   const wikiLinkTargets = useMemo(
     () => allNotes.map((n) => ({ id: n.id, title: n.title })),
     [allNotes],
@@ -23,10 +24,17 @@ export function ExecNoteView({ note, allNotes, onBack }: ExecNoteViewProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
-        <ArrowLeft size={18} />
-        <span className="text-sm">Back</span>
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="flex items-center gap-2 text-text-secondary active:text-text-primary -ml-1">
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back</span>
+        </button>
+        {onShare && (
+          <button onClick={onShare} className="p-2 rounded-lg text-text-muted active:bg-bg-hover" title="Share note">
+            <Share2 size={16} />
+          </button>
+        )}
+      </div>
 
       <h2 className="text-lg font-bold text-text-primary">{note.title || 'Untitled'}</h2>
 

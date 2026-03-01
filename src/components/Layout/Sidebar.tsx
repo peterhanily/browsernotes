@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Briefcase, Tag, Trash2,
-  Archive, ChevronDown, ChevronRight, ChevronLeft, Plus, X, Settings as SettingsIcon,
+  Archive, ChevronDown, ChevronRight, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
   LayoutDashboard,
 } from 'lucide-react';
@@ -282,6 +282,188 @@ export function Sidebar({
       </div>
 
       <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto p-2 space-y-1" aria-label="Views">
+        {/* Investigations — at the top for fast switching */}
+        <div data-tour="tags-folders">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setFoldersOpen(!foldersOpen)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFoldersOpen(!foldersOpen); } }}
+            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
+            aria-expanded={foldersOpen}
+          >
+            {foldersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            Investigations
+            <span className="ml-auto flex items-center gap-0.5">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowNameGenerator(true); }}
+                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                aria-label="Generate investigation name"
+                title="Generate investigation name"
+              >
+                <Dices size={14} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowNewFolder(true); }}
+                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
+                aria-label="Create investigation"
+                title="Create investigation"
+              >
+                <Plus size={14} />
+              </button>
+            </span>
+          </div>
+
+          {foldersOpen && (
+            <div className="mt-1 space-y-0.5">
+              {/* Status filter chips */}
+              {onFolderStatusFilterChange && (
+                <div className="flex gap-1 px-2 pb-1">
+                  {(['active', 'closed', 'archived'] as InvestigationStatus[]).map((s) => {
+                    const count = folders.filter((f) => (f.status || 'active') === s).length;
+                    const isActive = folderStatusFilter.includes(s);
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => {
+                          const next = isActive
+                            ? folderStatusFilter.filter((x) => x !== s)
+                            : [...folderStatusFilter, s];
+                          onFolderStatusFilterChange(next.length > 0 ? next : ['active']);
+                        }}
+                        className={cn(
+                          'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                          isActive ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                        )}
+                      >
+                        {s.charAt(0).toUpperCase() + s.slice(1)} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {showNewFolder && (
+                <div className="flex items-center gap-1 px-2">
+                  <input
+                    autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') setShowNewFolder(false); }}
+                    placeholder="Investigation name"
+                    aria-label="New investigation name"
+                    className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                  />
+                  <button onClick={handleCreateFolder} className="text-accent hover:text-accent-hover" aria-label="Confirm create investigation" title="Create investigation">
+                    <Plus size={14} />
+                  </button>
+                  <button onClick={() => setShowNewFolder(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {/* "All" item — click to deselect investigation */}
+              <SidebarItem
+                compact
+                icon={<Briefcase size={14} />}
+                label="All Items"
+                active={!selectedFolderId}
+                onClick={() => nav(() => { onFolderSelect(undefined); onTagSelect(undefined); onShowTrash(false); onShowArchive(false); })}
+              />
+              {folders
+                .filter((f) => folderStatusFilter.includes(f.status || 'active'))
+                .map((folder) => (
+                <div
+                  key={folder.id}
+                  className={cn(
+                    'group relative rounded-lg transition-colors',
+                    dragOverFolderId === folder.id && 'bg-accent/15',
+                    (folder.status === 'closed' || folder.status === 'archived') && 'opacity-60'
+                  )}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverFolderId(folder.id); }}
+                  onDragLeave={() => setDragOverFolderId(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverFolderId(null);
+                    const noteId = e.dataTransfer.getData('text/plain');
+                    if (noteId && onMoveNoteToFolder) onMoveNoteToFolder(noteId, folder.id);
+                  }}
+                >
+                  {editingFolder === folder.id ? (
+                    <div className="flex items-center gap-1 px-2">
+                      <input
+                        autoFocus
+                        value={editFolderName}
+                        onChange={(e) => setEditFolderName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
+                        aria-label="Rename investigation"
+                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  ) : (
+                    <SidebarItem
+                      compact
+                      icon={<Briefcase size={14} style={{ color: folder.color }} />}
+                      label={folder.name}
+                      active={selectedFolderId === folder.id}
+                      onClick={() => nav(() => {
+                        // Toggle: clicking selected investigation deselects it
+                        if (selectedFolderId === folder.id) {
+                          onFolderSelect(undefined);
+                        } else {
+                          onFolderSelect(folder.id);
+                        }
+                        onTagSelect(undefined); onShowTrash(false); onShowArchive(false);
+                      })}
+                      onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
+                      actions={
+                        <span className="flex items-center gap-px">
+                          {onEditFolder && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
+                              aria-label={`Edit investigation ${folder.name}`}
+                              title="Edit investigation"
+                            >
+                              <Info size={10} />
+                            </button>
+                          )}
+                          {(folder.status || 'active') !== 'archived' ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onArchiveFolder(folder.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-amber-400"
+                              aria-label={`Archive investigation ${folder.name}`}
+                              title="Archive investigation"
+                            >
+                              <Archive size={10} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onUnarchiveFolder(folder.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-green-400"
+                              aria-label={`Unarchive investigation ${folder.name}`}
+                              title="Unarchive investigation"
+                            >
+                              <RotateCcw size={10} />
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
+                            aria-label={`Delete investigation ${folder.name}`}
+                            title="Delete investigation"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      }
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Views */}
         <SidebarItem
           icon={<LayoutDashboard size={18} />}
@@ -519,225 +701,6 @@ export function Sidebar({
             )}
           </div>
         )}
-
-        {/* Folders */}
-        <div data-tour="tags-folders" className="pt-2">
-          {selectedFolderId ? (() => {
-            const folder = folders.find((f) => f.id === selectedFolderId);
-            if (!folder) return null;
-            return (
-              <div className="space-y-0.5">
-                <button
-                  onClick={() => onFolderSelect(undefined)}
-                  className="flex items-center gap-1 w-full px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
-                >
-                  <ChevronLeft size={14} />
-                  All Investigations
-                </button>
-                <div className="group relative">
-                  {editingFolder === folder.id ? (
-                    <div className="flex items-center gap-1 px-2">
-                      <input
-                        autoFocus
-                        value={editFolderName}
-                        onChange={(e) => setEditFolderName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
-                        aria-label="Rename investigation"
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  ) : (
-                    <SidebarItem
-                      compact
-                      icon={<Briefcase size={14} style={{ color: folder.color }} />}
-                      label={folder.name}
-                      active
-                      onClick={() => {}}
-                      onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
-                      actions={
-                        onEditFolder ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
-                            aria-label={`Edit investigation ${folder.name}`}
-                            title="Edit investigation"
-                          >
-                            <Info size={10} />
-                          </button>
-                        ) : undefined
-                      }
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })() : (
-          <>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setFoldersOpen(!foldersOpen)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFoldersOpen(!foldersOpen); } }}
-            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
-            aria-expanded={foldersOpen}
-          >
-            {foldersOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            Investigations
-            <span className="ml-auto flex items-center gap-0.5">
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNameGenerator(true); }}
-                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                aria-label="Generate investigation name"
-                title="Generate investigation name"
-              >
-                <Dices size={14} />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNewFolder(true); }}
-                className="p-0.5 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300"
-                aria-label="Create investigation"
-                title="Create investigation"
-              >
-                <Plus size={14} />
-              </button>
-            </span>
-          </div>
-
-          {foldersOpen && (
-            <div className="mt-1 space-y-0.5">
-              {/* Status filter chips */}
-              {onFolderStatusFilterChange && (
-                <div className="flex gap-1 px-2 pb-1">
-                  {(['active', 'closed', 'archived'] as InvestigationStatus[]).map((s) => {
-                    const count = folders.filter((f) => (f.status || 'active') === s).length;
-                    const isActive = folderStatusFilter.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => {
-                          const next = isActive
-                            ? folderStatusFilter.filter((x) => x !== s)
-                            : [...folderStatusFilter, s];
-                          onFolderStatusFilterChange(next.length > 0 ? next : ['active']);
-                        }}
-                        className={cn(
-                          'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
-                          isActive ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-                        )}
-                      >
-                        {s.charAt(0).toUpperCase() + s.slice(1)} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {showNewFolder && (
-                <div className="flex items-center gap-1 px-2">
-                  <input
-                    autoFocus
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') setShowNewFolder(false); }}
-                    placeholder="Investigation name"
-                    aria-label="New investigation name"
-                    className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                  />
-                  <button onClick={handleCreateFolder} className="text-accent hover:text-accent-hover" aria-label="Confirm create investigation" title="Create investigation">
-                    <Plus size={14} />
-                  </button>
-                  <button onClick={() => setShowNewFolder(false)} className="text-gray-500 hover:text-gray-300" aria-label="Cancel" title="Cancel">
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-              {folders
-                .filter((f) => folderStatusFilter.includes(f.status || 'active'))
-                .map((folder) => (
-                <div
-                  key={folder.id}
-                  className={cn(
-                    'group relative rounded-lg transition-colors',
-                    dragOverFolderId === folder.id && 'bg-accent/15',
-                    (folder.status === 'closed' || folder.status === 'archived') && 'opacity-60'
-                  )}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverFolderId(folder.id); }}
-                  onDragLeave={() => setDragOverFolderId(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOverFolderId(null);
-                    const noteId = e.dataTransfer.getData('text/plain');
-                    if (noteId && onMoveNoteToFolder) onMoveNoteToFolder(noteId, folder.id);
-                  }}
-                >
-                  {editingFolder === folder.id ? (
-                    <div className="flex items-center gap-1 px-2">
-                      <input
-                        autoFocus
-                        value={editFolderName}
-                        onChange={(e) => setEditFolderName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
-                        aria-label="Rename investigation"
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-accent"
-                      />
-                    </div>
-                  ) : (
-                    <SidebarItem
-                      compact
-                      icon={<Briefcase size={14} style={{ color: folder.color }} />}
-                      label={folder.name}
-                      active={selectedFolderId === folder.id}
-                      onClick={() => nav(() => { onFolderSelect(folder.id); onTagSelect(undefined); onShowTrash(false); onShowArchive(false); })}
-                      onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
-                      actions={
-                        <span className="flex items-center gap-px">
-                          {onEditFolder && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onEditFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-gray-300"
-                              aria-label={`Edit investigation ${folder.name}`}
-                              title="Edit investigation"
-                            >
-                              <Info size={10} />
-                            </button>
-                          )}
-                          {(folder.status || 'active') !== 'archived' ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onArchiveFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-amber-400"
-                              aria-label={`Archive investigation ${folder.name}`}
-                              title="Archive investigation"
-                            >
-                              <Archive size={10} />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onUnarchiveFolder(folder.id); }}
-                              className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-green-400"
-                              aria-label={`Unarchive investigation ${folder.name}`}
-                              title="Unarchive investigation"
-                            >
-                              <RotateCcw size={10} />
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-gray-600 text-gray-500 hover:text-red-400"
-                            aria-label={`Delete investigation ${folder.name}`}
-                            title="Delete investigation"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      }
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          </>
-          )}
-        </div>
 
         {/* Tags */}
         <div className="pt-2">

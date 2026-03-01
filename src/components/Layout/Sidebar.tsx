@@ -464,71 +464,77 @@ export function Sidebar({
           )}
         </div>
 
+        {/* Divider */}
+        <div className="mx-2 my-1.5 border-t border-gray-800" />
+
         {/* Views */}
-        <SidebarItem
-          icon={<LayoutDashboard size={18} />}
-          label="Dashboard"
-          active={activeView === 'dashboard' && !showTrash && !showArchive}
-          onClick={() => nav(() => navToView('dashboard'))}
-        />
-        <SidebarItem
-          icon={<FileText size={18} />}
-          label="Notes"
-          count={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
-          active={activeView === 'notes' && !showTrash && !showArchive}
-          onClick={() => nav(() => navToView('notes'))}
-        />
-        <div data-tour="tasks">
+        <div className="space-y-0.5">
           <SidebarItem
-            icon={<ListChecks size={18} />}
-            label="Tasks"
-            count={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
-            active={activeView === 'tasks'}
-            onClick={() => nav(() => navToView('tasks'))}
+            icon={<LayoutDashboard size={16} />}
+            label="Dashboard"
+            active={activeView === 'dashboard' && !showTrash && !showArchive}
+            onClick={() => nav(() => navToView('dashboard'))}
           />
-        </div>
-        <div data-tour="timeline">
           <SidebarItem
-            icon={<Clock size={18} />}
-            label="Timeline"
-            count={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
-            active={activeView === 'timeline'}
-            onClick={() => nav(() => navToView('timeline'))}
+            icon={<FileText size={16} />}
+            label="Notes"
+            count={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
+            active={activeView === 'notes' && !showTrash && !showArchive}
+            onClick={() => nav(() => navToView('notes'))}
           />
-        </div>
-        <SidebarItem
-          icon={<Network size={18} />}
-          label="Graph"
-          active={activeView === 'graph'}
-          onClick={() => nav(() => navToView('graph'))}
-        />
-        <SidebarItem
-          icon={<Search size={16} />}
-          label="IOC Stats"
-          count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
-          active={activeView === 'ioc-stats'}
-          onClick={() => nav(() => navToView('ioc-stats'))}
-        />
-        <div data-tour="whiteboards">
+          <div data-tour="tasks">
+            <SidebarItem
+              icon={<ListChecks size={16} />}
+              label="Tasks"
+              count={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
+              active={activeView === 'tasks'}
+              onClick={() => nav(() => navToView('tasks'))}
+            />
+          </div>
+          <div data-tour="timeline">
+            <SidebarItem
+              icon={<Clock size={16} />}
+              label="Timeline"
+              count={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
+              active={activeView === 'timeline'}
+              onClick={() => nav(() => navToView('timeline'))}
+            />
+          </div>
           <SidebarItem
-            icon={<PenTool size={18} />}
-            label="Whiteboards"
-            count={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
-            active={activeView === 'whiteboard'}
-            onClick={() => nav(() => navToView('whiteboard'))}
+            icon={<Network size={16} />}
+            label="Graph"
+            active={activeView === 'graph'}
+            onClick={() => nav(() => navToView('graph'))}
           />
-        </div>
-        <div data-tour="activity">
           <SidebarItem
-            icon={<Activity size={18} />}
-            label="Activity"
-            active={activeView === 'activity'}
-            onClick={() => nav(() => navToView('activity'))}
+            icon={<Search size={16} />}
+            label="IOC Stats"
+            count={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
+            active={activeView === 'ioc-stats'}
+            onClick={() => nav(() => navToView('ioc-stats'))}
           />
+          <div data-tour="whiteboards">
+            <SidebarItem
+              icon={<PenTool size={16} />}
+              label="Whiteboards"
+              count={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
+              active={activeView === 'whiteboard'}
+              onClick={() => nav(() => navToView('whiteboard'))}
+            />
+          </div>
+          <div data-tour="activity">
+            <SidebarItem
+              icon={<Activity size={16} />}
+              label="Activity"
+              active={activeView === 'activity'}
+              onClick={() => nav(() => navToView('activity'))}
+            />
+          </div>
         </div>
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
-          <div className="pt-2">
+          <div className="pt-1">
+            <div className="mx-2 mb-1.5 border-t border-gray-800" />
             <div
               role="button"
               tabIndex={0}
@@ -611,7 +617,8 @@ export function Sidebar({
         )}
         {/* Timelines — only in timeline view */}
         {activeView === 'timeline' && (
-          <div className="pt-2">
+          <div className="pt-1">
+            <div className="mx-2 mb-1.5 border-t border-gray-800" />
             <div
               role="button"
               tabIndex={0}
@@ -702,16 +709,22 @@ export function Sidebar({
           </div>
         )}
 
+        {/* Divider */}
+        <div className="mx-2 my-1.5 border-t border-gray-800" />
+
         {/* Tags */}
-        <div className="pt-2">
-          <button
+        <div>
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setTagsOpen(!tagsOpen)}
-            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTagsOpen(!tagsOpen); } }}
+            className="flex items-center gap-1 w-full px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 cursor-pointer"
             aria-expanded={tagsOpen}
           >
             {tagsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             Tags
-          </button>
+          </div>
 
           {tagsOpen && (
             <div className="mt-1 space-y-0.5">
@@ -757,8 +770,11 @@ export function Sidebar({
           )}
         </div>
 
+        {/* Divider */}
+        <div className="mx-2 my-1.5 border-t border-gray-800" />
+
         {/* Special */}
-        <div className="pt-2 space-y-0.5">
+        <div className="space-y-0.5">
           <SidebarItem
             icon={<Archive size={16} />}
             label="Archive"

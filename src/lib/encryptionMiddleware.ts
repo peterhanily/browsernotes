@@ -22,6 +22,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   whiteboards: ['name', 'elements', 'appState'],
   tags: ['name'],
   activityLog: ['detail', 'itemTitle'],
+  chatThreads: ['title', 'messages'],
 };
 
 // ── Session key (in-memory only, lost on tab close) ──────────────────

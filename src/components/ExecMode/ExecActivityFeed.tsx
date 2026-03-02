@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { FileText, ListChecks, Clock, PenTool, FolderOpen, Tag, Shield, Cloud, Database } from 'lucide-react';
+import { FileText, ListChecks, Clock, PenTool, FolderOpen, Tag, Shield, Cloud, Database, MessageSquare } from 'lucide-react';
 import type { ActivityLogEntry, ActivityCategory } from '../../types';
 import { ACTIVITY_CATEGORY_LABELS } from '../../types';
 import { formatDate } from '../../lib/utils';
@@ -19,6 +19,7 @@ const CATEGORY_ICONS: Record<ActivityCategory, typeof FileText> = {
   ioc: Shield,
   sync: Cloud,
   data: Database,
+  chat: MessageSquare,
 };
 
 function getTimePeriod(timestamp: number): string {

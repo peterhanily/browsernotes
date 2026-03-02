@@ -120,7 +120,7 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
-export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -162,6 +162,10 @@ export interface Settings {
   tiIocStatuses?: string[];
   backupDestinations?: BackupDestination[];
   quickLinks?: QuickLink[];
+  llmAnthropicApiKey?: string;
+  llmOpenAIApiKey?: string;
+  llmDefaultModel?: string;
+  llmDefaultProvider?: LLMProvider;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -359,6 +363,32 @@ export interface StandaloneIOC {
   updatedAt: number;
 }
 
+// LLM / Chat types
+export type LLMProvider = 'anthropic' | 'openai';
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  model?: string;
+  createdAt: number;
+}
+
+export interface ChatThread {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  model: string;
+  provider: LLMProvider;
+  folderId?: string;
+  tags: string[];
+  trashed: boolean;
+  trashedAt?: number;
+  archived: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface TimelineExportData {
   format: 'threatcaddy-timeline';
   version: 1;
@@ -444,7 +474,7 @@ export const TAG_COLORS = [
 // Activity Log types
 export type ActivityCategory =
   | 'note' | 'task' | 'timeline' | 'whiteboard'
-  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data';
+  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data' | 'chat';
 
 export type ActivityAction =
   | 'create' | 'update' | 'delete'
@@ -475,4 +505,5 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
   ioc:        { label: 'IOC',        color: '#ef4444' },
   sync:       { label: 'Sync',       color: '#06b6d4' },
   data:       { label: 'Data',       color: '#6366f1' },
+  chat:       { label: 'Chat',       color: '#8b5cf6' },
 };

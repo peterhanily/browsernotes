@@ -1,4 +1,4 @@
-import { Github, Download, FlaskConical, Trash2 } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2, Bot } from 'lucide-react';
 import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
@@ -63,6 +63,66 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <option value="list">List</option>
             <option value="kanban">Kanban</option>
           </select>
+        </div>
+      </div>
+
+      <hr className="border-gray-800" />
+
+      {/* AI / LLM */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+          <Bot size={16} />
+          AI / LLM
+        </h3>
+
+        <div className="space-y-3">
+          <div>
+            <label className={labelClass}>Anthropic API Key</label>
+            <input
+              type="password"
+              value={settings.llmAnthropicApiKey || ''}
+              onChange={(e) => onUpdateSettings({ llmAnthropicApiKey: e.target.value.trim() || undefined })}
+              placeholder="sk-ant-..."
+              className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>OpenAI API Key</label>
+            <input
+              type="password"
+              value={settings.llmOpenAIApiKey || ''}
+              onChange={(e) => onUpdateSettings({ llmOpenAIApiKey: e.target.value.trim() || undefined })}
+              placeholder="sk-..."
+              className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className={labelClass}>Default Model</label>
+            <select
+              value={settings.llmDefaultModel || 'claude-sonnet-4-6'}
+              onChange={(e) => {
+                const model = e.target.value;
+                const provider = model.startsWith('claude') ? 'anthropic' : 'openai';
+                onUpdateSettings({ llmDefaultModel: model, llmDefaultProvider: provider as 'anthropic' | 'openai' });
+              }}
+              className={selectClass}
+            >
+              <option value="claude-opus-4-6">Claude Opus 4</option>
+              <option value="claude-sonnet-4-6">Claude Sonnet 4</option>
+              <option value="claude-3-5-haiku-latest">Claude Haiku 3.5</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o Mini</option>
+            </select>
+          </div>
+
+          <p className="text-[10px] text-gray-600">
+            Keys are auto-saved to localStorage, never leave your device. LLM calls are proxied through the browser extension to bypass CORS.
+          </p>
+          {(settings.llmAnthropicApiKey || settings.llmOpenAIApiKey) && (
+            <p className="text-[10px] text-accent-green font-medium">API key saved</p>
+          )}
         </div>
       </div>
 

@@ -41,6 +41,12 @@ copyFileSync(
   join(outdir, 'content.js')
 );
 
+// Copy bridge script (LLM proxy content script)
+copyFileSync(
+  join(rootDir, 'src/bridge.js'),
+  join(outdir, 'bridge.js')
+);
+
 // Copy pages
 mkdirSync(join(outdir, 'pages'), { recursive: true });
 copyFileSync(

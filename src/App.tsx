@@ -16,6 +16,7 @@ import { useTimeline } from './hooks/useTimeline';
 import { useTimelines } from './hooks/useTimelines';
 import { useWhiteboards } from './hooks/useWhiteboards';
 import { useStandaloneIOCs } from './hooks/useStandaloneIOCs';
+import { useChats } from './hooks/useChats';
 import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
@@ -40,6 +41,7 @@ import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
 import { InvestigationDetailPanel } from './components/Investigation/InvestigationDetailPanel';
 import type { InvestigationStatus } from './types';
 import { GraphView } from './components/Graph/GraphView';
+import { ChatView } from './components/Chat/ChatView';
 import { IOCStatsView } from './components/Analysis/IOCStatsView';
 import { StandaloneIOCForm } from './components/Analysis/StandaloneIOCForm';
 import { StandaloneIOCList } from './components/Analysis/StandaloneIOCList';
@@ -110,6 +112,7 @@ function AppInner() {
   const { timelines, createTimeline, updateTimeline, deleteTimeline, reload: reloadTimelines } = useTimelines();
   const { whiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, getFilteredWhiteboards, whiteboardCounts, reload: reloadWhiteboards } = useWhiteboards();
   const standaloneIOCsHook = useStandaloneIOCs();
+  const chatsHook = useChats();
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
 
@@ -430,7 +433,7 @@ function AppInner() {
   }, [deleteTag, tags, activityLog]);
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' ? settings.defaultView : 'notes';
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
@@ -454,6 +457,9 @@ function AppInner() {
   const [selectedIOCTypes, setSelectedIOCTypes] = useState<IOCType[]>([]);
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | undefined>(savedNavState?.selectedTimelineId);
   const [selectedWhiteboardId, setSelectedWhiteboardId] = useState<string | undefined>(savedNavState?.selectedWhiteboardId);
+  const [selectedChatThreadId, setSelectedChatThreadId] = useState<string | undefined>(() => {
+    try { return sessionStorage.getItem('tc-chat-thread') || undefined; } catch { return undefined; }
+  });
   const [graphLayout, setGraphLayout] = useState<LayoutName>('cose-bilkent');
   const [screenshareMaxLevel, setScreenshareMaxLevel] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | undefined>();
@@ -484,6 +490,25 @@ function AppInner() {
       selectedWhiteboardId,
     }));
   }, [activeView, selectedNoteId, selectedFolderId, selectedTimelineId, selectedWhiteboardId]);
+
+  // Persist chat thread selection
+  useEffect(() => {
+    if (selectedChatThreadId) sessionStorage.setItem('tc-chat-thread', selectedChatThreadId);
+    else sessionStorage.removeItem('tc-chat-thread');
+  }, [selectedChatThreadId]);
+
+  const loggedCreateChatThread = useCallback(async (partial?: Partial<import('./types').ChatThread>) => {
+    const thread = await chatsHook.createThread(partial);
+    activityLog.log('chat', 'create', `Created chat thread "${thread.title}"`, thread.id, thread.title);
+    return thread;
+  }, [chatsHook, activityLog]);
+
+  const loggedTrashChatThread = useCallback(async (id: string) => {
+    const thread = chatsHook.threads.find((t) => t.id === id);
+    await chatsHook.trashThread(id);
+    activityLog.log('chat', 'trash', `Trashed chat thread "${thread?.title || 'Untitled'}"`, id, thread?.title);
+    if (selectedChatThreadId === id) setSelectedChatThreadId(undefined);
+  }, [chatsHook, activityLog, selectedChatThreadId]);
 
   const navigateTo = useCallback((view: ViewMode, opts?: { selectedNoteId?: string; selectedTimelineId?: string; selectedWhiteboardId?: string }) => {
     setActiveView(view);
@@ -1168,7 +1193,8 @@ function AppInner() {
     folderStatusFilter,
     onFolderStatusFilterChange: setFolderStatusFilter,
     investigationScopedCounts,
-  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts]);
+    chatCount: chatsHook.threadCounts.total,
+  }), [activeView, folders, tags, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts, chatsHook.threadCounts.total]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -1426,6 +1452,19 @@ function AppInner() {
             onCreateTag={loggedCreateTag}
             selectedWhiteboardId={selectedWhiteboardId ?? null}
             onWhiteboardSelect={(id) => setSelectedWhiteboardId(id ?? undefined)}
+          />
+        ) : activeView === 'chat' ? (
+          <ChatView
+            threads={chatsHook.getFilteredThreads({ folderId: selectedFolderId, showTrashed: false, showArchived: false })}
+            selectedThreadId={selectedChatThreadId}
+            onSelectThread={setSelectedChatThreadId}
+            onCreateThread={loggedCreateChatThread}
+            onUpdateThread={chatsHook.updateThread}
+            onAddMessage={chatsHook.addMessage}
+            onTrashThread={loggedTrashChatThread}
+            settings={settings}
+            selectedFolderId={selectedFolderId}
+            selectedFolder={selectedFolder}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView

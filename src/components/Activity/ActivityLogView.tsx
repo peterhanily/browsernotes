@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Activity, FileText, ListChecks, Clock, PenTool,
-  FolderOpen, Tag, Shield, Cloud, Database, Trash2,
+  FolderOpen, Tag, Shield, Cloud, Database, Trash2, MessageSquare,
 } from 'lucide-react';
 import type { ActivityLogEntry, ActivityCategory } from '../../types';
 import { ACTIVITY_CATEGORY_LABELS } from '../../types';
@@ -24,10 +24,11 @@ const CATEGORY_ICONS: Record<ActivityCategory, typeof FileText> = {
   ioc: Shield,
   sync: Cloud,
   data: Database,
+  chat: MessageSquare,
 };
 
 const ALL_CATEGORIES: ActivityCategory[] = [
-  'note', 'task', 'timeline', 'whiteboard', 'folder', 'tag', 'ioc', 'sync', 'data',
+  'note', 'task', 'timeline', 'whiteboard', 'folder', 'tag', 'ioc', 'sync', 'data', 'chat',
 ];
 
 function getTimePeriod(timestamp: number): string {

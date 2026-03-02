@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, ChatThread } from './types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
 const db = new Dexie('ThreatCaddyDB') as Dexie & {
@@ -12,6 +12,7 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   whiteboards: EntityTable<Whiteboard, 'id'>;
   activityLog: EntityTable<ActivityLogEntry, 'id'>;
   standaloneIOCs: EntityTable<StandaloneIOC, 'id'>;
+  chatThreads: EntityTable<ChatThread, 'id'>;
 };
 
 db.version(1).stores({
@@ -106,6 +107,11 @@ db.version(13).stores({
 // Version 14: standalone IOCs table
 db.version(14).stores({
   standaloneIOCs: 'id, type, value, folderId, trashed, archived, createdAt, updatedAt, *tags',
+});
+
+// Version 15: Chat threads table
+db.version(15).stores({
+  chatThreads: 'id, title, folderId, trashed, archived, createdAt, updatedAt, *tags',
 });
 
 // Encryption-at-rest middleware (transparent to all CRUD hooks)

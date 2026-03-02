@@ -3,7 +3,7 @@ import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
   Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
-  LayoutDashboard,
+  LayoutDashboard, MessageSquare,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -59,6 +59,7 @@ interface SidebarProps {
   folderStatusFilter?: InvestigationStatus[];
   onFolderStatusFilterChange?: (filter: InvestigationStatus[]) => void;
   investigationScopedCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
+  chatCount?: number;
 }
 
 type SegmentedFilter = 'all' | InvestigationStatus;
@@ -110,6 +111,7 @@ export function Sidebar({
   // folderStatusFilter — managed internally via segmentedFilter state
   onFolderStatusFilterChange,
   investigationScopedCounts,
+  chatCount,
 }: SidebarProps) {
   const [investigationsListOpen, setInvestigationsListOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(true);
@@ -238,6 +240,7 @@ export function Sidebar({
     { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
     { view: 'whiteboard', icon: PenTool, label: 'Whiteboards', badge: investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount, dataTour: 'whiteboards' },
     { view: 'ioc-stats', icon: Search, label: 'IOC Stats', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
+    { view: 'chat', icon: MessageSquare, label: 'AI Chat', badge: chatCount },
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
   ];
@@ -532,6 +535,14 @@ export function Sidebar({
           badgeColor="bg-accent-green/15 text-accent-green"
           active={activeView === 'ioc-stats'}
           onClick={() => nav(() => navToView('ioc-stats'))}
+        />
+        <NavItem
+          icon={<MessageSquare size={16} />}
+          label="AI Chat"
+          badge={chatCount}
+          badgeColor="bg-purple/15 text-purple"
+          active={activeView === 'chat'}
+          onClick={() => nav(() => navToView('chat'))}
         />
         <NavItem
           icon={<Network size={16} />}

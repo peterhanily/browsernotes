@@ -305,6 +305,147 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// ── LLM Streaming via long-lived ports ─────────────────────────────────
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port.name.startsWith('llm-')) return;
+
+  let abortController = new AbortController();
+
+  port.onDisconnect.addListener(() => {
+    abortController.abort();
+  });
+
+  port.onMessage.addListener(async (payload) => {
+    try {
+      if (payload.provider === 'anthropic') {
+        await streamAnthropic(port, payload, abortController.signal);
+      } else if (payload.provider === 'openai') {
+        await streamOpenAI(port, payload, abortController.signal);
+      } else {
+        port.postMessage({ type: 'error', error: `Unknown provider: ${payload.provider}` });
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      try { port.postMessage({ type: 'error', error: err.message || 'Unknown error' }); } catch {}
+    }
+  });
+});
+
+async function streamAnthropic(port, payload, signal) {
+  // Support both API keys (sk-ant-...) and OAuth/Bearer tokens
+  const isApiKey = payload.apiKey.startsWith('sk-ant-');
+  const authHeaders = isApiKey
+    ? { 'x-api-key': payload.apiKey, 'anthropic-dangerous-direct-browser-access': 'true' }
+    : { 'Authorization': `Bearer ${payload.apiKey}` };
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      model: payload.model,
+      max_tokens: 4096,
+      stream: true,
+      system: payload.systemPrompt || undefined,
+      messages: payload.messages.map((m) => ({ role: m.role, content: m.content })),
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    port.postMessage({ type: 'error', error: `Anthropic API ${resp.status}: ${body}` });
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+          port.postMessage({ type: 'chunk', content: parsed.delta.text });
+        }
+      } catch {}
+    }
+  }
+
+  port.postMessage({ type: 'done' });
+}
+
+async function streamOpenAI(port, payload, signal) {
+  const messages = [];
+  if (payload.systemPrompt) {
+    messages.push({ role: 'system', content: payload.systemPrompt });
+  }
+  messages.push(...payload.messages.map((m) => ({ role: m.role, content: m.content })));
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${payload.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: payload.model,
+      stream: true,
+      messages,
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    port.postMessage({ type: 'error', error: `OpenAI API ${resp.status}: ${body}` });
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          port.postMessage({ type: 'chunk', content });
+        }
+      } catch {}
+    }
+  }
+
+  port.postMessage({ type: 'done' });
+}
+
 async function sendToTarget(targetUrl, captures) {
   // Re-validate URL before opening (defense-in-depth; clips page also validates)
   try {

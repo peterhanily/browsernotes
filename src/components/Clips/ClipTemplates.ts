@@ -110,4 +110,268 @@ export const CLIP_TEMPLATES: ClipTemplate[] = [
 
 `,
   },
+  {
+    name: 'Host/Endpoint Details',
+    icon: '🖥️',
+    content: `# Host/Endpoint Details
+
+**Hostname:**
+**IP Address(es):** x.x.x.x
+**MAC Address:**
+**OS / Version:**
+**Domain / Workgroup:**
+**Last Seen:**
+
+## Logged-In Users
+
+-
+
+## Installed Software
+
+| Software | Version |
+|----------|---------|
+|          |         |
+
+## Running Processes
+
+| PID | Process Name | User | Command Line |
+|-----|-------------|------|-------------|
+|     |             |      |             |
+
+## Open Ports
+
+| Port | Protocol | Service | State |
+|------|----------|---------|-------|
+|      |          |         |       |
+
+## IOC Summary
+
+| Type | Value | Context |
+|------|-------|---------|
+|      |       |         |
+
+## Notes
+
+`,
+  },
+  {
+    name: 'Cloud Account Details',
+    icon: '☁️',
+    content: `# Cloud Account Details
+
+**Provider:** AWS / Azure / GCP
+**Account/Subscription ID:**
+**Root Email:** user@domain.com
+**Regions:**
+**Environment:** Production / Staging / Development
+
+## IAM Roles / Users
+
+| Name | Type | Permissions | Last Active |
+|------|------|-------------|-------------|
+|      |      |             |             |
+
+## Services In Use
+
+-
+
+## Access Keys
+
+| Key ID | Created | Last Used | Status |
+|--------|---------|-----------|--------|
+|        |         |           |        |
+
+## Suspicious Activity
+
+-
+
+## IOC Summary
+
+| Type | Value | Context |
+|------|-------|---------|
+|      |       |         |
+
+## Notes
+
+`,
+  },
+  {
+    name: 'User Account Details',
+    icon: '👤',
+    content: `# User Account Details
+
+**Username:**
+**Email:** user@domain.com
+**Display Name:**
+**Domain:**
+**Role / Title:**
+**Last Login:**
+**MFA Status:** Enabled / Disabled
+
+## Group Memberships
+
+-
+
+## Recent Activity
+
+| Timestamp | Action | Source IP | Details |
+|-----------|--------|----------|---------|
+|           |        |          |         |
+
+## Suspicious Indicators
+
+-
+
+## IOC Summary
+
+| Type | Value | Context |
+|------|-------|---------|
+|      |       |         |
+
+## Notes
+
+`,
+  },
+  {
+    name: 'Malware Sample',
+    icon: '🦠',
+    content: `# Malware Sample
+
+**Filename:**
+**File Size:**
+**File Type:**
+**First Seen:**
+
+## Hashes
+
+**MD5:**
+**SHA1:**
+**SHA256:**
+
+## C2 Infrastructure
+
+| Type | Value | Port | Protocol |
+|------|-------|------|----------|
+| IP   |       |      |          |
+| Domain |     |      |          |
+
+## YARA Rule Hits
+
+-
+
+## Sandbox Analysis
+
+**Sandbox URL:**
+**Verdict:**
+
+## MITRE ATT&CK Techniques
+
+| ID | Technique | Tactic |
+|----|-----------|--------|
+|    |           |        |
+
+## IOC Summary
+
+| Type | Value | Context |
+|------|-------|---------|
+|      |       |         |
+
+## Notes
+
+`,
+  },
+  {
+    name: 'OCI User Details',
+    icon: '🔑',
+    content: `# OCI User Details
+
+**User OCID:** ocid1.user.oc1..
+**Tenancy:**
+**Email:** user@domain.com
+**Created:**
+**Last Login:**
+
+## Compartments
+
+-
+
+## Group Memberships
+
+-
+
+## API Keys
+
+| Fingerprint | Created | Status |
+|-------------|---------|--------|
+|             |         |        |
+
+## Auth Tokens
+
+| Description | Created | Expires |
+|-------------|---------|---------|
+|             |         |         |
+
+## Capabilities
+
+- [ ] API Keys
+- [ ] Auth Tokens
+- [ ] SMTP Credentials
+- [ ] Customer Secret Keys
+- [ ] Console Access
+
+## Recent Activity
+
+| Timestamp | Action | Source IP | Details |
+|-----------|--------|----------|---------|
+|           |        |          |         |
+
+## Notes
+
+`,
+  },
+  {
+    name: 'OCI Tenancy Details',
+    icon: '🏢',
+    content: `# OCI Tenancy Details
+
+**Tenancy OCID:** ocid1.tenancy.oc1..
+**Tenancy Name:**
+**Home Region:**
+**Created:**
+
+## Subscribed Regions
+
+-
+
+## Compartment Hierarchy
+
+- Root
+  -
+
+## Key Policies
+
+| Policy Name | Compartment | Statements |
+|-------------|-------------|------------|
+|             |             |            |
+
+## Admin Users
+
+| Username | Email | Last Login |
+|----------|-------|------------|
+|          |       |            |
+
+## Budgets / Cost
+
+| Budget Name | Amount | Actual Spend | Alert Threshold |
+|-------------|--------|-------------|----------------|
+|             |        |             |                |
+
+## Connected Services
+
+-
+
+## Notes
+
+`,
+  },
 ];

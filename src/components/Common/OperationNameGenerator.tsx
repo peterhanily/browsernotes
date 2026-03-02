@@ -32,6 +32,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
   const [currentName, setCurrentName] = useState<GeneratedName | null>(null);
   const [copied, setCopied] = useState(false);
   const [leverPulled, setLeverPulled] = useState(false);
+  const [landed, setLanded] = useState(false);
 
   const [reelAWords, setReelAWords] = useState<string[]>([]);
   const [reelBWords, setReelBWords] = useState<string[]>([]);
@@ -69,7 +70,11 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
       } else {
         setSpinning(false);
         setCurrentName(result);
-        setTimeout(() => setLeverPulled(false), 100);
+        setLanded(true);
+        setTimeout(() => {
+          setLanded(false);
+          setLeverPulled(false);
+        }, 1200);
       }
     };
 
@@ -92,6 +97,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
     setSpinning(true);
     setLeverPulled(true);
     setCopied(false);
+    setLanded(false);
 
     // Store pending spin — animation starts after React renders new words
     pendingSpinRef.current = result;
@@ -168,134 +174,208 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
 
   if (!open) return null;
 
+  const ledsOn = spinning || (!spinning && currentName);
+  const ledColor = spinning
+    ? 'bg-amber-400 shadow-amber-400/50'
+    : 'bg-green-400 shadow-green-400/50';
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]">
+      {/* Keyframes for win celebration */}
+      <style>{`
+        @keyframes slotWinPulse {
+          0%, 100% { text-shadow: 0 0 4px rgba(99,102,241,0.3); }
+          50% { text-shadow: 0 0 20px rgba(99,102,241,0.8), 0 0 40px rgba(99,102,241,0.4); }
+        }
+        @keyframes slotPaylineFlash {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; box-shadow: 0 0 8px rgba(99,102,241,0.8); }
+        }
+      `}</style>
+
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
-      <div className="relative w-full max-w-2xl mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-100">Investigation Name Generator</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={cycleLevel}
-              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${levelInfo.bg} ${levelInfo.text} hover:opacity-80`}
-            >
-              {levelInfo.label}
-            </button>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors" aria-label="Close">
-              <X size={20} />
-            </button>
-          </div>
-        </div>
+      {/* Machine cabinet */}
+      <div className="relative w-full max-w-2xl mx-4">
+        {/* Metallic chrome frame */}
+        <div className="bg-gradient-to-b from-gray-600 via-gray-500 to-gray-600 p-[3px] rounded-xl shadow-2xl">
+          <div className="bg-gray-900 rounded-[10px] overflow-hidden" style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)' }}>
 
-        <div className="p-5 space-y-5">
-          {/* Slot machine area */}
-          <div className="flex items-center gap-4">
-            {/* Reels */}
-            <div className="flex-1 flex gap-3">
-              {/* Reel A */}
-              <div className="flex-1">
-                <div className="h-12 overflow-hidden rounded-lg bg-gray-800 border border-gray-600 relative">
-                  <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-gray-800 to-transparent z-10 pointer-events-none" />
-                  <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-gray-800 to-transparent z-10 pointer-events-none" />
-                  <div ref={reelARef} className="will-change-transform">
-                    {reelAWords.map((word, i) => (
-                      <div
-                        key={`${i}-${word}`}
-                        className="h-12 flex items-center justify-center text-sm font-bold text-green-400 tracking-widest"
-                      >
-                        {word}
+            {/* Top plate header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-b from-gray-750 to-gray-900 border-b border-gray-600"
+              style={{ background: 'linear-gradient(to bottom, #2d3748, #1a202c)' }}>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {/* LED dots left */}
+                <div className="flex gap-1.5 flex-shrink-0">
+                  {[0,1,2].map(i => (
+                    <div key={i} className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+                      ledsOn ? `${ledColor} shadow-sm` : 'bg-gray-700'
+                    }`} />
+                  ))}
+                </div>
+                <h2 className="text-xs font-bold text-gray-200 tracking-[0.25em] uppercase whitespace-nowrap">
+                  Investigation Name Generator
+                </h2>
+                {/* LED dots right */}
+                <div className="flex gap-1.5 flex-shrink-0">
+                  {[0,1,2].map(i => (
+                    <div key={i} className={`w-2 h-2 rounded-full transition-colors duration-500 ${
+                      ledsOn ? `${ledColor} shadow-sm` : 'bg-gray-700'
+                    }`} />
+                  ))}
+                </div>
+              </div>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors ml-2 flex-shrink-0" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Slot machine area: reels + lever */}
+              <div className="flex items-center gap-3">
+                {/* Reels container with payline */}
+                <div className="flex-1 relative">
+                  <div className="flex gap-3">
+                    {/* Reel A */}
+                    <div className="flex-1">
+                      <div className="h-[144px] overflow-hidden rounded-lg bg-black/70 border border-gray-600 relative"
+                        style={{ boxShadow: 'inset 0 2px 12px rgba(0,0,0,0.7)' }}>
+                        {/* Top fade */}
+                        <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/90 to-transparent z-10 pointer-events-none" />
+                        {/* Bottom fade */}
+                        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/90 to-transparent z-10 pointer-events-none" />
+                        <div ref={reelARef} className="will-change-transform" style={{ paddingTop: 48, paddingBottom: 48 }}>
+                          {reelAWords.map((word, i) => (
+                            <div
+                              key={`${i}-${word}`}
+                              className="h-12 flex items-center justify-center text-sm font-bold text-green-400 tracking-widest"
+                            >
+                              {word}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Reel B */}
+                    <div className="flex-1">
+                      <div className="h-[144px] overflow-hidden rounded-lg bg-black/70 border border-gray-600 relative"
+                        style={{ boxShadow: 'inset 0 2px 12px rgba(0,0,0,0.7)' }}>
+                        <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/90 to-transparent z-10 pointer-events-none" />
+                        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/90 to-transparent z-10 pointer-events-none" />
+                        <div ref={reelBRef} className="will-change-transform" style={{ paddingTop: 48, paddingBottom: 48 }}>
+                          {reelBWords.map((word, i) => (
+                            <div
+                              key={`${i}-${word}`}
+                              className="h-12 flex items-center justify-center text-sm font-bold text-green-400 tracking-widest"
+                            >
+                              {word}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Payline indicator — horizontal stripe across both reels at vertical center */}
+                  <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 z-20 pointer-events-none flex items-center">
+                    {/* Left triangle marker pointing inward */}
+                    <div className="w-0 h-0 flex-shrink-0"
+                      style={{ borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: '8px solid var(--color-accent, #6366f1)' }} />
+                    {/* Payline stripe */}
+                    <div
+                      className="flex-1 h-0.5 bg-accent/60"
+                      style={landed ? { animation: 'slotPaylineFlash 0.4s ease-in-out 3', backgroundColor: 'var(--color-accent, #6366f1)' } : undefined}
+                    />
+                    {/* Right triangle marker pointing inward */}
+                    <div className="w-0 h-0 flex-shrink-0"
+                      style={{ borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderRight: '8px solid var(--color-accent, #6366f1)' }} />
+                  </div>
+                </div>
+
+                {/* Lever — right side, prominent */}
+                <button
+                  onClick={spin}
+                  disabled={spinning}
+                  className="relative h-36 w-12 flex-shrink-0 cursor-pointer group disabled:cursor-not-allowed select-none"
+                  aria-label="Pull lever to spin"
+                  title="Pull lever"
+                >
+                  {/* Mount bracket */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-md bg-gradient-to-b from-gray-400 to-gray-500 border border-gray-400 z-10 shadow-md" />
+                  {/* Arm — pivots from center bracket */}
+                  <div
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 origin-top flex flex-col items-center"
+                    style={{
+                      transform: `translateX(-50%) rotate(${leverPulled ? '180deg' : '0deg'})`,
+                      transitionProperty: 'transform',
+                      transitionDuration: leverPulled ? '0.25s' : '0.5s',
+                      transitionTimingFunction: leverPulled ? 'cubic-bezier(0.4, 0, 1, 1)' : 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                  >
+                    {/* Shaft — chrome gradient */}
+                    <div className="w-2 h-12 bg-gradient-to-r from-gray-400 via-gray-300 to-gray-400 rounded-full shadow-sm" />
+                    {/* Grip ball — red, glossy */}
+                    <div className="w-8 h-8 -mt-0.5 rounded-full bg-gradient-to-br from-red-400 via-red-500 to-red-700 shadow-lg shadow-red-500/40 border border-red-400/50 group-hover:from-red-300 group-hover:via-red-400 group-hover:to-red-600 transition-colors overflow-hidden">
+                      {/* Glossy highlight */}
+                      <div className="w-3 h-2 mt-1.5 ml-1.5 rounded-full bg-white/30" />
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Result panel — recessed dark panel */}
+              <div className="rounded-lg border border-gray-700 px-4 py-3 text-center"
+                style={{ background: 'rgba(0,0,0,0.4)', boxShadow: 'inset 0 1px 6px rgba(0,0,0,0.5)' }}>
+                <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1 font-semibold">Operation</div>
+                <div
+                  className={`text-xl font-black tracking-wider font-mono transition-opacity duration-300 ${
+                    currentName && !spinning ? 'opacity-100 text-gray-100' : 'opacity-30 text-gray-500'
+                  }`}
+                  style={landed && currentName ? { animation: 'slotWinPulse 0.8s ease-in-out' } : undefined}
+                >
+                  {currentName ? currentName.full : 'SPIN TO GENERATE'}
                 </div>
               </div>
 
-              {/* Reel B */}
-              <div className="flex-1">
-                <div className="h-12 overflow-hidden rounded-lg bg-gray-800 border border-gray-600 relative">
-                  <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-gray-800 to-transparent z-10 pointer-events-none" />
-                  <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-gray-800 to-transparent z-10 pointer-events-none" />
-                  <div ref={reelBRef} className="will-change-transform">
-                    {reelBWords.map((word, i) => (
-                      <div
-                        key={`${i}-${word}`}
-                        className="h-12 flex items-center justify-center text-sm font-bold text-green-400 tracking-widest"
-                      >
-                        {word}
-                      </div>
-                    ))}
-                  </div>
+              {/* Action buttons */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={cycleLevel}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border-b-2 border-black/30 active:border-b-0 active:translate-y-0.5 ${levelInfo.bg} ${levelInfo.text} hover:opacity-80`}
+                >
+                  {levelInfo.label}
+                </button>
+
+                <button
+                  onClick={spin}
+                  disabled={spinning}
+                  className="px-6 py-2 text-sm font-bold rounded-lg bg-accent text-white hover:bg-accent-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed border-b-2 border-black/30 active:border-b-0 active:translate-y-0.5 tracking-wider"
+                >
+                  ◆ SPIN ◆
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopy}
+                    disabled={!currentName || spinning}
+                    className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 border-b-2 border-gray-900 active:border-b-0 active:translate-y-0.5"
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={handleCreate}
+                    disabled={!currentName || spinning}
+                    className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 border-b-2 border-gray-900 active:border-b-0 active:translate-y-0.5"
+                  >
+                    <FolderPlus size={14} />
+                    Create
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Lever — classic pull-down arm */}
-            <button
-              onClick={spin}
-              disabled={spinning}
-              className="relative h-28 w-10 flex-shrink-0 cursor-pointer group disabled:cursor-not-allowed select-none"
-              aria-label="Pull lever to spin"
-              title="Pull lever"
-            >
-              {/* Bracket mount */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded bg-gradient-to-b from-gray-400 to-gray-500 border border-gray-400 z-10" />
-              {/* Arm — pivots from center bracket, rests pointing UP, pulls DOWN */}
-              <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 origin-top flex flex-col items-center"
-                style={{
-                  transform: `translateX(-50%) rotate(${leverPulled ? '180deg' : '0deg'})`,
-                  transitionProperty: 'transform',
-                  transitionDuration: leverPulled ? '0.25s' : '0.5s',
-                  transitionTimingFunction: leverPulled ? 'cubic-bezier(0.4, 0, 1, 1)' : 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-                }}
-              >
-                {/* Shaft going UP from pivot */}
-                <div className="w-1.5 h-9 bg-gradient-to-t from-gray-400 to-gray-500 rounded-full" />
-                {/* Grip ball at top */}
-                <div className="w-7 h-7 -mt-0.5 rounded-full bg-gradient-to-br from-red-400 to-red-600 shadow-lg shadow-red-500/40 border border-red-400/50 group-hover:from-red-300 group-hover:to-red-500 transition-colors" />
-              </div>
-            </button>
-          </div>
-
-          {/* Result display */}
-          <div className="text-center py-3">
-            <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1">Investigation</div>
-            <div className={`text-xl font-black tracking-wider transition-opacity duration-300 ${
-              currentName && !spinning ? 'opacity-100 text-gray-100' : 'opacity-30 text-gray-500'
-            }`}>
-              {currentName ? currentName.full : 'SPIN TO GENERATE'}
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={spin}
-              disabled={spinning}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Spin Again
-            </button>
-            <button
-              onClick={handleCopy}
-              disabled={!currentName || spinning}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={!currentName || spinning}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              <FolderPlus size={14} />
-              Create Investigation
-            </button>
           </div>
         </div>
       </div>

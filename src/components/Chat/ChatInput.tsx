@@ -54,6 +54,7 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
 
   useEffect(() => {
     const shouldOpen = filteredCommands.length > 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from filteredCommands memo
     setSlashOpen(shouldOpen);
     if (shouldOpen) setSlashIndex(0);
   }, [filteredCommands]);

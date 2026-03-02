@@ -55,6 +55,7 @@ export function useLLM() {
   // Keep handleDone in a ref so the event listener always calls the latest version
   const handleDoneRef = useRef<((stopReason: string, contentBlocks: ContentBlock[]) => void) | undefined>(undefined);
 
+  // eslint-disable-next-line react-hooks/refs -- intentional: keep latest closure for event listener
   handleDoneRef.current = async (stopReason: string, contentBlocks: ContentBlock[]) => {
     try {
       const state = agentStateRef.current;

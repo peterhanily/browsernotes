@@ -18,7 +18,7 @@ app.get('/', async (c) => {
   const limit = parseInt(c.req.query('limit') || '20', 10);
   const folderId = c.req.query('folderId');
 
-  let query = db
+  const query = db
     .select({
       id: posts.id,
       authorId: posts.authorId,

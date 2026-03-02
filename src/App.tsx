@@ -200,9 +200,10 @@ function AppInner() {
     };
   }, [auth.serverUrl, auth.connected]);
 
-  const handleResolveConflict = useCallback((_entityId: string, _choice: 'mine' | 'theirs') => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleResolveConflict = useCallback((entityId: string, _choice: 'mine' | 'theirs') => {
     // For now, just dismiss the conflict (full resolution would re-push or accept server version)
-    setSyncConflicts((prev) => prev.filter((c) => c.entityId !== _entityId));
+    setSyncConflicts((prev) => prev.filter((c) => c.entityId !== entityId));
   }, []);
 
   // Share receiver state — listen for hash changes to support re-navigation

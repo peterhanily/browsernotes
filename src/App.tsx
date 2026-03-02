@@ -63,6 +63,15 @@ import { ExecDashboard } from './components/ExecMode/ExecDashboard';
 import { ShareReceiver } from './components/ExecMode/ShareReceiver';
 import { ShareDialog } from './components/ExecMode/ShareDialog';
 import type { SharePayload, InvestigationBundle } from './lib/share';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { FeedView } from './components/Social/FeedView';
+import { ConflictDialog } from './components/Common/ConflictDialog';
+import type { PresenceUser } from './types';
+import { configureServerApi } from './lib/server-api';
+import { syncEngine } from './lib/sync-engine';
+import { enableSync, disableSync } from './lib/sync-middleware';
+import { WSClient } from './lib/ws-client';
+import type { SyncResult } from './lib/server-api';
 
 // Parse share hash on initial load: #share=<encoded>
 function parseShareHash(): string | null {
@@ -97,9 +106,11 @@ const savedNavState = loadNavState();
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AppInner />
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <AppInner />
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 
@@ -123,6 +134,76 @@ function AppInner() {
   });
 
   const activityLog = useActivityLog();
+
+  // ─── Team Server Integration ───────────────────────────────────
+  const auth = useAuth();
+  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
+  const [syncConflicts, setSyncConflicts] = useState<SyncResult[]>([]);
+  const wsClientRef = useRef<WSClient | null>(null);
+
+  // Configure server API and sync engine when auth state changes
+  useEffect(() => {
+    if (auth.serverUrl && auth.connected) {
+      configureServerApi(auth.serverUrl, auth.getAccessToken);
+      enableSync();
+      syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
+      syncEngine.setRemoteChangeHandler(() => {
+        // Reload all entity hooks when remote changes arrive
+        notes.reload();
+        tasks.reload();
+        timeline.reload();
+        reloadTimelines();
+        reloadWhiteboards();
+        standaloneIOCsHook.reload();
+        chatsHook.reload();
+        reloadFolders();
+        reloadTags();
+      });
+      syncEngine.start();
+
+      // Connect WebSocket
+      auth.getAccessToken().then((token) => {
+        if (token && auth.serverUrl) {
+          const ws = new WSClient(auth.serverUrl, token);
+          ws.connect();
+          ws.on('entity-change', () => {
+            // Trigger sync pull on entity changes
+            syncEngine.sync();
+          });
+          ws.on('presence', (msg) => {
+            setPresenceUsers((msg.users as PresenceUser[]) || []);
+          });
+          ws.on('notification', () => {
+            // NotificationBell polls on its own
+          });
+          wsClientRef.current = ws;
+        }
+      });
+    } else {
+      disableSync();
+      syncEngine.stop();
+      configureServerApi(null, async () => null);
+      if (wsClientRef.current) {
+        wsClientRef.current.disconnect();
+        wsClientRef.current = null;
+      }
+      setPresenceUsers([]);
+    }
+
+    return () => {
+      syncEngine.stop();
+      disableSync();
+      if (wsClientRef.current) {
+        wsClientRef.current.disconnect();
+        wsClientRef.current = null;
+      }
+    };
+  }, [auth.serverUrl, auth.connected]);
+
+  const handleResolveConflict = useCallback((_entityId: string, _choice: 'mine' | 'theirs') => {
+    // For now, just dismiss the conflict (full resolution would re-push or accept server version)
+    setSyncConflicts((prev) => prev.filter((c) => c.entityId !== _entityId));
+  }, []);
 
   // Share receiver state — listen for hash changes to support re-navigation
   const [shareData, setShareData] = useState<string | null>(initialShareData);
@@ -1312,6 +1393,7 @@ function AppInner() {
             screenshareMaxLevel={screenshareMaxLevel}
             onScreenshareChange={setScreenshareMaxLevel}
             effectiveClsLevels={effectiveClsLevels}
+            presenceUsers={presenceUsers}
           />
         }
         sidebar={
@@ -1475,6 +1557,11 @@ function AppInner() {
             selectedFolderId={selectedFolderId}
             selectedFolder={selectedFolder}
             onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); }}
+          />
+        ) : activeView === 'feed' ? (
+          <FeedView
+            folderId={selectedFolderId}
+            folderName={selectedFolder?.name}
           />
         ) : activeView === 'tasks' ? (
           <TaskListView
@@ -1732,6 +1819,15 @@ function AppInner() {
       )}
     </ActivityLogContext.Provider>
     <ToastContainer />
+
+    {/* Sync Conflict Dialog */}
+    {syncConflicts.length > 0 && (
+      <ConflictDialog
+        conflicts={syncConflicts}
+        onResolve={handleResolveConflict}
+        onClose={() => setSyncConflicts([])}
+      />
+    )}
     </ScreenshareContext.Provider>
   );
 }

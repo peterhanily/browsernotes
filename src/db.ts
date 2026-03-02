@@ -114,6 +114,21 @@ db.version(15).stores({
   chatThreads: 'id, title, folderId, trashed, archived, createdAt, updatedAt, *tags',
 });
 
+// Version 16: Team server sync support — createdBy indexes + sync tables
+db.version(16).stores({
+  notes: 'id, title, folderId, pinned, archived, trashed, createdAt, updatedAt, *tags, *iocTypes, createdBy',
+  tasks: 'id, title, folderId, status, priority, completed, trashed, archived, order, createdAt, updatedAt, *tags, *iocTypes, createdBy',
+  folders: 'id, name, order, createdBy',
+  tags: 'id, name, createdBy',
+  timelineEvents: 'id, timestamp, eventType, source, starred, trashed, archived, folderId, timelineId, createdAt, updatedAt, *tags, *iocTypes, createdBy',
+  timelines: 'id, name, order, createdAt, createdBy',
+  whiteboards: 'id, name, folderId, trashed, archived, order, createdAt, updatedAt, *tags, createdBy',
+  standaloneIOCs: 'id, type, value, folderId, trashed, archived, createdAt, updatedAt, *tags, createdBy',
+  chatThreads: 'id, title, folderId, trashed, archived, createdAt, updatedAt, *tags, createdBy',
+  _syncQueue: '++seq, table, entityId, op',
+  _syncMeta: 'key',
+});
+
 // Encryption-at-rest middleware (transparent to all CRUD hooks)
 installEncryptionMiddleware(db);
 

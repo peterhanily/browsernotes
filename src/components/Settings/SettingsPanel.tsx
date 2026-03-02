@@ -5,6 +5,7 @@ import { ThreatIntelConfig } from './ThreatIntelConfig';
 import { CloudBackup } from './CloudBackup';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { EncryptionSettings } from '../Encryption/EncryptionSettings';
+import { ServerConnection } from './ServerConnection';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -23,6 +24,12 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
   return (
     <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto space-y-8">
       <h2 className="text-xl font-bold text-gray-100">Settings</h2>
+
+      {/* Team Server */}
+      <ServerConnection
+        settings={settings}
+        onUpdateSettings={onUpdateSettings}
+      />
 
       {/* Preferences */}
       <div className="space-y-4">

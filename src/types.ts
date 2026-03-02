@@ -18,6 +18,8 @@ export interface Note {
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
   annotations?: NoteAnnotation[];
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -35,12 +37,16 @@ export interface IOCTarget {
 export interface TaskComment {
   id: string;
   text: string;
+  authorId?: string;
+  authorName?: string;
   createdAt: number;
 }
 
 export interface NoteAnnotation {
   id: string;
   text: string;
+  authorId?: string;
+  authorName?: string;
   createdAt: number;
 }
 
@@ -68,6 +74,8 @@ export interface Task {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -102,12 +110,16 @@ export interface Folder {
   closureResolution?: ClosureResolution;
   closedReason?: string;
   closedAt?: number;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 export interface Tag {
   id: string;
   name: string;
   color: string;
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 export type CloudProvider = 'oci' | 'aws-s3' | 'azure-blob' | 'gcs';
@@ -120,7 +132,7 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
-export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'feed';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -171,6 +183,8 @@ export interface Settings {
   llmLocalModelName?: string;
   llmDefaultModel?: string;
   llmDefaultProvider?: LLMProvider;
+  serverUrl?: string;
+  serverDisplayName?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -316,6 +330,8 @@ export interface TimelineEvent {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -326,6 +342,8 @@ export interface Timeline {
   description?: string;
   color?: string;
   order: number;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -341,6 +359,8 @@ export interface Whiteboard {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -364,6 +384,8 @@ export interface StandaloneIOC {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -406,6 +428,7 @@ export interface ChatMessage {
   content: string;
   model?: string;
   toolCalls?: ToolCallRecord[];
+  userId?: string;
   createdAt: number;
 }
 
@@ -420,6 +443,8 @@ export interface ChatThread {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -527,6 +552,7 @@ export interface ActivityLogEntry {
   detail: string;
   itemId?: string;
   itemTitle?: string;
+  userId?: string;
   timestamp: number;
 }
 
@@ -542,3 +568,70 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
   data:       { label: 'Data',       color: '#6366f1' },
   chat:       { label: 'Chat',       color: '#8b5cf6' },
 };
+
+// ─── Social / Team Types ────────────────────────────────────────
+
+export interface PostImage {
+  id: string;
+  url: string;
+  alt?: string;
+}
+
+export interface Post {
+  id: string;
+  authorId: string;
+  content: string;
+  images: PostImage[];
+  folderId?: string | null;
+  parentId?: string | null;
+  mentions: string[];
+  pinned: boolean;
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string | null;
+  reactions?: Record<string, { count: number; userIds: string[] }>;
+  replyCount?: number;
+  replies?: Post[];
+}
+
+export type NotificationType = 'mention' | 'reply' | 'reaction' | 'invite' | 'entity-update';
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  sourceUserId?: string;
+  postId?: string;
+  folderId?: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  sourceUserDisplayName?: string;
+  sourceUserAvatarUrl?: string | null;
+}
+
+export interface TeamUser {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  role: string;
+}
+
+export interface InvestigationMember {
+  userId: string;
+  role: 'owner' | 'editor' | 'viewer';
+  joinedAt: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
+export interface PresenceUser {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  view: string;
+}

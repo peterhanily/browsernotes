@@ -59,8 +59,8 @@ describe('Database schema', () => {
     expect(db.standaloneIOCs).toBeDefined();
   });
 
-  it('is at version 15', () => {
-    expect(db.verno).toBe(15);
+  it('is at version 16', () => {
+    expect(db.verno).toBe(16);
   });
 });
 

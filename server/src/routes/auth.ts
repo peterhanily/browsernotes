@@ -1,0 +1,240 @@
+import { Hono } from 'hono';
+import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import * as argon2 from 'argon2';
+import { nanoid } from 'nanoid';
+import { db } from '../db/index.js';
+import { users, sessions } from '../db/schema.js';
+import { requireAuth, signAccessToken } from '../middleware/auth.js';
+import type { AuthUser } from '../types.js';
+
+const app = new Hono<{ Variables: { user: AuthUser } }>();
+
+const registerSchema = z.object({
+  email: z.string().email(),
+  displayName: z.string().min(1).max(100),
+  password: z.string().min(8).max(128),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
+const changePasswordSchema = z.object({
+  oldPassword: z.string(),
+  newPassword: z.string().min(8).max(128),
+});
+
+async function createTokenPair(user: AuthUser) {
+  const accessToken = await signAccessToken(user);
+  const refreshTokenId = nanoid(32);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await db.insert(sessions).values({
+    id: refreshTokenId,
+    userId: user.id,
+    expiresAt,
+  });
+
+  return { accessToken, refreshToken: refreshTokenId };
+}
+
+// POST /api/auth/register
+app.post('/register', async (c) => {
+  const body = await c.req.json();
+  const parsed = registerSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400);
+  }
+
+  const { email, displayName, password } = parsed.data;
+
+  // Check if email already exists
+  const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (existing.length > 0) {
+    return c.json({ error: 'Email already registered' }, 409);
+  }
+
+  const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+  const userId = nanoid();
+  const now = new Date();
+
+  // First user gets admin role
+  const allUsers = await db.select({ id: users.id }).from(users).limit(1);
+  const role = allUsers.length === 0 ? 'admin' : 'analyst';
+
+  await db.insert(users).values({
+    id: userId,
+    email,
+    displayName,
+    passwordHash,
+    role,
+    active: true,
+    lastLoginAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const user: AuthUser = { id: userId, email, role, displayName, avatarUrl: null };
+  const tokens = await createTokenPair(user);
+
+  return c.json({
+    ...tokens,
+    user: { id: userId, email, displayName, role, avatarUrl: null },
+  }, 201);
+});
+
+// POST /api/auth/login
+app.post('/login', async (c) => {
+  const body = await c.req.json();
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed' }, 400);
+  }
+
+  const { email, password } = parsed.data;
+
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (result.length === 0) {
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
+
+  const user = result[0];
+  if (!user.active) {
+    return c.json({ error: 'Account disabled' }, 403);
+  }
+
+  const valid = await argon2.verify(user.passwordHash, password);
+  if (!valid) {
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
+
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+  const authUser: AuthUser = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+  };
+  const tokens = await createTokenPair(authUser);
+
+  return c.json({
+    ...tokens,
+    user: { id: user.id, email: user.email, displayName: user.displayName, role: user.role, avatarUrl: user.avatarUrl },
+  });
+});
+
+// POST /api/auth/refresh
+app.post('/refresh', async (c) => {
+  const body = await c.req.json();
+  const { refreshToken } = body;
+  if (!refreshToken) {
+    return c.json({ error: 'Missing refresh token' }, 400);
+  }
+
+  const session = await db.select().from(sessions).where(eq(sessions.id, refreshToken)).limit(1);
+  if (session.length === 0) {
+    return c.json({ error: 'Invalid refresh token' }, 401);
+  }
+
+  const s = session[0];
+  if (new Date() > s.expiresAt) {
+    await db.delete(sessions).where(eq(sessions.id, s.id));
+    return c.json({ error: 'Refresh token expired' }, 401);
+  }
+
+  // Rotate: delete old session
+  await db.delete(sessions).where(eq(sessions.id, s.id));
+
+  const user = await db.select().from(users).where(eq(users.id, s.userId)).limit(1);
+  if (user.length === 0 || !user[0].active) {
+    return c.json({ error: 'User not found or disabled' }, 401);
+  }
+
+  const u = user[0];
+  const authUser: AuthUser = {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    displayName: u.displayName,
+    avatarUrl: u.avatarUrl,
+  };
+  const tokens = await createTokenPair(authUser);
+
+  return c.json({
+    ...tokens,
+    user: { id: u.id, email: u.email, displayName: u.displayName, role: u.role, avatarUrl: u.avatarUrl },
+  });
+});
+
+// POST /api/auth/logout
+app.post('/logout', requireAuth, async (c) => {
+  const body = await c.req.json();
+  const { refreshToken } = body;
+  if (refreshToken) {
+    await db.delete(sessions).where(eq(sessions.id, refreshToken));
+  }
+  return c.json({ ok: true });
+});
+
+// GET /api/auth/me
+app.get('/me', requireAuth, async (c) => {
+  const authUser = c.get('user');
+  const result = await db.select().from(users).where(eq(users.id, authUser.id)).limit(1);
+  if (result.length === 0) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+  const u = result[0];
+  return c.json({
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName,
+    role: u.role,
+    avatarUrl: u.avatarUrl,
+    createdAt: u.createdAt,
+  });
+});
+
+// PATCH /api/auth/me
+app.patch('/me', requireAuth, async (c) => {
+  const authUser = c.get('user');
+  const body = await c.req.json();
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+  if (body.displayName) updates.displayName = body.displayName;
+  if (body.avatarUrl !== undefined) updates.avatarUrl = body.avatarUrl;
+
+  await db.update(users).set(updates).where(eq(users.id, authUser.id));
+
+  return c.json({ ok: true });
+});
+
+// POST /api/auth/change-password
+app.post('/change-password', requireAuth, async (c) => {
+  const authUser = c.get('user');
+  const body = await c.req.json();
+  const parsed = changePasswordSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Validation failed' }, 400);
+  }
+
+  const result = await db.select().from(users).where(eq(users.id, authUser.id)).limit(1);
+  if (result.length === 0) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  const valid = await argon2.verify(result[0].passwordHash, parsed.data.oldPassword);
+  if (!valid) {
+    return c.json({ error: 'Incorrect current password' }, 401);
+  }
+
+  const newHash = await argon2.hash(parsed.data.newPassword, { type: argon2.argon2id });
+  await db.update(users).set({ passwordHash: newHash, updatedAt: new Date() }).where(eq(users.id, authUser.id));
+
+  return c.json({ ok: true });
+});
+
+export default app;

@@ -4,6 +4,9 @@ import { ThemeToggle } from '../Common/ThemeToggle';
 import { ScreenshareToggle } from '../Common/ScreenshareToggle';
 import { CreateDropdown } from '../Common/CreateDropdown';
 import { cn } from '../../lib/utils';
+import { NotificationBell } from '../Social/NotificationBell';
+import { PresenceIndicator } from '../Common/PresenceIndicator';
+import type { PresenceUser } from '../../types';
 import logoSvgRaw from '/logo.svg?raw';
 const logoSvg = `data:image/svg+xml,${encodeURIComponent(logoSvgRaw)}`;
 
@@ -27,6 +30,7 @@ interface HeaderProps {
   onScreenshareChange: (level: string | null) => void;
   effectiveClsLevels: string[];
   selectedFolderName?: string;
+  presenceUsers?: PresenceUser[];
 }
 
 export function Header({
@@ -48,6 +52,7 @@ export function Header({
   onScreenshareChange,
   effectiveClsLevels,
   selectedFolderName,
+  presenceUsers,
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [buildAge] = useState(() => {
@@ -186,6 +191,10 @@ export function Header({
           onChangeLevel={onScreenshareChange}
           effectiveLevels={effectiveClsLevels}
         />
+        {presenceUsers && presenceUsers.length > 0 && (
+          <PresenceIndicator users={presenceUsers} />
+        )}
+        <NotificationBell />
         <span data-tour="theme-toggle">
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </span>

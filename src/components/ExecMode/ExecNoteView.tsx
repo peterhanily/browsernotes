@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ArrowLeft, Share2 } from 'lucide-react';
 import type { Note } from '../../types';
 import { renderMarkdown } from '../../lib/markdown';
-import { formatFullDate } from '../../lib/utils';
+import { formatFullDate, isSafeUrl } from '../../lib/utils';
 
 interface ExecNoteViewProps {
   note: Note;
@@ -53,7 +53,7 @@ export function ExecNoteView({ note, allNotes, onBack, onShare }: ExecNoteViewPr
         </div>
       )}
 
-      {note.sourceUrl && (
+      {isSafeUrl(note.sourceUrl) && (
         <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-accent underline truncate">
           {note.sourceUrl}
         </a>

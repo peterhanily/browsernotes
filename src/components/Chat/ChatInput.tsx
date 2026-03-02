@@ -13,12 +13,19 @@ const SLASH_COMMANDS = [
   { command: '/timeline', description: 'List timeline events', placeholder: '', icon: Clock },
 ];
 
-const MODELS: { label: string; value: string; provider: LLMProvider }[] = [
-  { label: 'Claude Opus 4', value: 'claude-opus-4-6', provider: 'anthropic' },
-  { label: 'Claude Sonnet 4', value: 'claude-sonnet-4-6', provider: 'anthropic' },
-  { label: 'Claude Haiku 3.5', value: 'claude-3-5-haiku-latest', provider: 'anthropic' },
-  { label: 'GPT-4o', value: 'gpt-4o', provider: 'openai' },
-  { label: 'GPT-4o Mini', value: 'gpt-4o-mini', provider: 'openai' },
+interface ModelEntry { label: string; value: string; provider: LLMProvider; group: string }
+
+const STATIC_MODELS: ModelEntry[] = [
+  { label: 'Claude Opus 4', value: 'claude-opus-4-6', provider: 'anthropic', group: 'Anthropic' },
+  { label: 'Claude Sonnet 4', value: 'claude-sonnet-4-6', provider: 'anthropic', group: 'Anthropic' },
+  { label: 'Claude Haiku 3.5', value: 'claude-3-5-haiku-latest', provider: 'anthropic', group: 'Anthropic' },
+  { label: 'GPT-4o', value: 'gpt-4o', provider: 'openai', group: 'OpenAI' },
+  { label: 'GPT-4o Mini', value: 'gpt-4o-mini', provider: 'openai', group: 'OpenAI' },
+  { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro-preview-06-05', provider: 'gemini', group: 'Google' },
+  { label: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash-preview-05-20', provider: 'gemini', group: 'Google' },
+  { label: 'Mistral Large', value: 'mistral-large-latest', provider: 'mistral', group: 'Mistral' },
+  { label: 'Mistral Small', value: 'mistral-small-latest', provider: 'mistral', group: 'Mistral' },
+  { label: 'Codestral', value: 'codestral-latest', provider: 'mistral', group: 'Mistral' },
 ];
 
 interface ChatInputProps {
@@ -29,9 +36,18 @@ interface ChatInputProps {
   model: string;
   onModelChange: (model: string, provider: LLMProvider) => void;
   disabled?: boolean;
+  localModelName?: string;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, model, onModelChange, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, model, onModelChange, disabled, localModelName }: ChatInputProps) {
+  const MODELS = useMemo(() => {
+    const models = [...STATIC_MODELS];
+    if (localModelName) {
+      models.push({ label: `Local: ${localModelName}`, value: localModelName, provider: 'local' as LLMProvider, group: 'Local' });
+    }
+    return models;
+  }, [localModelName]);
+
   const [text, setText] = useState('');
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
@@ -129,8 +145,12 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
           }}
           className="bg-bg-deep border border-border-medium rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-purple text-xs"
         >
-          {MODELS.map((m) => (
-            <option key={m.value} value={m.value}>{m.label}</option>
+          {Array.from(new Set(MODELS.map(m => m.group))).map(group => (
+            <optgroup key={group} label={group}>
+              {MODELS.filter(m => m.group === group).map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
         <div className="flex-1" />

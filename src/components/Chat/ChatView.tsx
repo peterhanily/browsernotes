@@ -75,17 +75,45 @@ export function ChatView({
     }
   }, [onCreateThread, onSelectThread, settings, selectedFolderId]);
 
+  const getApiKeyForProvider = useCallback((provider: LLMProvider, s: Settings): string | undefined => {
+    switch (provider) {
+      case 'anthropic': return s.llmAnthropicApiKey?.trim();
+      case 'openai': return s.llmOpenAIApiKey?.trim();
+      case 'gemini': return s.llmGeminiApiKey?.trim();
+      case 'mistral': return s.llmMistralApiKey?.trim();
+      case 'local': return s.llmLocalApiKey?.trim() || 'none';
+      default: return undefined;
+    }
+  }, []);
+
+  const getProviderLabel = useCallback((provider: LLMProvider): string => {
+    switch (provider) {
+      case 'anthropic': return 'Anthropic';
+      case 'openai': return 'OpenAI';
+      case 'gemini': return 'Google Gemini';
+      case 'mistral': return 'Mistral';
+      case 'local': return 'Local LLM';
+      default: return provider;
+    }
+  }, []);
+
   const handleSend = useCallback(async (text: string) => {
     if (!activeThread) return;
     setLocalError(null);
 
+    const provider = activeThread.provider;
+
+    // Local provider: validate endpoint is set
+    if (provider === 'local' && !settings.llmLocalEndpoint) {
+      setLocalError('No Local LLM endpoint configured. Add it in Settings.');
+      return;
+    }
+
     // Get API key (trim whitespace from copy-paste)
-    const apiKey = (activeThread.provider === 'anthropic'
-      ? settings.llmAnthropicApiKey
-      : settings.llmOpenAIApiKey)?.trim();
+    const apiKey = getApiKeyForProvider(provider, settings);
 
     if (!apiKey) {
-      setLocalError(`No ${activeThread.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key configured. Add it in Settings.`);
+      setLocalError(`No ${getProviderLabel(provider)} API key configured. Add it in Settings.`);
       return;
     }
 
@@ -190,6 +218,7 @@ export function ChatView({
         apiKey,
         systemPrompt,
         tools: TOOL_DEFINITIONS,
+        endpoint: activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined,
       },
       async (toolUse: ToolUseBlock) => {
         const result = await executeTool(toolUse, selectedFolderId);
@@ -217,11 +246,10 @@ export function ChatView({
         // Auto-generate a contextual title after first exchange
         // The initial auto-title is the truncated first user message — improve it with LLM
         if (activeThread.messages.length <= 1 && content) {
-          const apiKey = (activeThread.provider === 'anthropic'
-            ? settings.llmAnthropicApiKey
-            : settings.llmOpenAIApiKey)?.trim();
-          if (apiKey) {
-            generateChatTitle(text, content, activeThread.provider, activeThread.model, apiKey)
+          const titleApiKey = getApiKeyForProvider(activeThread.provider, settings);
+          if (titleApiKey) {
+            const titleEndpoint = activeThread.provider === 'local' ? settings.llmLocalEndpoint : undefined;
+            generateChatTitle(text, content, activeThread.provider, activeThread.model, titleApiKey, titleEndpoint)
               .then((title) => {
                 if (title) onUpdateThread(activeThread.id, { title });
               })
@@ -230,7 +258,7 @@ export function ChatView({
         }
       }
     );
-  }, [activeThread, settings, selectedFolder, selectedFolderId, sendAgentRequest, onAddMessage, onUpdateThread, onEntitiesChanged]);
+  }, [activeThread, settings, selectedFolder, selectedFolderId, sendAgentRequest, onAddMessage, onUpdateThread, onEntitiesChanged, getApiKeyForProvider, getProviderLabel]);
 
   const handleModelChange = useCallback((model: string, provider: LLMProvider) => {
     if (activeThread) {
@@ -402,6 +430,7 @@ export function ChatView({
               extensionAvailable={extensionAvailable}
               model={activeThread.model}
               onModelChange={handleModelChange}
+              localModelName={settings.llmLocalModelName}
             />
           </>
         ) : (

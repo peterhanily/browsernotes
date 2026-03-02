@@ -425,6 +425,12 @@ chrome.runtime.onConnect.addListener((port) => {
         await streamAnthropic(port, payload, abortController.signal);
       } else if (payload.provider === 'openai') {
         await streamOpenAI(port, payload, abortController.signal);
+      } else if (payload.provider === 'gemini') {
+        await streamGemini(port, payload, abortController.signal);
+      } else if (payload.provider === 'mistral') {
+        await streamMistral(port, payload, abortController.signal);
+      } else if (payload.provider === 'local') {
+        await streamLocal(port, payload, abortController.signal);
       } else {
         port.postMessage({ type: 'error', error: `Unknown provider: ${payload.provider}` });
       }
@@ -538,7 +544,8 @@ async function streamAnthropic(port, payload, signal) {
   port.postMessage({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
 }
 
-async function streamOpenAI(port, payload, signal) {
+// Shared streamer for OpenAI-compatible APIs (OpenAI, Mistral, Local/Ollama/vLLM)
+async function streamOpenAICompatible(port, payload, signal, endpoint, headers, providerLabel) {
   const messages = [];
   if (payload.systemPrompt) {
     messages.push({ role: 'system', content: payload.systemPrompt });
@@ -547,7 +554,6 @@ async function streamOpenAI(port, payload, signal) {
   // Convert structured messages for OpenAI format
   for (const m of payload.messages) {
     if (m.role === 'assistant' && Array.isArray(m.content)) {
-      // Anthropic-style content blocks → OpenAI assistant message + tool_calls
       let textContent = '';
       const toolCalls = [];
       for (const block of m.content) {
@@ -560,7 +566,6 @@ async function streamOpenAI(port, payload, signal) {
       if (toolCalls.length > 0) msg.tool_calls = toolCalls;
       messages.push(msg);
     } else if (m.role === 'user' && Array.isArray(m.content)) {
-      // Tool result blocks → OpenAI tool messages
       for (const block of m.content) {
         if (block.type === 'tool_result') {
           messages.push({ role: 'tool', tool_call_id: block.tool_use_id, content: block.content });
@@ -585,19 +590,16 @@ async function streamOpenAI(port, payload, signal) {
     }));
   }
 
-  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+  const resp = await fetch(endpoint, {
     method: 'POST',
     signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${payload.apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 
   if (!resp.ok) {
     const respBody = await resp.text().catch(() => '');
-    port.postMessage({ type: 'error', error: `OpenAI API ${resp.status}: ${respBody}` });
+    port.postMessage({ type: 'error', error: `${providerLabel} API ${resp.status}: ${respBody}` });
     return;
   }
 
@@ -605,9 +607,7 @@ async function streamOpenAI(port, payload, signal) {
   const decoder = new TextDecoder();
   let buffer = '';
   let stopReason = null;
-
-  // Track tool calls being assembled from deltas
-  const toolCallAccum = {}; // index → { id, name, arguments }
+  const toolCallAccum = {};
 
   while (true) {
     const { done, value } = await reader.read();
@@ -619,20 +619,18 @@ async function streamOpenAI(port, payload, signal) {
 
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6);
+      const data = line.slice(6).trim();
       if (data === '[DONE]') continue;
       try {
         const parsed = JSON.parse(data);
         const choice = parsed.choices?.[0];
         if (!choice) continue;
 
-        // Text content
         const content = choice.delta?.content;
         if (content) {
           port.postMessage({ type: 'chunk', content });
         }
 
-        // Tool call deltas
         if (choice.delta?.tool_calls) {
           for (const tc of choice.delta.tool_calls) {
             const idx = tc.index;
@@ -643,7 +641,6 @@ async function streamOpenAI(port, payload, signal) {
           }
         }
 
-        // Finish reason
         if (choice.finish_reason) {
           stopReason = choice.finish_reason;
         }
@@ -651,10 +648,7 @@ async function streamOpenAI(port, payload, signal) {
     }
   }
 
-  // Build content blocks in Anthropic format
   const contentBlocks = [];
-  // If there was streamed text, it was already sent as chunks. Reconstruct the text block isn't
-  // needed since useLLM tracks accumulated text. But we still need tool_use blocks.
   const toolEntries = Object.values(toolCallAccum);
   if (toolEntries.length > 0) {
     for (const tc of toolEntries) {
@@ -664,12 +658,160 @@ async function streamOpenAI(port, payload, signal) {
     }
   }
 
-  // Normalize OpenAI stop reasons to Anthropic format
   const normalizedStop = stopReason === 'tool_calls' ? 'tool_use'
     : stopReason === 'stop' ? 'end_turn'
     : stopReason || 'end_turn';
 
   port.postMessage({ type: 'done', stopReason: normalizedStop, contentBlocks });
+}
+
+async function streamOpenAI(port, payload, signal) {
+  await streamOpenAICompatible(
+    port, payload, signal,
+    'https://api.openai.com/v1/chat/completions',
+    { 'Authorization': `Bearer ${payload.apiKey}` },
+    'OpenAI'
+  );
+}
+
+async function streamMistral(port, payload, signal) {
+  await streamOpenAICompatible(
+    port, payload, signal,
+    'https://api.mistral.ai/v1/chat/completions',
+    { 'Authorization': `Bearer ${payload.apiKey}` },
+    'Mistral'
+  );
+}
+
+async function streamLocal(port, payload, signal) {
+  const base = (payload.endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+  const headers = {};
+  if (payload.apiKey) headers['Authorization'] = `Bearer ${payload.apiKey}`;
+  await streamOpenAICompatible(
+    port, payload, signal,
+    `${base}/chat/completions`,
+    headers,
+    'Local LLM'
+  );
+}
+
+async function streamGemini(port, payload, signal) {
+  const model = payload.model;
+  const apiKey = payload.apiKey;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  // Convert messages: user/assistant → user/model, content → parts[{text}]
+  const contents = [];
+  for (const m of payload.messages) {
+    const role = m.role === 'assistant' ? 'model' : 'user';
+    if (Array.isArray(m.content)) {
+      const parts = [];
+      for (const block of m.content) {
+        if (block.type === 'text') {
+          parts.push({ text: block.text });
+        } else if (block.type === 'tool_use') {
+          parts.push({ functionCall: { name: block.name, args: block.input } });
+        } else if (block.type === 'tool_result') {
+          parts.push({ functionResponse: { name: block.tool_use_id, response: { result: block.content } } });
+        }
+      }
+      contents.push({ role, parts });
+    } else {
+      contents.push({ role, parts: [{ text: m.content }] });
+    }
+  }
+
+  const body = { contents };
+
+  // System prompt → systemInstruction
+  if (payload.systemPrompt) {
+    body.systemInstruction = { parts: [{ text: payload.systemPrompt }] };
+  }
+
+  // Convert tool defs → functionDeclarations
+  if (payload.tools && payload.tools.length > 0) {
+    body.tools = [{
+      functionDeclarations: payload.tools.map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema,
+      })),
+    }];
+  }
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const respBody = await resp.text().catch(() => '');
+    port.postMessage({ type: 'error', error: `Gemini API ${resp.status}: ${respBody}` });
+    return;
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const contentBlocks = [];
+  let stopReason = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (!data) continue;
+      try {
+        const parsed = JSON.parse(data);
+        const candidate = parsed.candidates?.[0];
+        if (!candidate) continue;
+
+        if (candidate.content?.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.text) {
+              port.postMessage({ type: 'chunk', content: part.text });
+              // Accumulate text into a single text block
+              let textBlock = contentBlocks.find(b => b.type === 'text');
+              if (!textBlock) {
+                textBlock = { type: 'text', text: '' };
+                contentBlocks.push(textBlock);
+              }
+              textBlock.text += part.text;
+            }
+            if (part.functionCall) {
+              contentBlocks.push({
+                type: 'tool_use',
+                id: `gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                name: part.functionCall.name,
+                input: part.functionCall.args || {},
+              });
+            }
+          }
+        }
+
+        if (candidate.finishReason) {
+          if (candidate.finishReason === 'STOP') stopReason = 'end_turn';
+          else if (candidate.finishReason === 'MAX_TOKENS') stopReason = 'max_tokens';
+          else stopReason = candidate.finishReason;
+        }
+      } catch {}
+    }
+  }
+
+  // Determine if tool_use is the stop reason based on content blocks
+  const hasToolUse = contentBlocks.some(b => b.type === 'tool_use');
+  if (hasToolUse && stopReason !== 'max_tokens') stopReason = 'tool_use';
+
+  port.postMessage({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
 }
 
 async function sendToTarget(targetUrl, captures) {

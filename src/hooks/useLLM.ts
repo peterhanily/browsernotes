@@ -15,6 +15,7 @@ interface SendRequestOptions {
   apiKey: string;
   systemPrompt?: string;
   tools?: ToolDef[];
+  endpoint?: string;
 }
 
 export interface ToolActivity {
@@ -169,6 +170,7 @@ export function useLLM() {
           apiKey: state.opts.apiKey,
           systemPrompt: state.opts.systemPrompt,
           tools: state.opts.tools,
+          endpoint: state.opts.endpoint,
         },
       }, '*');
     } catch (err) {
@@ -262,6 +264,7 @@ export function useLLM() {
         apiKey: opts.apiKey,
         systemPrompt: opts.systemPrompt,
         tools: opts.tools,
+        endpoint: opts.endpoint,
       },
     }, '*');
 

@@ -13,6 +13,7 @@ export function generateChatTitle(
   provider: LLMProvider,
   model: string,
   apiKey: string,
+  endpoint?: string,
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const requestId = nanoid();
@@ -70,6 +71,7 @@ export function generateChatTitle(
         ],
         apiKey,
         systemPrompt: 'Generate a concise 3-6 word title for this conversation. Reply with ONLY the title, no quotes or punctuation.',
+        endpoint,
       },
     }, '*');
   });

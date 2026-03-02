@@ -98,29 +98,109 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             />
           </div>
 
+          <div>
+            <label className={labelClass}>Google Gemini API Key</label>
+            <input
+              type="password"
+              value={settings.llmGeminiApiKey || ''}
+              onChange={(e) => onUpdateSettings({ llmGeminiApiKey: e.target.value.trim() || undefined })}
+              placeholder="AIza..."
+              className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>Mistral API Key</label>
+            <input
+              type="password"
+              value={settings.llmMistralApiKey || ''}
+              onChange={(e) => onUpdateSettings({ llmMistralApiKey: e.target.value.trim() || undefined })}
+              placeholder="..."
+              className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div className="border border-gray-700 rounded-lg p-3 space-y-3">
+            <label className="text-sm text-gray-300 font-medium">Local LLM (Ollama / LM Studio / vLLM)</label>
+            <div>
+              <label className={labelClass}>Endpoint URL</label>
+              <input
+                type="text"
+                value={settings.llmLocalEndpoint || ''}
+                onChange={(e) => onUpdateSettings({ llmLocalEndpoint: e.target.value.trim() || undefined })}
+                placeholder="http://localhost:11434/v1"
+                className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>API Key (optional)</label>
+              <input
+                type="password"
+                value={settings.llmLocalApiKey || ''}
+                onChange={(e) => onUpdateSettings({ llmLocalApiKey: e.target.value.trim() || undefined })}
+                placeholder="Optional — some servers require one"
+                className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Model Name</label>
+              <input
+                type="text"
+                value={settings.llmLocalModelName || ''}
+                onChange={(e) => onUpdateSettings({ llmLocalModelName: e.target.value.trim() || undefined })}
+                placeholder="llama3, mistral-nemo, etc."
+                className="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <label className={labelClass}>Default Model</label>
             <select
               value={settings.llmDefaultModel || 'claude-sonnet-4-6'}
               onChange={(e) => {
                 const model = e.target.value;
-                const provider = model.startsWith('claude') ? 'anthropic' : 'openai';
-                onUpdateSettings({ llmDefaultModel: model, llmDefaultProvider: provider as 'anthropic' | 'openai' });
+                const providerMap: Record<string, string> = {
+                  'claude-opus-4-6': 'anthropic', 'claude-sonnet-4-6': 'anthropic', 'claude-3-5-haiku-latest': 'anthropic',
+                  'gpt-4o': 'openai', 'gpt-4o-mini': 'openai',
+                  'gemini-2.5-pro-preview-06-05': 'gemini', 'gemini-2.5-flash-preview-05-20': 'gemini',
+                  'mistral-large-latest': 'mistral', 'mistral-small-latest': 'mistral', 'codestral-latest': 'mistral',
+                };
+                const provider = providerMap[model] || (model === settings.llmLocalModelName ? 'local' : 'anthropic');
+                onUpdateSettings({ llmDefaultModel: model, llmDefaultProvider: provider as Settings['llmDefaultProvider'] });
               }}
               className={selectClass}
             >
-              <option value="claude-opus-4-6">Claude Opus 4</option>
-              <option value="claude-sonnet-4-6">Claude Sonnet 4</option>
-              <option value="claude-3-5-haiku-latest">Claude Haiku 3.5</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
+              <optgroup label="Anthropic">
+                <option value="claude-opus-4-6">Claude Opus 4</option>
+                <option value="claude-sonnet-4-6">Claude Sonnet 4</option>
+                <option value="claude-3-5-haiku-latest">Claude Haiku 3.5</option>
+              </optgroup>
+              <optgroup label="OpenAI">
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4o-mini">GPT-4o Mini</option>
+              </optgroup>
+              <optgroup label="Google">
+                <option value="gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro</option>
+                <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash</option>
+              </optgroup>
+              <optgroup label="Mistral">
+                <option value="mistral-large-latest">Mistral Large</option>
+                <option value="mistral-small-latest">Mistral Small</option>
+                <option value="codestral-latest">Codestral</option>
+              </optgroup>
+              {settings.llmLocalModelName && (
+                <optgroup label="Local">
+                  <option value={settings.llmLocalModelName}>Local: {settings.llmLocalModelName}</option>
+                </optgroup>
+              )}
             </select>
           </div>
 
           <p className="text-[10px] text-gray-600">
             Keys are auto-saved to localStorage, never leave your device. LLM calls are proxied through the browser extension to bypass CORS.
           </p>
-          {(settings.llmAnthropicApiKey || settings.llmOpenAIApiKey) && (
+          {(settings.llmAnthropicApiKey || settings.llmOpenAIApiKey || settings.llmGeminiApiKey || settings.llmMistralApiKey) && (
             <p className="text-[10px] text-accent-green font-medium">API key saved</p>
           )}
         </div>

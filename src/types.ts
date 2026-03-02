@@ -164,6 +164,11 @@ export interface Settings {
   quickLinks?: QuickLink[];
   llmAnthropicApiKey?: string;
   llmOpenAIApiKey?: string;
+  llmGeminiApiKey?: string;
+  llmMistralApiKey?: string;
+  llmLocalEndpoint?: string;
+  llmLocalApiKey?: string;
+  llmLocalModelName?: string;
   llmDefaultModel?: string;
   llmDefaultProvider?: LLMProvider;
 }
@@ -364,7 +369,7 @@ export interface StandaloneIOC {
 }
 
 // LLM / Chat types
-export type LLMProvider = 'anthropic' | 'openai';
+export type LLMProvider = 'anthropic' | 'openai' | 'gemini' | 'mistral' | 'local';
 
 export interface TextBlock {
   type: 'text';

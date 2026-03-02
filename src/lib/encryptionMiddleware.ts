@@ -21,6 +21,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   timelines: ['name', 'description'],
   whiteboards: ['name', 'elements', 'appState'],
   tags: ['name'],
+  activityLog: ['detail', 'itemTitle'],
   chatThreads: ['title', 'messages'],
 };
 

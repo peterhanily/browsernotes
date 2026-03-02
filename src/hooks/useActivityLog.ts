@@ -3,22 +3,33 @@ import { db } from '../db';
 import type { ActivityLogEntry, ActivityCategory, ActivityAction } from '../types';
 import { nanoid } from 'nanoid';
 
-const MAX_ENTRIES = 1000;
+const RETENTION_DAYS = 30;
 
 export function useActivityLog() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
 
-  // Load entries on mount, trim to MAX_ENTRIES
+  // Load entries on mount, prune anything older than 30 days
   useEffect(() => {
     (async () => {
-      const all = await db.activityLog.orderBy('timestamp').reverse().toArray();
-      if (all.length > MAX_ENTRIES) {
-        const toRemove = all.slice(MAX_ENTRIES);
-        await db.activityLog.bulkDelete(toRemove.map((e) => e.id));
-        setEntries(all.slice(0, MAX_ENTRIES));
-      } else {
-        setEntries(all);
+      const cutoff = Date.now() - RETENTION_DAYS * 86_400_000;
+      // Use toArray() (goes through DBCore query handler → decrypts).
+      // Avoid orderBy().reverse() which may use openCursor and bypass
+      // the encryption middleware's query-level decryption.
+      const all = await db.activityLog.toArray();
+      const kept: ActivityLogEntry[] = [];
+      const expiredIds: string[] = [];
+      for (const entry of all) {
+        if (entry.timestamp >= cutoff) {
+          kept.push(entry);
+        } else {
+          expiredIds.push(entry.id);
+        }
       }
+      if (expiredIds.length > 0) {
+        await db.activityLog.bulkDelete(expiredIds);
+      }
+      kept.sort((a, b) => b.timestamp - a.timestamp);
+      setEntries(kept);
     })();
   }, []);
 
@@ -39,10 +50,7 @@ export function useActivityLog() {
       timestamp: Date.now(),
     };
     await db.activityLog.add(entry);
-    setEntries((prev) => {
-      const next = [entry, ...prev];
-      return next.length > MAX_ENTRIES ? next.slice(0, MAX_ENTRIES) : next;
-    });
+    setEntries((prev) => [entry, ...prev]);
   }, []);
 
   const clear = useCallback(async () => {

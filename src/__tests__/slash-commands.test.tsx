@@ -198,7 +198,7 @@ describe('ChatInput slash command menu', () => {
       renderInput();
       const textarea = getTextarea();
       await userEvent.type(textarea, '/');
-      const searchBtn = screen.getByText('/search').closest('button')!;
+      const searchBtn = screen.getByText('/search').closest('button') as HTMLButtonElement;
       fireEvent.mouseDown(searchBtn);
       expect(textarea.value).toBe('/search ');
     });
@@ -354,7 +354,7 @@ describe('Dashboard AI Chat tool link', () => {
         onViewChange={onViewChange}
       />
     );
-    const chatButton = screen.getByText('AI Chat').closest('button')!;
+    const chatButton = screen.getByText('AI Chat').closest('button') as HTMLButtonElement;
     fireEvent.click(chatButton);
     expect(onViewChange).toHaveBeenCalledWith('chat');
   });

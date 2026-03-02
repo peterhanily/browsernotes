@@ -113,7 +113,8 @@ describe('NoteCard', () => {
   it('shows tags', () => {
     render(<NoteCard note={note} active={false} onSelect={() => {}} />);
     expect(screen.getByText('work')).toBeInTheDocument();
-    expect(screen.getByText('important')).toBeInTheDocument();
+    // TagPills collapses overflow tags behind a "+N" button
+    expect(screen.getByText('+1')).toBeInTheDocument();
   });
 
   it('calls onSelect when clicked', () => {

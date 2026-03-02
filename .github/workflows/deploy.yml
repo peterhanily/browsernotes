@@ -41,28 +41,32 @@ jobs:
 
       - run: cp dist-single/index.html dist/threatcaddy-standalone.html
 
-      - name: Verify extension zip is up to date
+      - name: Verify extension zips are up to date
         run: |
           cd extension
           npm ci
           npm run build
           npm run package:chrome
-          mkdir -p /tmp/ext-committed /tmp/ext-built
-          unzip -o threatcaddy-chrome.zip -d /tmp/ext-committed > /dev/null
-          unzip -o dist/threatcaddy-chrome.zip -d /tmp/ext-built > /dev/null
-          # Compare non-binary files (JS, HTML, JSON, SVG) — PNGs may differ
-          # across platforms due to sharp/libvips versions but are derived
-          # deterministically from the committed SVG source
-          if ! diff -rq --exclude='*.png' /tmp/ext-committed /tmp/ext-built > /dev/null 2>&1; then
-            echo "::error::extension/threatcaddy-chrome.zip is out of date. Run 'cd extension && npm run build && npm run package:chrome && cp dist/threatcaddy-chrome.zip .' and commit."
-            diff -rq --exclude='*.png' /tmp/ext-committed /tmp/ext-built || true
-            exit 1
-          fi
-          # Verify the SVG icon is present in both zips
-          if [ ! -f /tmp/ext-committed/assets/icon.svg ] || [ ! -f /tmp/ext-built/assets/icon.svg ]; then
-            echo "::error::icon.svg missing from extension zip"
-            exit 1
-          fi
+          npm run package:firefox
+
+          for browser in chrome firefox; do
+            mkdir -p /tmp/ext-committed-$browser /tmp/ext-built-$browser
+            unzip -o threatcaddy-$browser.zip -d /tmp/ext-committed-$browser > /dev/null
+            unzip -o dist/threatcaddy-$browser.zip -d /tmp/ext-built-$browser > /dev/null
+            # Compare non-binary files (JS, HTML, JSON, SVG) — PNGs may differ
+            # across platforms due to sharp/libvips versions but are derived
+            # deterministically from the committed SVG source
+            if ! diff -rq --exclude='*.png' /tmp/ext-committed-$browser /tmp/ext-built-$browser > /dev/null 2>&1; then
+              echo "::error::extension/threatcaddy-$browser.zip is out of date. Run 'cd extension && npm run build && npm run package:$browser && cp dist/threatcaddy-$browser.zip .' and commit."
+              diff -rq --exclude='*.png' /tmp/ext-committed-$browser /tmp/ext-built-$browser || true
+              exit 1
+            fi
+            # Verify the SVG icon is present in both zips
+            if [ ! -f /tmp/ext-committed-$browser/assets/icon.svg ] || [ ! -f /tmp/ext-built-$browser/assets/icon.svg ]; then
+              echo "::error::icon.svg missing from $browser extension zip"
+              exit 1
+            fi
+          done
 
       - uses: actions/upload-pages-artifact@v3
         with:

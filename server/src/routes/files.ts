@@ -7,6 +7,7 @@ import { files } from '../db/schema.js';
 import type { AuthUser } from '../types.js';
 import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { logger } from '../lib/logger.js';
 
 const STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -51,7 +52,7 @@ app.post('/upload', requireRole('admin', 'analyst'), async (c) => {
       await sharp(buffer).resize(400, 400, { fit: 'inside' }).webp({ quality: 80 }).toFile(thumbnailPath);
       thumbnailPath = thumbName;
     } catch (err) {
-      console.error('Thumbnail generation failed:', err);
+      logger.error('Thumbnail generation failed', { error: String(err) });
       thumbnailPath = null;
     }
   }

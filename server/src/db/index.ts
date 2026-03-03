@@ -7,5 +7,5 @@ const connectionString = process.env.DATABASE_URL || 'postgres://tc:tc@localhost
 const sql = postgres(connectionString, { max: 20 });
 export const db = drizzle(sql, { schema });
 
-export { schema };
+export { schema, sql };
 export type DB = typeof db;

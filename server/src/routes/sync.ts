@@ -1,9 +1,16 @@
 import { Hono } from 'hono';
+import { eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
+import { checkInvestigationAccess } from '../middleware/access.js';
 import { processPush, pullChanges, getSnapshot } from '../services/sync-service.js';
 import { logActivity } from '../services/audit-service.js';
 import { broadcastToFolder } from '../ws/handler.js';
-import type { AuthUser, SyncChange } from '../types.js';
+import { db } from '../db/index.js';
+import { folders } from '../db/schema.js';
+import type { AuthUser, SyncChange, SyncResult } from '../types.js';
+
+// Tables that are global (not scoped to a folder)
+const TABLES_WITHOUT_FOLDER = new Set(['tags', 'timelines']);
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
 
@@ -19,7 +26,59 @@ app.post('/push', async (c) => {
     return c.json({ results: [] });
   }
 
-  const results = await processPush(changes, user.id);
+  const isAdmin = user.role === 'admin';
+
+  // Build authorization list
+  const authorized: boolean[] = [];
+  for (const change of changes) {
+    if (isAdmin || TABLES_WITHOUT_FOLDER.has(change.table)) {
+      authorized.push(true);
+      continue;
+    }
+
+    // Extract folderId: for folders table, entityId IS the folderId
+    const folderId =
+      change.table === 'folders'
+        ? change.entityId
+        : (change.data?.folderId as string | undefined);
+
+    if (!folderId) {
+      authorized.push(true); // No folder context — allow
+      continue;
+    }
+
+    const hasAccess = await checkInvestigationAccess(user.id, folderId, 'editor');
+    if (hasAccess) {
+      authorized.push(true);
+    } else if (change.table === 'folders' && change.op === 'put') {
+      // Allow creating new folders — user won't have membership yet.
+      // Existing folder modifications still require editor access.
+      const existing = await db
+        .select({ id: folders.id })
+        .from(folders)
+        .where(eq(folders.id, change.entityId))
+        .limit(1);
+      authorized.push(existing.length === 0);
+    } else {
+      authorized.push(false);
+    }
+  }
+
+  // Process only authorized changes
+  const toProcess = changes.filter((_, i) => authorized[i]);
+  const processedResults =
+    toProcess.length > 0 ? await processPush(toProcess, user.id) : [];
+
+  // Map results back by original index
+  const results: SyncResult[] = [];
+  let processedIdx = 0;
+  for (let i = 0; i < changes.length; i++) {
+    if (authorized[i]) {
+      results.push(processedResults[processedIdx++]);
+    } else {
+      results.push({ entityId: changes[i].entityId, status: 'rejected' });
+    }
+  }
 
   // Broadcast accepted changes via WebSocket
   for (let i = 0; i < changes.length; i++) {
@@ -59,18 +118,42 @@ app.post('/push', async (c) => {
 
 // GET /api/sync/pull
 app.get('/pull', async (c) => {
+  const user = c.get('user');
   const since = c.req.query('since');
   if (!since) {
     return c.json({ error: 'Missing since parameter' }, 400);
   }
+
   const folderId = c.req.query('folderId');
+
+  // Non-admin users must specify a folderId
+  if (!folderId && user.role !== 'admin') {
+    return c.json({ error: 'folderId is required' }, 400);
+  }
+
+  if (folderId && user.role !== 'admin') {
+    const hasAccess = await checkInvestigationAccess(user.id, folderId, 'viewer');
+    if (!hasAccess) {
+      return c.json({ error: 'No access to this investigation' }, 403);
+    }
+  }
+
   const result = await pullChanges(since, folderId || undefined);
   return c.json(result);
 });
 
 // GET /api/sync/snapshot/:folderId
 app.get('/snapshot/:folderId', async (c) => {
+  const user = c.get('user');
   const folderId = c.req.param('folderId');
+
+  if (user.role !== 'admin') {
+    const hasAccess = await checkInvestigationAccess(user.id, folderId, 'viewer');
+    if (!hasAccess) {
+      return c.json({ error: 'No access to this investigation' }, 403);
+    }
+  }
+
   const snapshot = await getSnapshot(folderId);
   return c.json(snapshot);
 });

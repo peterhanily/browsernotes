@@ -1,12 +1,15 @@
 import type { WSContext } from 'hono/ws';
 import { verifyAccessToken } from '../middleware/auth.js';
 import { updatePresence, removePresence, removeUserFromAllFolders, getPresence } from './presence.js';
+import { logger } from '../lib/logger.js';
 import type { AuthUser } from '../types.js';
 
 interface ConnectedClient {
   ws: WSContext;
   user: AuthUser;
   subscribedFolders: Set<string>;
+  alive: boolean;
+  pingTimer: ReturnType<typeof setInterval>;
 }
 
 const clients = new Map<WSContext, ConnectedClient>();
@@ -21,7 +24,20 @@ export function handleWSConnection(ws: WSContext, token: string) {
         ws,
         user,
         subscribedFolders: new Set(),
+        alive: true,
+        pingTimer: null as unknown as ReturnType<typeof setInterval>,
       };
+
+      client.pingTimer = setInterval(() => {
+        if (!client.alive) {
+          clearInterval(client.pingTimer);
+          try { ws.close(4002, 'Ping timeout'); } catch { /* noop */ }
+          return;
+        }
+        client.alive = false;
+        sendTo(ws, { type: 'ping' });
+      }, 25_000);
+
       clients.set(ws, client);
 
       // Track user connections
@@ -45,6 +61,11 @@ export function handleWSMessage(ws: WSContext, data: string) {
     const msg = JSON.parse(data);
 
     switch (msg.type) {
+      case 'pong': {
+        client.alive = true;
+        break;
+      }
+
       case 'subscribe': {
         const folderId = msg.folderId as string;
         if (folderId) {
@@ -84,13 +105,15 @@ export function handleWSMessage(ws: WSContext, data: string) {
       }
     }
   } catch (err) {
-    console.error('WS message parse error:', err);
+    logger.error('WS message parse error', { error: String(err) });
   }
 }
 
 export function handleWSClose(ws: WSContext) {
   const client = clients.get(ws);
   if (client) {
+    clearInterval(client.pingTimer);
+
     // Remove from all subscribed folders' presence
     removeUserFromAllFolders(client.user.id);
 

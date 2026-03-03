@@ -3,6 +3,7 @@ import type { PgTable } from 'drizzle-orm/pg-core';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { SyncChange, SyncResult } from '../types.js';
+import { logger } from '../lib/logger.js';
 
 // Maps table names to Drizzle table references
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,7 +90,7 @@ export async function processPush(
         }
       }
     } catch (err) {
-      console.error(`Sync error for ${change.table}/${entityId}:`, err);
+      logger.error(`Sync error for ${change.table}/${entityId}`, { error: String(err) });
       results.push({ entityId, status: 'conflict' });
     }
   }

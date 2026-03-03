@@ -154,6 +154,7 @@ export const DEFAULT_QUICK_LINKS: QuickLink[] = [
   { id: 'ql-6', title: 'CVE Database',     url: 'https://www.cve.org',            description: 'Common vulnerabilities',      color: '#eab308', icon: '\uD83D\uDCCB' },
   { id: 'ql-7', title: 'URLhaus',          url: 'https://urlhaus.abuse.ch',       description: 'Malicious URL tracker',       color: '#ec4899', icon: '\uD83D\uDD17' },
   { id: 'ql-8', title: 'MalwareBazaar',    url: 'https://bazaar.abuse.ch',        description: 'Malware sample sharing',      color: '#06b6d4', icon: '\u2623\uFE0F' },
+  { id: 'ql-9', title: 'Forensicate.ai',   url: 'https://forensicate.ai',         description: 'AI-powered forensic analysis', color: '#6366f1', icon: '\uD83E\uDDE0' },
 ];
 
 export interface Settings {

@@ -61,7 +61,7 @@ export function Header({
     return ` · Built ${d === 0 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`}`;
   });
   return (
-    <header data-tour="header" className={cn("h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative", screenshareMaxLevel && "pt-0.5")}>
+    <header data-tour="header" className={cn("h-12 sm:h-14 border-b border-gray-800 flex items-center px-2 sm:px-4 gap-2 sm:gap-3 bg-gray-900/50 backdrop-blur-sm shrink-0 relative z-20", screenshareMaxLevel && "pt-0.5")}>
       {screenshareMaxLevel && <div className="absolute top-0 left-0 right-0 h-0.5 bg-red-500" />}
       {/* Mobile: toggle mobile overlay sidebar */}
       <button

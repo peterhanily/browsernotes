@@ -1418,6 +1418,7 @@ function AppInner() {
             sampleLoaded={sampleLoaded}
             onLoadSample={handleLoadSample}
             onDeleteSample={handleDeleteSample}
+            onClose={() => setShowSettings(false)}
           />
         ) : showTrash || showArchive ? (
           <TrashArchiveView
@@ -1589,7 +1590,7 @@ function AppInner() {
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */
-          <div className="flex flex-1 overflow-hidden">
+          <div data-tour="notes-editor" className="flex flex-1 overflow-hidden">
             <div className={cn(
               'shrink-0 h-full',
               selectedNote ? 'hidden md:block md:w-72' : 'w-full md:w-72'
@@ -1806,10 +1807,11 @@ function AppInner() {
 
       {tour.isActive && tour.currentStep && (
         <>
-          <TourOverlay targetRect={tour.targetRect} />
+          <TourOverlay targetRect={tour.targetRect} highlightRects={tour.highlightRects.map(h => h.rect)} />
           <TourTooltip
             step={tour.currentStep}
             targetRect={tour.targetRect}
+            highlightRects={tour.highlightRects}
             currentIndex={tour.currentStepIndex}
             totalSteps={tour.totalSteps}
             onNext={tour.next}

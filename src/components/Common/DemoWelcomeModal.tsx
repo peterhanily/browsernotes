@@ -9,10 +9,10 @@ interface DemoWelcomeModalProps {
 
 export function DemoWelcomeModal({ open, onClose, onStartTour, onDeleteDemo }: DemoWelcomeModalProps) {
   return (
-    <Modal open={open} onClose={onClose} title="Welcome to BrowserNotes">
+    <Modal open={open} onClose={onClose} title="Welcome to ThreatCaddy">
       <div className="space-y-4">
         <p className="text-sm text-gray-300">
-          A sample investigation <strong className="text-gray-100">"Operation DARK GLACIER"</strong> has been loaded so you can explore how everything works.
+          A sample investigation <strong className="text-gray-100">"Operation FERMENTED PERSISTENCE"</strong> has been loaded so you can explore how everything works.
         </p>
 
         <div className="text-sm text-gray-400 space-y-1.5">

@@ -1,10 +1,12 @@
 import { useRef, useLayoutEffect, useState } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import type { TourStep } from './tourSteps';
+import type { HighlightRect } from '../../hooks/useTour';
 
 interface TourTooltipProps {
   step: TourStep;
   targetRect: DOMRect | null;
+  highlightRects?: HighlightRect[];
   currentIndex: number;
   totalSteps: number;
   onNext: () => void;
@@ -15,6 +17,7 @@ interface TourTooltipProps {
 export function TourTooltip({
   step,
   targetRect,
+  highlightRects,
   currentIndex,
   totalSteps,
   onNext,
@@ -108,57 +111,102 @@ export function TourTooltip({
     }
   }
 
+  // Compute label positions for highlight rects
+  const labels = (highlightRects ?? []).filter((h) => h.label).map((h) => {
+    const gap = 6;
+    let top = 0;
+    let left = 0;
+    const p = h.placement || 'top';
+    switch (p) {
+      case 'bottom':
+        top = h.rect.bottom + gap;
+        left = h.rect.left + h.rect.width / 2;
+        break;
+      case 'left':
+        top = h.rect.top + h.rect.height / 2;
+        left = h.rect.left - gap;
+        break;
+      case 'right':
+        top = h.rect.top + h.rect.height / 2;
+        left = h.rect.right + gap;
+        break;
+      default: // top
+        top = h.rect.top - gap;
+        left = h.rect.left + h.rect.width / 2;
+        break;
+    }
+    return { label: h.label!, top, left, placement: p };
+  });
+
   return (
-    <div
-      ref={tooltipRef}
-      className="tour-tooltip"
-      style={{ top: pos.top, left: pos.left }}
-      role="dialog"
-      aria-label={step.title}
-    >
-      <div className="tour-tooltip-arrow" style={arrowStyle} />
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-400 tabular-nums">
-          {currentIndex + 1} / {totalSteps}
-        </span>
-        <button
-          onClick={onSkip}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          Skip tour
-        </button>
-      </div>
-      <h3 className="text-sm font-semibold text-gray-100 mb-1">{step.title}</h3>
-      <p className="text-xs text-gray-400 leading-relaxed mb-4">{step.description}</p>
-
-      {/* Progress dots */}
-      <div className="flex items-center gap-1 mb-3">
-        {Array.from({ length: totalSteps }, (_, i) => (
-          <div
-            key={i}
-            className={`w-1.5 h-1.5 rounded-full transition-colors ${
-              i === currentIndex ? 'bg-accent' : i < currentIndex ? 'bg-accent/40' : 'bg-gray-600'
-            }`}
-          />
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {!isFirst && (
+    <>
+      <div
+        ref={tooltipRef}
+        className="tour-tooltip"
+        style={{ top: pos.top, left: pos.left }}
+        role="dialog"
+        aria-label={step.title}
+      >
+        <div className="tour-tooltip-arrow" style={arrowStyle} />
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-gray-400 tabular-nums">
+            {currentIndex + 1} / {totalSteps}
+          </span>
           <button
-            onClick={onPrev}
-            className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+            onClick={onSkip}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
           >
-            Back
+            Skip tour
           </button>
-        )}
-        <button
-          onClick={onNext}
-          className="px-3 py-1.5 text-xs rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors ml-auto"
-        >
-          {isLast ? 'Finish' : 'Next'}
-        </button>
+        </div>
+        <h3 className="text-sm font-semibold text-gray-100 mb-1">{step.title}</h3>
+        <p className="text-xs text-gray-400 leading-relaxed mb-4">{step.description}</p>
+
+        {/* Progress dots */}
+        <div className="flex items-center gap-1 mb-3">
+          {Array.from({ length: totalSteps }, (_, i) => (
+            <div
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                i === currentIndex ? 'bg-accent' : i < currentIndex ? 'bg-accent/40' : 'bg-gray-600'
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!isFirst && (
+            <button
+              onClick={onPrev}
+              className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+            >
+              Back
+            </button>
+          )}
+          <button
+            onClick={onNext}
+            className="px-3 py-1.5 text-xs rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors ml-auto"
+          >
+            {isLast ? 'Finish' : 'Next'}
+          </button>
+        </div>
       </div>
-    </div>
+      {labels.map((l) => (
+        <div
+          key={l.label}
+          className="tour-highlight-label"
+          style={{
+            top: l.top,
+            left: l.left,
+            transform: l.placement === 'top' ? 'translate(-50%, -100%)'
+              : l.placement === 'bottom' ? 'translate(-50%, 0)'
+              : l.placement === 'left' ? 'translate(-100%, -50%)'
+              : 'translate(0, -50%)',
+          }}
+        >
+          {l.label}
+        </div>
+      ))}
+    </>
   );
 }

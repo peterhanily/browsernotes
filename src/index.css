@@ -422,11 +422,35 @@
   border-color: #e2e8f0;
 }
 
+/* ─── Tour highlight labels ─── */
+.tour-highlight-label {
+  position: fixed;
+  z-index: 9999;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #e2e8f0;
+  background: rgba(99, 102, 241, 0.85);
+  border-radius: 9999px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tour-tooltip-enter 0.2s ease-out;
+}
+
+.light .tour-highlight-label {
+  background: rgba(79, 70, 229, 0.85);
+  color: #ffffff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tour-overlay {
     transition: none;
   }
   .tour-tooltip {
+    animation: none;
+  }
+  .tour-highlight-label {
     animation: none;
   }
 }

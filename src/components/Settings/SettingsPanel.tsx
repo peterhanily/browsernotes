@@ -1,4 +1,4 @@
-import { Github, Download, FlaskConical, Trash2, Bot } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2, Bot, X } from 'lucide-react';
 import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
@@ -15,15 +15,23 @@ interface SettingsPanelProps {
   sampleLoaded?: boolean;
   onLoadSample?: () => void;
   onDeleteSample?: () => void;
+  onClose?: () => void;
 }
 
-export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose }: SettingsPanelProps) {
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto space-y-8">
-      <h2 className="text-xl font-bold text-gray-100">Settings</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-100">Settings</h2>
+        {onClose && (
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors" aria-label="Close settings">
+            <X size={18} />
+          </button>
+        )}
+      </div>
 
       {/* Team Server */}
       <ServerConnection
@@ -240,7 +248,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-300">Sample Data</h3>
             <p className="text-xs text-gray-500">
-              Load a pre-built APT investigation (Operation DARK GLACIER) to explore ThreatCaddy's features. Includes notes, tasks, timeline events, IOCs, and a whiteboard.
+              Load a pre-built APT investigation (Operation FERMENTED PERSISTENCE) to explore ThreatCaddy's features. Includes notes, tasks, timeline events, IOCs, and a whiteboard.
             </p>
             {sampleLoaded ? (
               <button

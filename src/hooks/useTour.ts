@@ -10,16 +10,24 @@ export interface UseTourOptions {
   onShowSettings?: (show: boolean) => void;
 }
 
+export interface HighlightRect {
+  rect: DOMRect;
+  label?: string;
+  placement?: string;
+}
+
 export interface TourState {
   isActive: boolean;
   currentStepIndex: number;
   targetRect: DOMRect | null;
+  highlightRects: HighlightRect[];
 }
 
 export function useTour(options?: UseTourOptions) {
   const [isActive, setIsActive] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [highlightRects, setHighlightRects] = useState<HighlightRect[]>([]);
   const rafRef = useRef<number | undefined>(undefined);
   const stepRef = useRef(0);
   /** The view that was active before the tour started — restored on finish/skip. */
@@ -32,6 +40,7 @@ export function useTour(options?: UseTourOptions) {
   const updateRect = useCallback(() => {
     if (!isActive || !currentStep) {
       setTargetRect(null);
+      setHighlightRects([]);
       return;
     }
     const el = document.querySelector(currentStep.target);
@@ -39,6 +48,19 @@ export function useTour(options?: UseTourOptions) {
       setTargetRect(el.getBoundingClientRect());
     } else {
       setTargetRect(null);
+    }
+    // Compute highlight rects
+    if (currentStep.highlights?.length) {
+      const rects: HighlightRect[] = [];
+      for (const h of currentStep.highlights) {
+        const hEl = document.querySelector(h.target);
+        if (hEl) {
+          rects.push({ rect: hEl.getBoundingClientRect(), label: h.label, placement: h.placement });
+        }
+      }
+      setHighlightRects(rects);
+    } else {
+      setHighlightRects([]);
     }
   }, [isActive, currentStep]);
 
@@ -153,6 +175,7 @@ export function useTour(options?: UseTourOptions) {
     currentStepIndex,
     currentStep,
     targetRect,
+    highlightRects,
     totalSteps: tourSteps.length,
     start,
     stop,

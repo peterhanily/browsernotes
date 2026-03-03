@@ -486,12 +486,14 @@ export function Sidebar({
 
       {/* 5. NAVIGATION */}
       <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto px-2 pt-2 space-y-0.5" aria-label="Views">
-        <NavItem
-          icon={<LayoutDashboard size={16} />}
-          label="Dashboard"
-          active={activeView === 'dashboard' && !showTrash && !showArchive}
-          onClick={() => nav(() => navToView('dashboard'))}
-        />
+        <div data-tour="dashboard">
+          <NavItem
+            icon={<LayoutDashboard size={16} />}
+            label="Dashboard"
+            active={activeView === 'dashboard' && !showTrash && !showArchive}
+            onClick={() => nav(() => navToView('dashboard'))}
+          />
+        </div>
         <NavItem
           icon={<FileText size={16} />}
           label="Notes"
@@ -541,14 +543,16 @@ export function Sidebar({
           active={activeView === 'ioc-stats'}
           onClick={() => nav(() => navToView('ioc-stats'))}
         />
-        <NavItem
-          icon={<MessageSquare size={16} />}
-          label="AI Chat"
-          badge={chatCount}
-          badgeColor="bg-purple/15 text-purple"
-          active={activeView === 'chat'}
-          onClick={() => nav(() => navToView('chat'))}
-        />
+        <div data-tour="chat">
+          <NavItem
+            icon={<MessageSquare size={16} />}
+            label="AI Chat"
+            badge={chatCount}
+            badgeColor="bg-purple/15 text-purple"
+            active={activeView === 'chat'}
+            onClick={() => nav(() => navToView('chat'))}
+          />
+        </div>
         <NavItem
           icon={<Network size={16} />}
           label="Graph"
@@ -563,12 +567,14 @@ export function Sidebar({
             onClick={() => nav(() => navToView('activity'))}
           />
         </div>
-        <NavItem
-          icon={<Rss size={16} />}
-          label="Team Feed"
-          active={activeView === 'feed'}
-          onClick={() => nav(() => navToView('feed'))}
-        />
+        <div data-tour="feed">
+          <NavItem
+            icon={<Rss size={16} />}
+            label="Team Feed"
+            active={activeView === 'feed'}
+            onClick={() => nav(() => navToView('feed'))}
+          />
+        </div>
 
         {/* 6. CONTEXTUAL SUB-LISTS */}
 

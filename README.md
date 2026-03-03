@@ -59,8 +59,19 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 - **Cloud Backup** — Multi-provider cloud backup to OCI Object Storage, AWS S3, Azure Blob Storage, or Google Cloud Storage via pre-authenticated URLs
 - **Export & Import** — Full JSON backup/restore including all entity types; per-investigation export
 
+### Team Server
+- **Docker Deployment** — `docker compose up` spins up the team server (Hono + Node.js) and PostgreSQL
+- **Authentication** — Ed25519 JWT-based auth with user roles (admin, analyst, viewer)
+- **Real-Time Sync** — Push/pull synchronization with version tracking and conflict detection
+- **WebSocket Presence** — See who's online and what view they're in
+- **Team Feed** — Social feed with posts, reactions, threaded replies, mentions, and notifications
+- **Investigation Sharing** — Invite team members with per-investigation role-based access (owner, editor, viewer)
+- **Audit Trail** — Server-side activity logging for compliance
+- **Server-Side LLM** — Proxy LLM requests through the team server with shared API keys
+- **File Storage** — Upload and share files within investigations
+
 ### Platform
-- **Quick Links Dashboard** — Configurable shortcut tiles for threat intel tools (VirusTotal, Shodan, AbuseIPDB, etc.) as the default home view
+- **Quick Links Dashboard** — Configurable shortcut tiles for threat intel tools (VirusTotal, Shodan, AbuseIPDB, Forensicate.ai, OpenSlaw.ai, etc.) as the default home view
 - **Shareable Demo Link** — Visit `?demo=1` to auto-load a sample investigation with a welcome modal offering explore, guided tour, or fresh start options
 - **Dark & Light Mode** — Dark by default, toggle anytime
 - **Guided Tour** — Interactive onboarding tour highlighting key features
@@ -72,6 +83,7 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 
 ## Tech Stack
 
+### Client
 - React 19 + TypeScript 5
 - Vite 7
 - Tailwind CSS 4
@@ -84,6 +96,13 @@ Try it instantly: [threatcaddy.com/?demo=1](https://threatcaddy.com/?demo=1) loa
 - nanoid (ID generation)
 - pako (compression)
 - lucide-react
+
+### Server (Team Server)
+- Hono (HTTP + WebSocket framework)
+- drizzle-orm + PostgreSQL
+- argon2 (password hashing)
+- jose (JWT signing/verification)
+- Docker + Docker Compose
 
 ## Development
 
@@ -109,7 +128,19 @@ The `extension/` directory contains a browser extension for Chrome and Firefox. 
 
 ## Deploy
 
+### Client (GitHub Pages)
+
 The `dist/` output is configured for GitHub Pages with a custom domain (`threatcaddy.com`). Push to `main` and deploy via GitHub Pages settings pointing at the `dist/` directory or a GitHub Actions workflow.
+
+### Team Server (Docker)
+
+```bash
+cd server
+cp .env.example .env   # Configure JWT keys and optional LLM API keys
+docker compose up -d    # Starts Hono server + PostgreSQL
+```
+
+Set `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` (Ed25519) in `.env`. Optionally add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` to enable server-side LLM proxying.
 
 ## License
 

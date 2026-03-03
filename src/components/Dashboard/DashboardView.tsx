@@ -90,7 +90,7 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+      <div data-tour="quick-links" className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <span className="text-lg" role="img" aria-label="dashboard">{'\uD83C\uDFE0'}</span>
           <h2 className="text-lg font-semibold text-gray-100">Quick Links</h2>

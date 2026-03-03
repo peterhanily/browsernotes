@@ -50,7 +50,7 @@ import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
 import { useTour } from './hooks/useTour';
-import { TourOverlay } from './components/Tour/TourOverlay';
+import { TourOverlay, TourGlow } from './components/Tour/TourOverlay';
 import { TourTooltip } from './components/Tour/TourTooltip';
 import { DemoWelcomeModal } from './components/Common/DemoWelcomeModal';
 import { DataImportModal } from './components/Import/DataImportModal';
@@ -1807,11 +1807,11 @@ function AppInner() {
 
       {tour.isActive && tour.currentStep && (
         <>
-          <TourOverlay targetRect={tour.targetRect} highlightRects={tour.highlightRects.map(h => h.rect)} />
+          <TourOverlay targetRect={tour.targetRect} />
+          <TourGlow targetRect={tour.targetRect} />
           <TourTooltip
             step={tour.currentStep}
             targetRect={tour.targetRect}
-            highlightRects={tour.highlightRects}
             currentIndex={tour.currentStepIndex}
             totalSteps={tour.totalSteps}
             onNext={tour.next}

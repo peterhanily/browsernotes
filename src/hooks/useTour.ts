@@ -7,27 +7,19 @@ export interface UseTourOptions {
   /** Called when a tour step requires navigating to a different view. */
   onNavigate?: (view: ViewMode) => void;
   /** Called when a tour step requires the settings panel to be shown/hidden. */
-  onShowSettings?: (show: boolean) => void;
-}
-
-export interface HighlightRect {
-  rect: DOMRect;
-  label?: string;
-  placement?: string;
+  onShowSettings?: (show: boolean) => void; // kept for settings close on tour start/end
 }
 
 export interface TourState {
   isActive: boolean;
   currentStepIndex: number;
   targetRect: DOMRect | null;
-  highlightRects: HighlightRect[];
 }
 
 export function useTour(options?: UseTourOptions) {
   const [isActive, setIsActive] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const [highlightRects, setHighlightRects] = useState<HighlightRect[]>([]);
   const rafRef = useRef<number | undefined>(undefined);
   const stepRef = useRef(0);
   /** The view that was active before the tour started — restored on finish/skip. */
@@ -40,7 +32,6 @@ export function useTour(options?: UseTourOptions) {
   const updateRect = useCallback(() => {
     if (!isActive || !currentStep) {
       setTargetRect(null);
-      setHighlightRects([]);
       return;
     }
     const el = document.querySelector(currentStep.target);
@@ -48,19 +39,6 @@ export function useTour(options?: UseTourOptions) {
       setTargetRect(el.getBoundingClientRect());
     } else {
       setTargetRect(null);
-    }
-    // Compute highlight rects
-    if (currentStep.highlights?.length) {
-      const rects: HighlightRect[] = [];
-      for (const h of currentStep.highlights) {
-        const hEl = document.querySelector(h.target);
-        if (hEl) {
-          rects.push({ rect: hEl.getBoundingClientRect(), label: h.label, placement: h.placement });
-        }
-      }
-      setHighlightRects(rects);
-    } else {
-      setHighlightRects([]);
     }
   }, [isActive, currentStep]);
 
@@ -89,7 +67,7 @@ export function useTour(options?: UseTourOptions) {
     if (step?.view && optionsRef.current?.onNavigate) {
       optionsRef.current.onNavigate(step.view);
     }
-    optionsRef.current?.onShowSettings?.(!!step?.showSettings);
+    optionsRef.current?.onShowSettings?.(false);
   }, []);
 
   /** Restore the view that was active before the tour started. */
@@ -107,7 +85,7 @@ export function useTour(options?: UseTourOptions) {
     if (firstStep?.view && optionsRef.current?.onNavigate) {
       optionsRef.current.onNavigate(firstStep.view);
     }
-    optionsRef.current?.onShowSettings?.(!!firstStep?.showSettings);
+    optionsRef.current?.onShowSettings?.(false);
     stepRef.current = 0;
     setCurrentStepIndex(0);
     setIsActive(true);
@@ -175,7 +153,6 @@ export function useTour(options?: UseTourOptions) {
     currentStepIndex,
     currentStep,
     targetRect,
-    highlightRects,
     totalSteps: tourSteps.length,
     start,
     stop,

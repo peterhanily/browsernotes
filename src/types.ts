@@ -155,6 +155,7 @@ export const DEFAULT_QUICK_LINKS: QuickLink[] = [
   { id: 'ql-7', title: 'URLhaus',          url: 'https://urlhaus.abuse.ch',       description: 'Malicious URL tracker',       color: '#ec4899', icon: '\uD83D\uDD17' },
   { id: 'ql-8', title: 'MalwareBazaar',    url: 'https://bazaar.abuse.ch',        description: 'Malware sample sharing',      color: '#06b6d4', icon: '\u2623\uFE0F' },
   { id: 'ql-9', title: 'Forensicate.ai',   url: 'https://forensicate.ai',         description: 'AI-powered forensic analysis', color: '#6366f1', icon: '\uD83E\uDDE0' },
+  { id: 'ql-10', title: 'OpenSlaw.ai',    url: 'https://openslaw.ai',            description: 'Parody site \u2014 homage to OpenClaw by the ThreatCaddy creator', color: '#f43f5e', icon: '\uD83E\uDD9E' },
 ];
 
 export interface Settings {

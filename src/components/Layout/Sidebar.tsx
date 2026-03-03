@@ -3,7 +3,7 @@ import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
   Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
-  LayoutDashboard, MessageSquare, Rss,
+  LayoutDashboard, MessageSquare, Rss, FolderOpen, FolderClosed,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -113,7 +113,7 @@ export function Sidebar({
   investigationScopedCounts,
   chatCount,
 }: SidebarProps) {
-  const [investigationsListOpen, setInvestigationsListOpen] = useState(false);
+  const [investigationsListOpen, setInvestigationsListOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
@@ -314,15 +314,19 @@ export function Sidebar({
       <div className="px-2 pt-1.5">
         <button
           onClick={() => setInvestigationsListOpen(!investigationsListOpen)}
-          className="flex items-center justify-center gap-1 w-full py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
           aria-expanded={investigationsListOpen}
         >
-          All Investigations
-          <ChevronDown
-            size={12}
-            className="transition-transform duration-200"
-            style={{ transform: investigationsListOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-          />
+          {investigationsListOpen ? <FolderOpen size={14} className="text-purple/70 shrink-0" /> : <FolderClosed size={14} className="text-text-muted shrink-0" />}
+          <span>Investigations</span>
+          <span className="ml-auto flex items-center gap-1.5">
+            <span className="px-1.5 py-px rounded-full bg-bg-deep text-[9px] font-mono text-text-muted">{folders.length}</span>
+            <ChevronDown
+              size={12}
+              className="text-text-muted transition-transform duration-200"
+              style={{ transform: investigationsListOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </span>
         </button>
 
         <div

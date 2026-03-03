@@ -18,6 +18,7 @@ extension/dist
 extension/assets/icon-*.png
 extension/node_modules
 *.zip
+!extension/threatcaddy-*.zip
 
 # Editor directories and files
 .vscode/*

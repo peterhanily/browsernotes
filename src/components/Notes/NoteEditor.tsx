@@ -4,6 +4,7 @@ import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, Note
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
+import { mergeText, adjustCursor } from '../../lib/text-merge';
 import { getEffectiveClsLevels } from '../../lib/classification';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
@@ -68,6 +69,7 @@ export function NoteEditor({
   const [content, setContent] = useState(note.content);
   const [showColors, setShowColors] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [mergeIndicator, setMergeIndicator] = useState<'merged' | 'conflict' | null>(null);
   const [showIOCPanel, setShowIOCPanel] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareMessage, setShareMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -84,6 +86,16 @@ export function NoteEditor({
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const shareMsgTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const mergeTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const baseContentRef = useRef(note.content);
+  const baseTitleRef = useRef(note.title);
+  const lastSavedContentRef = useRef(note.content);
+  const lastSavedTitleRef = useRef(note.title);
+  const prevNoteIdRef = useRef(note.id);
+  const localContentRef = useRef(content);
+  localContentRef.current = content;
+  const localTitleRef = useRef(title);
+  localTitleRef.current = title;
 
   // Slash command menu state
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
@@ -113,11 +125,117 @@ export function NoteEditor({
   // Resizable: editor area ↔ IOC panel
   const editorIOC = useResizable({ initialRatio: 0.75, minRatio: 0.4, maxRatio: 0.85 });
 
+  const save = useCallback((updates: Partial<Note>) => {
+    onUpdate(note.id, updates);
+    if (updates.content !== undefined) {
+      lastSavedContentRef.current = updates.content;
+      baseContentRef.current = updates.content;
+    }
+    if (updates.title !== undefined) {
+      lastSavedTitleRef.current = updates.title;
+      baseTitleRef.current = updates.title;
+    }
+    setSaved(true);
+    clearTimeout(savedTimeoutRef.current);
+    savedTimeoutRef.current = setTimeout(() => setSaved(false), 1500);
+  }, [note.id, onUpdate]);
+
   useEffect(() => {
-    clearTimeout(saveTimeoutRef.current);
-    setTitle(note.title);
-    setContent(note.content);
-  }, [note.id, note.title, note.content]);
+    // Note switched — full reset
+    if (note.id !== prevNoteIdRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      prevNoteIdRef.current = note.id;
+      baseContentRef.current = note.content;
+      baseTitleRef.current = note.title;
+      lastSavedContentRef.current = note.content;
+      lastSavedTitleRef.current = note.title;
+      setTitle(note.title);
+      setContent(note.content);
+      return;
+    }
+
+    let contentMerged = false;
+    let titleMerged = false;
+    const mergedUpdates: Partial<Note> = {};
+
+    // Same note — 3-way merge for content
+    if (note.content !== baseContentRef.current) {
+      const local = localContentRef.current;
+      const hasLocalEdits = local !== baseContentRef.current;
+      // Cancel any pending save — its closure has stale pre-merge content
+      clearTimeout(saveTimeoutRef.current);
+
+      if (!hasLocalEdits) {
+        // No unsaved local edits — accept remote
+        setContent(note.content);
+      } else {
+        // Merge remote changes with local edits
+        const result = mergeText(baseContentRef.current, local, note.content);
+        if (!result.ok) {
+          // Patch conflict — accept remote to avoid garbage, show indicator
+          setContent(note.content);
+          setMergeIndicator('conflict');
+          clearTimeout(mergeTimeoutRef.current);
+          mergeTimeoutRef.current = setTimeout(() => setMergeIndicator(null), 3000);
+        } else if (result.merged !== local) {
+          // Successful merge — adjust cursor and auto-save
+          const textarea = textareaRef.current;
+          if (textarea) {
+            const oldCursor = textarea.selectionStart;
+            const newCursor = adjustCursor(local, result.merged, oldCursor);
+            setContent(result.merged);
+            requestAnimationFrame(() => {
+              textarea.selectionStart = textarea.selectionEnd = newCursor;
+            });
+          } else {
+            setContent(result.merged);
+          }
+          mergedUpdates.content = result.merged;
+          contentMerged = true;
+        }
+      }
+      baseContentRef.current = note.content;
+    }
+
+    // Same note — 3-way merge for title
+    if (note.title !== baseTitleRef.current) {
+      const localTitle = localTitleRef.current;
+      const hasLocalTitleEdits = localTitle !== baseTitleRef.current;
+      if (!hasLocalTitleEdits) {
+        setTitle(note.title);
+      } else {
+        const result = mergeText(baseTitleRef.current, localTitle, note.title);
+        if (!result.ok) {
+          // Patch conflict — accept remote
+          setTitle(note.title);
+        } else if (result.merged !== localTitle) {
+          // Adjust cursor in title input
+          const input = titleRef.current;
+          if (input) {
+            const oldCursor = input.selectionStart ?? localTitle.length;
+            const newCursor = adjustCursor(localTitle, result.merged, oldCursor);
+            setTitle(result.merged);
+            requestAnimationFrame(() => {
+              input.selectionStart = input.selectionEnd = newCursor;
+            });
+          } else {
+            setTitle(result.merged);
+          }
+          mergedUpdates.title = result.merged;
+          titleMerged = true;
+        }
+      }
+      baseTitleRef.current = note.title;
+    }
+
+    // Auto-save merged result and show indicator
+    if (contentMerged || titleMerged) {
+      save(mergedUpdates);
+      setMergeIndicator('merged');
+      clearTimeout(mergeTimeoutRef.current);
+      mergeTimeoutRef.current = setTimeout(() => setMergeIndicator(null), 2000);
+    }
+  }, [note.id, note.title, note.content, save]);
 
   // Auto-focus title for new/empty notes
   useEffect(() => {
@@ -134,15 +252,9 @@ export function NoteEditor({
       clearTimeout(saveTimeoutRef.current);
       clearTimeout(savedTimeoutRef.current);
       clearTimeout(shareMsgTimeoutRef.current);
+      clearTimeout(mergeTimeoutRef.current);
     };
   }, []);
-
-  const save = useCallback((updates: Partial<Note>) => {
-    onUpdate(note.id, updates);
-    setSaved(true);
-    clearTimeout(savedTimeoutRef.current);
-    savedTimeoutRef.current = setTimeout(() => setSaved(false), 1500);
-  }, [note.id, onUpdate]);
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -700,7 +812,9 @@ export function NoteEditor({
               {shareMessage.text}
             </span>
           )}
-          {saved && !shareMessage && <span className="text-xs text-green-400" role="status">Saved</span>}
+          {mergeIndicator === 'merged' && !shareMessage && <span className="text-xs text-blue-400" role="status">Merged</span>}
+          {mergeIndicator === 'conflict' && !shareMessage && <span className="text-xs text-amber-400" role="status">Conflict — accepted remote</span>}
+          {saved && !shareMessage && !mergeIndicator && <span className="text-xs text-green-400" role="status">Saved</span>}
           {note.trashed ? (
             <button
               onClick={() => onRestore(note.id)}

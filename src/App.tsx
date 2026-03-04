@@ -25,7 +25,7 @@ import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
-import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, StandaloneIOC, ChatThread } from './types';
+import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText } from 'lucide-react';
@@ -66,15 +66,14 @@ import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 import { ConflictDialog } from './components/Common/ConflictDialog';
-import type { PresenceUser, InvestigationMember } from './types';
-import { configureServerApi, fetchInvestigationMembers } from './lib/server-api';
-import { syncEngine } from './lib/sync-engine';
-import { enableSync, disableSync, installSyncHooks } from './lib/sync-middleware';
+import type { InvestigationMember } from './types';
+import { fetchInvestigationMembers } from './lib/server-api';
+import { installSyncHooks } from './lib/sync-middleware';
 
 // Install Dexie hooks once at module load so every write is captured
 installSyncHooks();
-import { WSClient } from './lib/ws-client';
-import type { SyncResult } from './lib/server-api';
+import { useLoggedActions } from './hooks/useLoggedActions';
+import { useServerSync } from './hooks/useServerSync';
 
 // Parse share hash on initial load: #share=<encoded>
 function parseShareHash(): string | null {
@@ -140,93 +139,17 @@ function AppInner() {
 
   // ─── Team Server Integration ───────────────────────────────────
   const auth = useAuth();
-  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
-  const [syncConflicts, setSyncConflicts] = useState<SyncResult[]>([]);
-  const wsClientRef = useRef<WSClient | null>(null);
-
-  // Configure server API and sync engine when auth state changes
-  useEffect(() => {
-    if (auth.serverUrl && auth.connected) {
-      configureServerApi(auth.serverUrl, auth.getAccessToken);
-      enableSync();
-      syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
-      syncEngine.setRemoteChangeHandler((_changes, tables) => {
-        // Targeted reload: only refresh hooks for tables that changed
-        if (tables.has('notes')) notes.reload();
-        if (tables.has('tasks')) tasks.reload();
-        if (tables.has('timelineEvents')) timeline.reload();
-        if (tables.has('timelines')) reloadTimelines();
-        if (tables.has('whiteboards')) reloadWhiteboards();
-        if (tables.has('standaloneIOCs')) standaloneIOCsHook.reload();
-        if (tables.has('chatThreads')) chatsHook.reload();
-        if (tables.has('folders')) reloadFolders();
-        if (tables.has('tags')) reloadTags();
-      });
-      syncEngine.start();
-
-      // Connect WebSocket
-      auth.getAccessToken().then((token) => {
-        if (token && auth.serverUrl) {
-          const ws = new WSClient(auth.serverUrl, token);
-          ws.onStatusChange((ok) => auth.setReachable(ok));
-          ws.connect();
-          syncEngine.setWSClient(ws);
-          ws.on('entity-change', (msg) => {
-            // Fast-path: apply the entity change directly to Dexie
-            const { table, op, entityId, data } = msg as { table: string; op: 'put' | 'delete'; entityId: string; data?: Record<string, unknown> };
-            if (table && op && entityId) {
-              syncEngine.applyRemoteChange(table, op, entityId, data).catch(() => {
-                // Fall back to full sync on error
-                syncEngine.sync();
-              });
-            } else {
-              syncEngine.sync();
-            }
-          });
-          ws.on('presence', (msg) => {
-            setPresenceUsers((msg.users as PresenceUser[]) || []);
-          });
-          ws.on('notification', () => {
-            window.dispatchEvent(new CustomEvent('ws-notification'));
-          });
-          wsClientRef.current = ws;
-        }
-      });
-    } else {
-      disableSync();
-      syncEngine.stop();
-      syncEngine.setWSClient(null);
-      configureServerApi(null, async () => null);
-      if (wsClientRef.current) {
-        wsClientRef.current.disconnect();
-        wsClientRef.current = null;
-      }
-      setPresenceUsers([]);
-    }
-
-    return () => {
-      syncEngine.stop();
-      syncEngine.setWSClient(null);
-      disableSync();
-      if (wsClientRef.current) {
-        wsClientRef.current.disconnect();
-        wsClientRef.current = null;
-      }
-    };
-  }, [auth.serverUrl, auth.connected]);
-
-  const handleResolveConflict = useCallback(async (entityId: string, choice: 'mine' | 'theirs') => {
-    const conflict = syncConflicts.find((c) => c.entityId === entityId);
-    if (conflict) {
-      await syncEngine.resolveConflicts([conflict], choice);
-    }
-    setSyncConflicts((prev) => prev.filter((c) => c.entityId !== entityId));
-  }, [syncConflicts]);
-
-  const handleResolveAllConflicts = useCallback(async (choice: 'mine' | 'theirs') => {
-    await syncEngine.resolveConflicts(syncConflicts, choice);
-    setSyncConflicts([]);
-  }, [syncConflicts]);
+  const { presenceUsers, syncConflicts, setSyncConflicts, handleResolveConflict, handleResolveAllConflicts } = useServerSync(auth, {
+    notes: notes.reload,
+    tasks: tasks.reload,
+    timeline: timeline.reload,
+    timelines: reloadTimelines,
+    whiteboards: reloadWhiteboards,
+    standaloneIOCs: standaloneIOCsHook.reload,
+    chats: chatsHook.reload,
+    folders: reloadFolders,
+    tags: reloadTags,
+  });
 
   // Share receiver state — listen for hash changes to support re-navigation
   const [shareData, setShareData] = useState<string | null>(initialShareData);
@@ -255,286 +178,35 @@ function AppInner() {
   }, [isMobile]);
 
   // Instrumented wrappers for activity logging
-  const loggedCreateNote = useCallback(async (partial?: Partial<Note>) => {
-    const note = await notes.createNote(partial);
-    activityLog.log('note', 'create', `Created note "${note.title}"`, note.id, note.title);
-    return note;
-  }, [notes, activityLog]);
-
-  const loggedTrashNote = useCallback(async (id: string) => {
-    const note = notes.notes.find((n) => n.id === id);
-    await notes.trashNote(id);
-    activityLog.log('note', 'trash', `Trashed note "${note?.title || 'Untitled'}"`, id, note?.title);
-  }, [notes, activityLog]);
-
-  const loggedRestoreNote = useCallback(async (id: string) => {
-    const note = notes.notes.find((n) => n.id === id);
-    await notes.restoreNote(id);
-    activityLog.log('note', 'restore', `Restored note "${note?.title || 'Untitled'}"`, id, note?.title);
-  }, [notes, activityLog]);
-
-  const loggedTogglePin = useCallback(async (id: string) => {
-    const note = notes.notes.find((n) => n.id === id);
-    await notes.togglePin(id);
-    const action = note?.pinned ? 'unpin' : 'pin';
-    activityLog.log('note', action, `${action === 'pin' ? 'Pinned' : 'Unpinned'} note "${note?.title || 'Untitled'}"`, id, note?.title);
-  }, [notes, activityLog]);
-
-  const loggedToggleArchive = useCallback(async (id: string) => {
-    const note = notes.notes.find((n) => n.id === id);
-    await notes.toggleArchive(id);
-    const action = note?.archived ? 'unarchive' : 'archive';
-    activityLog.log('note', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} note "${note?.title || 'Untitled'}"`, id, note?.title);
-  }, [notes, activityLog]);
-
-  const loggedEmptyTrash = useCallback(async () => {
-    const count = notes.notes.filter((n) => n.trashed).length;
-    await notes.emptyTrash();
-    activityLog.log('note', 'empty-trash', `Emptied trash (${count} notes)`);
-  }, [notes, activityLog]);
-
-  const loggedCreateTask = useCallback(async (partial?: Partial<import('./types').Task>) => {
-    const task = await tasks.createTask(partial);
-    activityLog.log('task', 'create', `Created task "${task.title || 'Untitled'}"`, task.id, task.title);
-    return task;
-  }, [tasks, activityLog]);
-
-  const loggedDeleteTask = useCallback(async (id: string) => {
-    const task = tasks.tasks.find((t) => t.id === id);
-    await tasks.deleteTask(id);
-    activityLog.log('task', 'delete', `Deleted task "${task?.title || 'Untitled'}"`, id, task?.title);
-  }, [tasks, activityLog]);
-
-  const loggedToggleComplete = useCallback(async (id: string) => {
-    const task = tasks.tasks.find((t) => t.id === id);
-    await tasks.toggleComplete(id);
-    const action = task?.completed ? 'reopen' : 'complete';
-    activityLog.log('task', action, `${action === 'complete' ? 'Completed' : 'Reopened'} task "${task?.title || 'Untitled'}"`, id, task?.title);
-  }, [tasks, activityLog]);
-
-  const loggedCreateEvent = useCallback(async (data: Partial<import('./types').TimelineEvent>) => {
-    const event = await timeline.createEvent(data);
-    activityLog.log('timeline', 'create', `Created timeline event "${event.title || 'Untitled'}"`, event.id, event.title);
-    return event;
-  }, [timeline, activityLog]);
-
-  const loggedDeleteEvent = useCallback(async (id: string) => {
-    const event = timeline.events.find((e) => e.id === id);
-    await timeline.deleteEvent(id);
-    activityLog.log('timeline', 'delete', `Deleted timeline event "${event?.title || 'Untitled'}"`, id, event?.title);
-  }, [timeline, activityLog]);
-
-  const loggedToggleStar = useCallback(async (id: string) => {
-    const event = timeline.events.find((e) => e.id === id);
-    await timeline.toggleStar(id);
-    const action = event?.starred ? 'unstar' : 'star';
-    activityLog.log('timeline', action, `${action === 'star' ? 'Starred' : 'Unstarred'} event "${event?.title || 'Untitled'}"`, id, event?.title);
-  }, [timeline, activityLog]);
-
-  const loggedCreateTimeline = useCallback(async (name: string) => {
-    const tl = await createTimeline(name);
-    activityLog.log('timeline', 'create', `Created timeline "${name}"`, tl.id, name);
-    return tl;
-  }, [createTimeline, activityLog]);
-
-  const loggedDeleteTimeline = useCallback(async (id: string) => {
-    const tl = timelines.find((t) => t.id === id);
-    await deleteTimeline(id);
-    activityLog.log('timeline', 'delete', `Deleted timeline "${tl?.name || 'Untitled'}"`, id, tl?.name);
-  }, [deleteTimeline, timelines, activityLog]);
-
-  const loggedCreateWhiteboard = useCallback(async (name?: string, folderId?: string) => {
-    const wb = await createWhiteboard(name, folderId);
-    activityLog.log('whiteboard', 'create', `Created whiteboard "${wb.name}"`, wb.id, wb.name);
-    return wb;
-  }, [createWhiteboard, activityLog]);
-
-  const loggedDeleteWhiteboard = useCallback(async (id: string) => {
-    const wb = whiteboards.find((w) => w.id === id);
-    await deleteWhiteboard(id);
-    activityLog.log('whiteboard', 'delete', `Deleted whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
-  }, [deleteWhiteboard, whiteboards, activityLog]);
-
-  // Task trash/archive wrappers
-  const loggedTrashTask = useCallback(async (id: string) => {
-    const task = tasks.tasks.find((t) => t.id === id);
-    await tasks.trashTask(id);
-    activityLog.log('task', 'trash', `Trashed task "${task?.title || 'Untitled'}"`, id, task?.title);
-  }, [tasks, activityLog]);
-
-  const loggedRestoreTask = useCallback(async (id: string) => {
-    const task = tasks.tasks.find((t) => t.id === id);
-    await tasks.restoreTask(id);
-    activityLog.log('task', 'restore', `Restored task "${task?.title || 'Untitled'}"`, id, task?.title);
-  }, [tasks, activityLog]);
-
-  const loggedToggleArchiveTask = useCallback(async (id: string) => {
-    const task = tasks.tasks.find((t) => t.id === id);
-    await tasks.toggleArchiveTask(id);
-    const action = task?.archived ? 'unarchive' : 'archive';
-    activityLog.log('task', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} task "${task?.title || 'Untitled'}"`, id, task?.title);
-  }, [tasks, activityLog]);
-
-  const loggedEmptyTrashTasks = useCallback(async () => {
-    const count = tasks.tasks.filter((t) => t.trashed).length;
-    await tasks.emptyTrashTasks();
-    activityLog.log('task', 'empty-trash', `Emptied task trash (${count} tasks)`);
-  }, [tasks, activityLog]);
-
-  // Timeline event trash/archive wrappers
-  const loggedTrashEvent = useCallback(async (id: string) => {
-    const event = timeline.events.find((e) => e.id === id);
-    await timeline.trashEvent(id);
-    activityLog.log('timeline', 'trash', `Trashed event "${event?.title || 'Untitled'}"`, id, event?.title);
-  }, [timeline, activityLog]);
-
-  const loggedRestoreEvent = useCallback(async (id: string) => {
-    const event = timeline.events.find((e) => e.id === id);
-    await timeline.restoreEvent(id);
-    activityLog.log('timeline', 'restore', `Restored event "${event?.title || 'Untitled'}"`, id, event?.title);
-  }, [timeline, activityLog]);
-
-  const loggedToggleArchiveEvent = useCallback(async (id: string) => {
-    const event = timeline.events.find((e) => e.id === id);
-    await timeline.toggleArchiveEvent(id);
-    const action = event?.archived ? 'unarchive' : 'archive';
-    activityLog.log('timeline', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} event "${event?.title || 'Untitled'}"`, id, event?.title);
-  }, [timeline, activityLog]);
-
-  const loggedEmptyTrashEvents = useCallback(async () => {
-    const count = timeline.events.filter((e) => e.trashed).length;
-    await timeline.emptyTrashEvents();
-    activityLog.log('timeline', 'empty-trash', `Emptied event trash (${count} events)`);
-  }, [timeline, activityLog]);
-
-  // Whiteboard trash/archive wrappers
-  const loggedTrashWhiteboard = useCallback(async (id: string) => {
-    const wb = whiteboards.find((w) => w.id === id);
-    await trashWhiteboard(id);
-    activityLog.log('whiteboard', 'trash', `Trashed whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
-  }, [trashWhiteboard, whiteboards, activityLog]);
-
-  const loggedRestoreWhiteboard = useCallback(async (id: string) => {
-    const wb = whiteboards.find((w) => w.id === id);
-    await restoreWhiteboard(id);
-    activityLog.log('whiteboard', 'restore', `Restored whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
-  }, [restoreWhiteboard, whiteboards, activityLog]);
-
-  const loggedToggleArchiveWhiteboard = useCallback(async (id: string) => {
-    const wb = whiteboards.find((w) => w.id === id);
-    await toggleArchiveWhiteboard(id);
-    const action = wb?.archived ? 'unarchive' : 'archive';
-    activityLog.log('whiteboard', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} whiteboard "${wb?.name || 'Untitled'}"`, id, wb?.name);
-  }, [toggleArchiveWhiteboard, whiteboards, activityLog]);
-
-  const loggedEmptyTrashWhiteboards = useCallback(async () => {
-    const count = whiteboards.filter((w) => w.trashed).length;
-    await emptyTrashWhiteboards();
-    activityLog.log('whiteboard', 'empty-trash', `Emptied whiteboard trash (${count} whiteboards)`);
-  }, [emptyTrashWhiteboards, whiteboards, activityLog]);
-
-  // Standalone IOC wrappers
-  const loggedCreateIOC = useCallback(async (partial?: Partial<StandaloneIOC>) => {
-    const ioc = await standaloneIOCsHook.createIOC(partial);
-    activityLog.log('ioc', 'create', `Created standalone IOC "${ioc.value}"`, ioc.id, ioc.value);
-    return ioc;
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedTrashIOC = useCallback(async (id: string) => {
-    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
-    await standaloneIOCsHook.trashIOC(id);
-    activityLog.log('ioc', 'trash', `Trashed IOC "${ioc?.value || ''}"`, id, ioc?.value);
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedRestoreIOC = useCallback(async (id: string) => {
-    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
-    await standaloneIOCsHook.restoreIOC(id);
-    activityLog.log('ioc', 'restore', `Restored IOC "${ioc?.value || ''}"`, id, ioc?.value);
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedToggleArchiveIOC = useCallback(async (id: string) => {
-    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
-    await standaloneIOCsHook.toggleArchiveIOC(id);
-    const action = ioc?.archived ? 'unarchive' : 'archive';
-    activityLog.log('ioc', action, `${action === 'archive' ? 'Archived' : 'Unarchived'} IOC "${ioc?.value || ''}"`, id, ioc?.value);
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedDeleteIOC = useCallback(async (id: string) => {
-    const ioc = standaloneIOCsHook.iocs.find((i) => i.id === id);
-    await standaloneIOCsHook.deleteIOC(id);
-    activityLog.log('ioc', 'delete', `Deleted IOC "${ioc?.value || ''}"`, id, ioc?.value);
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedEmptyTrashIOCs = useCallback(async () => {
-    const count = standaloneIOCsHook.iocs.filter((i) => i.trashed).length;
-    await standaloneIOCsHook.emptyTrashIOCs();
-    activityLog.log('ioc', 'empty-trash', `Emptied IOC trash (${count} IOCs)`);
-  }, [standaloneIOCsHook, activityLog]);
-
-  const loggedCreateFolder = useCallback(async (name: string) => {
-    const folder = await createFolder(name);
-    activityLog.log('folder', 'create', `Created investigation "${name}"`, folder.id, name);
-    return folder;
-  }, [createFolder, activityLog]);
-
-  const loggedDeleteFolder = useCallback(async (id: string) => {
-    const folder = folders.find((f) => f.id === id);
-    await deleteFolder(id);
-    activityLog.log('folder', 'delete', `Deleted investigation "${folder?.name || 'Untitled'}"`, id, folder?.name);
-  }, [deleteFolder, folders, activityLog]);
-
-  const loggedTrashFolderContents = useCallback(async (id: string) => {
-    const folder = folders.find((f) => f.id === id);
-    await trashFolderContents(id);
-    activityLog.log('folder', 'trash', `Trashed contents of investigation "${folder?.name || 'Untitled'}" and removed folder`, id, folder?.name);
-    notes.reload();
-    tasks.reload();
-    timeline.reload();
-    reloadWhiteboards();
-    standaloneIOCsHook.reload();
-  }, [trashFolderContents, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
-
-  const loggedArchiveFolder = useCallback(async (id: string) => {
-    const folder = folders.find((f) => f.id === id);
-    await archiveFolder(id);
-    activityLog.log('folder', 'archive', `Archived investigation "${folder?.name || 'Untitled'}" and all contents`, id, folder?.name);
-    notes.reload();
-    tasks.reload();
-    timeline.reload();
-    reloadWhiteboards();
-    standaloneIOCsHook.reload();
-  }, [archiveFolder, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
-
-  const loggedUnarchiveFolder = useCallback(async (id: string) => {
-    const folder = folders.find((f) => f.id === id);
-    await unarchiveFolder(id);
-    activityLog.log('folder', 'unarchive', `Unarchived investigation "${folder?.name || 'Untitled'}" and all contents`, id, folder?.name);
-    notes.reload();
-    tasks.reload();
-    timeline.reload();
-    reloadWhiteboards();
-    standaloneIOCsHook.reload();
-  }, [unarchiveFolder, folders, activityLog, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook]);
-
-  const emptyAllTrash = useCallback(async () => {
-    await loggedEmptyTrash();
-    await loggedEmptyTrashTasks();
-    await loggedEmptyTrashEvents();
-    await loggedEmptyTrashWhiteboards();
-    await loggedEmptyTrashIOCs();
-  }, [loggedEmptyTrash, loggedEmptyTrashTasks, loggedEmptyTrashEvents, loggedEmptyTrashWhiteboards, loggedEmptyTrashIOCs]);
-
-  const loggedCreateTag = useCallback(async (name: string) => {
-    const tag = await createTag(name);
-    activityLog.log('tag', 'create', `Created tag "${name}"`, tag.id, name);
-    return tag;
-  }, [createTag, activityLog]);
-
-  const loggedDeleteTag = useCallback(async (id: string) => {
-    const tag = tags.find((t) => t.id === id);
-    await deleteTag(id);
-    activityLog.log('tag', 'delete', `Deleted tag "${tag?.name || ''}"`, id, tag?.name);
-  }, [deleteTag, tags, activityLog]);
+  const {
+    loggedCreateNote, loggedTrashNote, loggedRestoreNote,
+    loggedTogglePin, loggedToggleArchive,
+    loggedCreateTask, loggedDeleteTask, loggedToggleComplete,
+    loggedTrashTask, loggedRestoreTask, loggedToggleArchiveTask,
+    loggedCreateEvent, loggedDeleteEvent, loggedToggleStar,
+    loggedTrashEvent, loggedRestoreEvent, loggedToggleArchiveEvent,
+    loggedCreateTimeline, loggedDeleteTimeline,
+    loggedCreateWhiteboard, loggedDeleteWhiteboard,
+    loggedTrashWhiteboard, loggedRestoreWhiteboard, loggedToggleArchiveWhiteboard,
+    loggedCreateIOC, loggedTrashIOC, loggedRestoreIOC,
+    loggedToggleArchiveIOC, loggedDeleteIOC,
+    loggedCreateFolder, loggedDeleteFolder,
+    loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder,
+    loggedCreateTag, loggedDeleteTag,
+    loggedCreateChatThread,
+    emptyAllTrash,
+  } = useLoggedActions(
+    activityLog.log,
+    notes,
+    tasks,
+    timeline,
+    { timelines, createTimeline, deleteTimeline },
+    { whiteboards, createWhiteboard, deleteWhiteboard, trashWhiteboard, restoreWhiteboard, toggleArchiveWhiteboard, emptyTrashWhiteboards, reload: reloadWhiteboards },
+    standaloneIOCsHook,
+    { createThread: chatsHook.createThread },
+    { folders, createFolder, deleteFolder, trashFolderContents, archiveFolder, unarchiveFolder },
+    { tags, createTag, deleteTag },
+  );
 
   // UI state — guard against stale 'clips' defaultView in localStorage
   const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' ? settings.defaultView : 'notes';
@@ -612,12 +284,6 @@ function AppInner() {
     if (selectedChatThreadId) sessionStorage.setItem('tc-chat-thread', selectedChatThreadId);
     else sessionStorage.removeItem('tc-chat-thread');
   }, [selectedChatThreadId]);
-
-  const loggedCreateChatThread = useCallback(async (partial?: Partial<import('./types').ChatThread>) => {
-    const thread = await chatsHook.createThread(partial);
-    activityLog.log('chat', 'create', `Created chat thread "${thread.title}"`, thread.id, thread.title);
-    return thread;
-  }, [chatsHook, activityLog]);
 
   const loggedTrashChatThread = useCallback(async (id: string) => {
     const thread = chatsHook.threads.find((t) => t.id === id);

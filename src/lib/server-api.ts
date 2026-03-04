@@ -299,7 +299,7 @@ export async function streamLLMChat(
         if (event.type === 'chunk') onChunk(event.content);
         else if (event.type === 'done') onDone(event.stopReason);
         else if (event.type === 'error') onError(event.error);
-      } catch { /* skip */ }
+      } catch (e) { console.warn('Failed to parse SSE event:', e); }
     }
   }
 }

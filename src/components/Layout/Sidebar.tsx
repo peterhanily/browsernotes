@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
   Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
-  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
+  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Dices, Search,
   LayoutDashboard, MessageSquare, MessagesSquare, FolderOpen, FolderClosed,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
-import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { Modal } from '../Common/Modal';
 import { OperationNameGenerator } from '../Common/OperationNameGenerator';
 import { InvestigationCard } from './InvestigationCard';
-import { cn, formatDate } from '../../lib/utils';
+import { cn } from '../../lib/utils';
+import { NavItem, InvestigationListItem, CollapsedIcon } from './SidebarHelpers';
+import { WhiteboardSubList } from './WhiteboardSubList';
+import { TimelineSubList } from './TimelineSubList';
+import { TagSubList } from './TagSubList';
 
 interface SidebarProps {
   activeView: ViewMode;
@@ -114,7 +117,6 @@ export function Sidebar({
   chatCount,
 }: SidebarProps) {
   const [investigationsListOpen, setInvestigationsListOpen] = useState(true);
-  const [tagsOpen, setTagsOpen] = useState(true);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
@@ -122,24 +124,6 @@ export function Sidebar({
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showNameGenerator, setShowNameGenerator] = useState(false);
-
-  const [timelinesOpen, setTimelinesOpen] = useState(true);
-  const [newTimelineName, setNewTimelineName] = useState('');
-  const [showNewTimeline, setShowNewTimeline] = useState(false);
-  const [editingTimeline, setEditingTimeline] = useState<string | null>(null);
-  const [editTimelineName, setEditTimelineName] = useState('');
-  const [deletingTimelineId, setDeletingTimelineId] = useState<string | null>(null);
-
-  const [whiteboardsOpen, setWhiteboardsOpen] = useState(true);
-  const [newWhiteboardName, setNewWhiteboardName] = useState('');
-  const [showNewWhiteboard, setShowNewWhiteboard] = useState(false);
-  const [editingWhiteboard, setEditingWhiteboard] = useState<string | null>(null);
-  const [editWhiteboardName, setEditWhiteboardName] = useState('');
-  const [deletingWhiteboardId, setDeletingWhiteboardId] = useState<string | null>(null);
-
-  const [editingTag, setEditingTag] = useState<string | null>(null);
-  const [editTagName, setEditTagName] = useState('');
-  const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
 
   const [segmentedFilter, setSegmentedFilter] = useState<SegmentedFilter>('all');
 
@@ -158,43 +142,6 @@ export function Sidebar({
     if (editFolderName.trim()) {
       onRenameFolder(id, editFolderName.trim());
       setEditingFolder(null);
-    }
-  };
-
-  const handleCreateTimeline = () => {
-    if (newTimelineName.trim() && onCreateTimeline) {
-      onCreateTimeline(newTimelineName.trim());
-      setNewTimelineName('');
-      setShowNewTimeline(false);
-    }
-  };
-
-  const handleRenameTimeline = (id: string) => {
-    if (editTimelineName.trim() && onRenameTimeline) {
-      onRenameTimeline(id, editTimelineName.trim());
-      setEditingTimeline(null);
-    }
-  };
-
-  const handleCreateWhiteboard = () => {
-    if (newWhiteboardName.trim() && onCreateWhiteboard) {
-      onCreateWhiteboard(newWhiteboardName.trim());
-      setNewWhiteboardName('');
-      setShowNewWhiteboard(false);
-    }
-  };
-
-  const handleRenameWhiteboard = (id: string) => {
-    if (editWhiteboardName.trim() && onRenameWhiteboard) {
-      onRenameWhiteboard(id, editWhiteboardName.trim());
-      setEditingWhiteboard(null);
-    }
-  };
-
-  const handleRenameTag = (id: string) => {
-    if (editTagName.trim() && onRenameTag) {
-      onRenameTag(id, editTagName.trim());
-      setEditingTag(null);
     }
   };
 
@@ -580,254 +527,44 @@ export function Sidebar({
 
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
-          <div className="pt-1">
-            <div className="mx-0 mb-1.5 border-t border-border-subtle" />
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setWhiteboardsOpen(!whiteboardsOpen)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWhiteboardsOpen(!whiteboardsOpen); } }}
-              className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
-              aria-expanded={whiteboardsOpen}
-            >
-              <ChevronDown
-                size={12}
-                className="transition-transform duration-200"
-                style={{ transform: whiteboardsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-              />
-              Whiteboards
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNewWhiteboard(true); }}
-                className="ml-auto p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
-                aria-label="Create whiteboard"
-                title="Create whiteboard"
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-
-            {whiteboardsOpen && (
-              <div className="mt-1 space-y-0.5">
-                {showNewWhiteboard && (
-                  <div className="flex items-center gap-1 px-2">
-                    <input
-                      autoFocus
-                      value={newWhiteboardName}
-                      onChange={(e) => setNewWhiteboardName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateWhiteboard(); if (e.key === 'Escape') setShowNewWhiteboard(false); }}
-                      placeholder="Whiteboard name"
-                      aria-label="New whiteboard name"
-                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
-                    />
-                    <button onClick={handleCreateWhiteboard} className="text-purple hover:text-accent-hover" aria-label="Confirm create whiteboard" title="Create whiteboard">
-                      <Plus size={14} />
-                    </button>
-                    <button onClick={() => setShowNewWhiteboard(false)} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-                {whiteboards.map((wb) => (
-                  <div key={wb.id} className="group relative">
-                    {editingWhiteboard === wb.id ? (
-                      <div className="flex items-center gap-1 px-2">
-                        <input
-                          autoFocus
-                          value={editWhiteboardName}
-                          onChange={(e) => setEditWhiteboardName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleRenameWhiteboard(wb.id); if (e.key === 'Escape') setEditingWhiteboard(null); }}
-                          aria-label="Rename whiteboard"
-                          className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
-                        />
-                      </div>
-                    ) : (
-                      <NavItem
-                        compact
-                        icon={<PenTool size={14} />}
-                        label={wb.name}
-                        active={selectedWhiteboardId === wb.id}
-                        onClick={() => nav(() => { onWhiteboardSelect?.(wb.id); })}
-                        onDoubleClick={() => { setEditingWhiteboard(wb.id); setEditWhiteboardName(wb.name); }}
-                        actions={
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingWhiteboardId(wb.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
-                            aria-label={`Delete whiteboard ${wb.name}`}
-                            title="Delete whiteboard"
-                          >
-                            <X size={12} />
-                          </button>
-                        }
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <WhiteboardSubList
+            whiteboards={whiteboards}
+            selectedWhiteboardId={selectedWhiteboardId}
+            onWhiteboardSelect={onWhiteboardSelect}
+            onCreateWhiteboard={onCreateWhiteboard}
+            onDeleteWhiteboard={onDeleteWhiteboard}
+            onRenameWhiteboard={onRenameWhiteboard}
+            onNavigate={onNavigate}
+          />
         )}
 
         {/* Timelines — only in timeline view */}
         {activeView === 'timeline' && (
-          <div className="pt-1">
-            <div className="mx-0 mb-1.5 border-t border-border-subtle" />
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setTimelinesOpen(!timelinesOpen)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTimelinesOpen(!timelinesOpen); } }}
-              className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
-              aria-expanded={timelinesOpen}
-            >
-              <ChevronDown
-                size={12}
-                className="transition-transform duration-200"
-                style={{ transform: timelinesOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-              />
-              Timelines
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowNewTimeline(true); }}
-                className="ml-auto p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
-                aria-label="Create timeline"
-                title="Create timeline"
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-
-            {timelinesOpen && (
-              <div className="mt-1 space-y-0.5">
-                {showNewTimeline && (
-                  <div className="flex items-center gap-1 px-2">
-                    <input
-                      autoFocus
-                      value={newTimelineName}
-                      onChange={(e) => setNewTimelineName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTimeline(); if (e.key === 'Escape') setShowNewTimeline(false); }}
-                      placeholder="Timeline name"
-                      aria-label="New timeline name"
-                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
-                    />
-                    <button onClick={handleCreateTimeline} className="text-purple hover:text-accent-hover" aria-label="Confirm create timeline" title="Create timeline">
-                      <Plus size={14} />
-                    </button>
-                    <button onClick={() => setShowNewTimeline(false)} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-                <NavItem
-                  compact
-                  icon={<Clock size={14} />}
-                  label="All Events"
-                  badge={timelineCounts?.total}
-                  active={!selectedTimelineId}
-                  onClick={() => nav(() => { onTimelineSelect?.(undefined); })}
-                />
-                {timelines.map((tl) => (
-                  <div key={tl.id} className="group relative">
-                    {editingTimeline === tl.id ? (
-                      <div className="flex items-center gap-1 px-2">
-                        <input
-                          autoFocus
-                          value={editTimelineName}
-                          onChange={(e) => setEditTimelineName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTimeline(tl.id); if (e.key === 'Escape') setEditingTimeline(null); }}
-                          aria-label="Rename timeline"
-                          className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
-                        />
-                      </div>
-                    ) : (
-                      <NavItem
-                        compact
-                        icon={<Clock size={14} style={{ color: tl.color }} />}
-                        label={tl.name}
-                        badge={timelineEventCounts[tl.id] || 0}
-                        active={selectedTimelineId === tl.id}
-                        onClick={() => nav(() => { onTimelineSelect?.(tl.id); })}
-                        onDoubleClick={() => { setEditingTimeline(tl.id); setEditTimelineName(tl.name); }}
-                        actions={
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingTimelineId(tl.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
-                            aria-label={`Delete timeline ${tl.name}`}
-                            title="Delete timeline"
-                          >
-                            <X size={12} />
-                          </button>
-                        }
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <TimelineSubList
+            timelines={timelines}
+            selectedTimelineId={selectedTimelineId}
+            timelineCounts={timelineCounts}
+            timelineEventCounts={timelineEventCounts}
+            onTimelineSelect={onTimelineSelect}
+            onCreateTimeline={onCreateTimeline}
+            onDeleteTimeline={onDeleteTimeline}
+            onRenameTimeline={onRenameTimeline}
+            onNavigate={onNavigate}
+          />
         )}
 
         {/* 7. TAGS */}
-        <div className="pt-1">
-          <div className="mx-0 mb-1 border-t border-border-subtle" />
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setTagsOpen(!tagsOpen)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTagsOpen(!tagsOpen); } }}
-            className="flex items-center gap-1 w-full px-2 py-1 font-mono text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
-            aria-expanded={tagsOpen}
-          >
-            <ChevronDown
-              size={12}
-              className="transition-transform duration-200"
-              style={{ transform: tagsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-            />
-            Tags
-          </div>
-
-          {tagsOpen && (
-            <div className="mt-1 flex flex-wrap gap-1 px-2" data-tour="tags-folders">
-              {tags.map((tag) => (
-                <div key={tag.id} className="group relative">
-                  {editingTag === tag.id ? (
-                    <input
-                      autoFocus
-                      value={editTagName}
-                      onChange={(e) => setEditTagName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleRenameTag(tag.id); if (e.key === 'Escape') setEditingTag(null); }}
-                      aria-label="Rename tag"
-                      className="bg-bg-deep border border-border-medium rounded px-2 py-0.5 text-xs text-text-primary focus:outline-none focus:border-purple w-24"
-                    />
-                  ) : (
-                    <button
-                      onClick={() => nav(() => { onTagSelect(tag.name); onFolderSelect(undefined); onShowTrash(false); onShowArchive(false); })}
-                      onDoubleClick={() => { setEditingTag(tag.id); setEditTagName(tag.name); }}
-                      className={cn(
-                        'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs transition-colors',
-                        selectedTag === tag.name
-                          ? 'bg-purple/20 text-purple'
-                          : 'bg-bg-raised text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-                      )}
-                    >
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                      {tag.name}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeletingTagId(tag.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-0 hover:text-red-400 transition-all"
-                        aria-label={`Delete tag ${tag.name}`}
-                        title="Delete tag"
-                      >
-                        <X size={10} />
-                      </button>
-                    </button>
-                  )}
-                </div>
-              ))}
-              {tags.length === 0 && (
-                <p className="text-[10px] text-text-muted font-mono">No tags yet</p>
-              )}
-            </div>
-          )}
-        </div>
+        <TagSubList
+          tags={tags}
+          selectedTag={selectedTag}
+          onTagSelect={onTagSelect}
+          onFolderSelect={onFolderSelect}
+          onShowTrash={onShowTrash}
+          onShowArchive={onShowArchive}
+          onRenameTag={onRenameTag}
+          onDeleteTag={onDeleteTag}
+          onNavigate={onNavigate}
+        />
       </nav>
 
       {/* 8. FOOTER */}
@@ -933,36 +670,6 @@ export function Sidebar({
         </div>
       </Modal>
 
-      <ConfirmDialog
-        open={deletingTimelineId !== null}
-        onClose={() => setDeletingTimelineId(null)}
-        onConfirm={() => { if (deletingTimelineId) { onDeleteTimeline?.(deletingTimelineId); setDeletingTimelineId(null); } }}
-        title="Delete Timeline"
-        message="This timeline and all its events will be permanently deleted. This cannot be undone."
-        confirmLabel="Delete Timeline"
-        danger
-      />
-
-      <ConfirmDialog
-        open={deletingWhiteboardId !== null}
-        onClose={() => setDeletingWhiteboardId(null)}
-        onConfirm={() => { if (deletingWhiteboardId) { onDeleteWhiteboard?.(deletingWhiteboardId); setDeletingWhiteboardId(null); } }}
-        title="Delete Whiteboard"
-        message="This whiteboard will be permanently deleted. This cannot be undone."
-        confirmLabel="Delete Whiteboard"
-        danger
-      />
-
-      <ConfirmDialog
-        open={deletingTagId !== null}
-        onClose={() => setDeletingTagId(null)}
-        onConfirm={() => { if (deletingTagId) { onDeleteTag?.(deletingTagId); setDeletingTagId(null); } }}
-        title="Delete Tag"
-        message="This tag will be removed from all notes, tasks, timeline events, and whiteboards."
-        confirmLabel="Delete Tag"
-        danger
-      />
-
       <OperationNameGenerator
         open={showNameGenerator}
         onClose={() => setShowNameGenerator(false)}
@@ -972,198 +679,3 @@ export function Sidebar({
   );
 }
 
-/* ─── NavItem: flat nav item with accent glow bar ─── */
-const NavItem = React.memo(function NavItem({
-  icon,
-  label,
-  badge,
-  badgeColor,
-  active,
-  onClick,
-  onDoubleClick,
-  actions,
-  compact,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  badge?: number;
-  badgeColor?: string;
-  active?: boolean;
-  onClick: () => void;
-  onDoubleClick?: () => void;
-  actions?: React.ReactNode;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-      className={cn(
-        'flex items-center w-full rounded-lg transition-colors group cursor-pointer relative',
-        compact ? 'gap-1.5 px-2 py-0.5 text-xs' : 'gap-2 px-3 py-1.5 text-[13px] font-medium',
-        active
-          ? 'bg-bg-active text-text-primary'
-          : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-      )}
-    >
-      {active && (
-        <span
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-purple"
-          style={{ boxShadow: '0 0 8px 1px var(--color-purple)' }}
-        />
-      )}
-      {icon}
-      <span className="truncate flex-1 text-left">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className={cn(
-          'font-mono text-[10px] px-1.5 py-0 rounded-full',
-          badgeColor || 'bg-bg-raised text-text-muted'
-        )}>
-          {badge > 999 ? '999+' : badge}
-        </span>
-      )}
-      {actions}
-    </div>
-  );
-});
-
-/* ─── InvestigationListItem: compact item for the investigations dropdown ─── */
-const InvestigationListItem = React.memo(function InvestigationListItem({
-  folder,
-  active,
-  onClick,
-  onDoubleClick,
-  onInfo,
-  onArchive,
-  onUnarchive,
-  onDelete,
-}: {
-  folder: Folder;
-  active?: boolean;
-  onClick: () => void;
-  onDoubleClick?: () => void;
-  onInfo?: () => void;
-  onArchive?: () => void;
-  onUnarchive?: () => void;
-  onDelete: () => void;
-}) {
-  const status = folder.status || 'active';
-  const statusColor = status === 'active'
-    ? 'bg-accent-green'
-    : status === 'archived'
-      ? 'bg-accent-amber'
-      : 'bg-text-muted';
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
-      className={cn(
-        'flex items-center gap-2 w-full rounded-lg px-2 py-1 cursor-pointer transition-colors group',
-        active
-          ? 'bg-bg-active text-text-primary'
-          : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-      )}
-    >
-      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusColor)} />
-      <span className="truncate flex-1 text-left text-[12px]">{folder.name}</span>
-      <span className="font-mono text-[10px] text-text-muted shrink-0">
-        {formatDate(folder.createdAt)}
-      </span>
-      <span className="flex items-center gap-px shrink-0">
-        {onInfo && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onInfo(); }}
-            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-all"
-            aria-label={`Edit investigation ${folder.name}`}
-            title="Edit investigation"
-          >
-            <Info size={10} />
-          </button>
-        )}
-        {onArchive && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onArchive(); }}
-            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-amber-400 transition-all"
-            aria-label={`Archive investigation ${folder.name}`}
-            title="Archive investigation"
-          >
-            <Archive size={10} />
-          </button>
-        )}
-        {onUnarchive && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onUnarchive(); }}
-            className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-green-400 transition-all"
-            aria-label={`Unarchive investigation ${folder.name}`}
-            title="Unarchive investigation"
-          >
-            <RotateCcw size={10} />
-          </button>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="opacity-0 group-hover:opacity-100 p-px rounded hover:bg-bg-hover text-text-muted hover:text-red-400 transition-all"
-          aria-label={`Delete investigation ${folder.name}`}
-          title="Delete investigation"
-        >
-          <X size={10} />
-        </button>
-      </span>
-    </div>
-  );
-});
-
-/* ─── CollapsedIcon: icon button for collapsed sidebar rail ─── */
-const CollapsedIcon = React.memo(function CollapsedIcon({
-  icon: Icon,
-  label,
-  active,
-  badge,
-  onClick,
-  dataTour,
-}: {
-  icon: typeof FileText;
-  label: string;
-  active?: boolean;
-  badge?: number;
-  onClick: () => void;
-  dataTour?: string;
-}) {
-  return (
-    <div className="group relative" {...(dataTour ? { 'data-tour': dataTour } : {})}>
-      <button
-        onClick={onClick}
-        className={cn(
-          'w-9 h-9 flex items-center justify-center rounded-lg transition-colors relative',
-          active
-            ? 'bg-bg-active text-purple'
-            : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-        )}
-        aria-label={label}
-      >
-        {active && (
-          <span
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-purple"
-            style={{ boxShadow: '0 0 8px 1px var(--color-purple)' }}
-          />
-        )}
-        <Icon size={18} />
-        {badge !== undefined && badge > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-purple/80 text-[9px] font-medium text-white flex items-center justify-center px-1 leading-none">
-            {badge > 999 ? '999+' : badge}
-          </span>
-        )}
-      </button>
-      <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded bg-bg-raised border border-border-medium text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
-        {label}
-      </div>
-    </div>
-  );
-});

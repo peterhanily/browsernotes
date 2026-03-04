@@ -205,7 +205,7 @@ export function PostComposer({ folderId, parentId, replyToId, placeholder, initi
     try {
       const users = await searchUsers(query);
       setMentionResults(users);
-    } catch { /* ignore */ }
+    } catch (e) { console.warn('Mention search failed:', e); }
   };
 
   const insertMention = (mentionUser: TeamUser) => {

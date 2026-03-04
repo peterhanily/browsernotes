@@ -88,11 +88,11 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
 
   // Parse initial data
   let initialElements: unknown[] = [];
-  try { initialElements = JSON.parse(whiteboard.elements); } catch { /* empty */ }
+  try { initialElements = JSON.parse(whiteboard.elements); } catch (e) { console.warn('Failed to parse whiteboard elements:', e); }
 
   let initialAppState: Record<string, unknown> = {};
   if (whiteboard.appState) {
-    try { initialAppState = pickAppState(JSON.parse(whiteboard.appState)); } catch { /* empty */ }
+    try { initialAppState = pickAppState(JSON.parse(whiteboard.appState)); } catch (e) { console.warn('Failed to parse whiteboard appState:', e); }
   }
 
   // Detect theme from document

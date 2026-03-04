@@ -128,9 +128,15 @@ adminApp.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 });
 
-// Admin CORS: same-origin only (block cross-origin requests)
+// Admin CORS: reject all cross-origin requests (admin UI is same-origin)
 adminApp.use('*', cors({
-  origin: (origin) => origin, // Reflect origin (restrictive: only same-origin JS can reach it)
+  origin: (origin, c) => {
+    // Only allow requests from the admin panel's own origin
+    const host = c.req.header('host');
+    if (host && origin === `http://${host}`) return origin;
+    if (host && origin === `https://${host}`) return origin;
+    return '';  // Deny cross-origin
+  },
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   maxAge: 86400,

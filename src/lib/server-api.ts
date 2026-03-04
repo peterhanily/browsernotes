@@ -360,3 +360,61 @@ export async function fetchUserFeed(userId: string) {
   if (!resp.ok) throw new Error('Failed to fetch user feed');
   return resp.json();
 }
+
+// ─── Backups ─────────────────────────────────────────────────────
+
+export interface BackupMeta {
+  id: string;
+  name: string;
+  type: 'full' | 'differential';
+  scope: 'all' | 'investigation' | 'entity';
+  scopeId: string | null;
+  entityCount: number;
+  sizeBytes: number;
+  parentBackupId: string | null;
+  createdAt: string;
+}
+
+export async function createBackup(
+  metadata: {
+    name: string;
+    type: string;
+    scope: string;
+    scopeId?: string;
+    entityCount: number;
+    parentBackupId?: string;
+  },
+  encryptedBlob: Blob,
+): Promise<BackupMeta> {
+  const formData = new FormData();
+  formData.append('metadata', JSON.stringify(metadata));
+  formData.append('blob', encryptedBlob, 'backup.enc');
+
+  const resp = await apiFetch('/api/backups', {
+    method: 'POST',
+    body: formData,
+    headers: {},
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: 'Failed to create backup' }));
+    throw new Error(err.error || 'Failed to create backup');
+  }
+  return resp.json();
+}
+
+export async function listBackups(): Promise<{ backups: BackupMeta[] }> {
+  const resp = await apiFetch('/api/backups');
+  if (!resp.ok) throw new Error('Failed to list backups');
+  return resp.json();
+}
+
+export async function downloadBackup(id: string): Promise<Blob> {
+  const resp = await apiFetch(`/api/backups/${id}`);
+  if (!resp.ok) throw new Error('Failed to download backup');
+  return resp.blob();
+}
+
+export async function deleteBackup(id: string): Promise<void> {
+  const resp = await apiFetch(`/api/backups/${id}`, { method: 'DELETE' });
+  if (!resp.ok) throw new Error('Failed to delete backup');
+}

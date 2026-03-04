@@ -381,3 +381,22 @@ export const files = pgTable('files', {
 }, (t) => ({
   idxFilesFolderId: index('idx_files_folder_id').on(t.folderId),
 }));
+
+// ─── Encrypted Backups ──────────────────────────────────────────
+
+export const backups = pgTable('backups', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['full', 'differential'] }).notNull().default('full'),
+  scope: text('scope', { enum: ['all', 'investigation', 'entity'] }).notNull().default('all'),
+  scopeId: text('scope_id'),
+  entityCount: integer('entity_count').notNull().default(0),
+  sizeBytes: integer('size_bytes').notNull().default(0),
+  storagePath: text('storage_path').notNull(),
+  parentBackupId: text('parent_backup_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxBackupsUserId: index('idx_backups_user_id').on(t.userId),
+  idxBackupsCreatedAt: index('idx_backups_created_at').on(t.createdAt),
+}));

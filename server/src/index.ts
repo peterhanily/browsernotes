@@ -15,6 +15,7 @@ import investigationRoutes from './routes/investigations.js';
 import feedRoutes from './routes/feed.js';
 import llmRoutes from './routes/llm.js';
 import fileRoutes from './routes/files.js';
+import backupRoutes from './routes/backups.js';
 import auditRoutes from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
@@ -63,8 +64,9 @@ app.use('*', cors({
 }));
 app.use('*', redactingLogger);
 
-// Body limits — file routes get 50 MB, other API routes get 1 MB
+// Body limits — file/backup routes get larger limits, other API routes get 1 MB
 app.use('/api/files/*', bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+app.use('/api/backups/*', bodyLimit({ maxSize: 100 * 1024 * 1024 }));
 app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
 
 // Rate limiting
@@ -73,6 +75,7 @@ app.use('/api/auth/register', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.use('/api/auth/refresh', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/llm/chat', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/feed/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
+app.use('/api/backups', rateLimiter({ windowMs: 60_000, max: 5 }));
 
 // Health check with DB connectivity
 app.get('/health', async (c) => {
@@ -91,6 +94,7 @@ app.route('/api/investigations', investigationRoutes);
 app.route('/api/feed', feedRoutes);
 app.route('/api/llm', llmRoutes);
 app.route('/api/files', fileRoutes);
+app.route('/api/backups', backupRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/users', userRoutes);

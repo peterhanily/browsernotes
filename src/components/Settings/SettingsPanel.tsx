@@ -3,6 +3,7 @@ import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
 import { CloudBackup } from './CloudBackup';
+import { ServerBackup } from './ServerBackup';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
@@ -236,6 +237,10 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       <hr className="border-gray-800" />
 
       <CloudBackup />
+
+      <hr className="border-gray-800" />
+
+      <ServerBackup />
 
       <hr className="border-gray-800" />
 

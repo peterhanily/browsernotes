@@ -60,9 +60,7 @@ app.post('/register', async (c) => {
   const userId = nanoid();
   const now = new Date();
 
-  // First user gets admin role
-  const allUsers = await db.select({ id: users.id }).from(users).limit(1);
-  const role = allUsers.length === 0 ? 'admin' : 'analyst';
+  const role = 'analyst';
 
   await db.insert(users).values({
     id: userId,

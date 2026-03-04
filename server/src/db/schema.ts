@@ -235,6 +235,14 @@ export const chatThreads = pgTable('chat_threads', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 
+// ─── Server Settings ────────────────────────────────────────────
+
+export const serverSettings = pgTable('server_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Activity Log ───────────────────────────────────────────────
 
 export const activityLog = pgTable('activity_log', {

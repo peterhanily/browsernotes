@@ -4,7 +4,7 @@ import type { AuthUser } from '../types.js';
 
 let publicKey: jose.KeyLike | null = null;
 
-async function getPublicKey(): Promise<jose.KeyLike> {
+export async function getPublicKey(): Promise<jose.KeyLike> {
   if (publicKey) return publicKey;
   const raw = process.env.JWT_PUBLIC_KEY;
   if (!raw) throw new Error('JWT_PUBLIC_KEY not set');

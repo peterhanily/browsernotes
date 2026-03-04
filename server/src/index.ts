@@ -18,6 +18,8 @@ import fileRoutes from './routes/files.js';
 import auditRoutes from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
+import { initAdminSecret } from './services/admin-secret.js';
 import { handleWSConnection, handleWSMessage, handleWSClose } from './ws/handler.js';
 import { db, sql as pgSql } from './db/index.js';
 import { rateLimiter } from './middleware/rate-limit.js';
@@ -27,12 +29,13 @@ const app = new Hono();
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 // Configurable CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : ['*'];
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS?.trim();
+const corsOrigin = !allowedOriginsEnv || allowedOriginsEnv === '*'
+  ? '*'
+  : allowedOriginsEnv.split(',').map((o) => o.trim());
 
 app.use('*', cors({
-  origin: allowedOrigins,
+  origin: corsOrigin,
   allowHeaders: ['Content-Type', 'Authorization'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   exposeHeaders: ['Content-Length'],
@@ -50,6 +53,7 @@ app.use('/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
 // Rate limiting on auth endpoints
 app.use('/api/auth/login', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/api/auth/register', rateLimiter({ windowMs: 60_000, max: 5 }));
+app.use('/admin/api/login', rateLimiter({ windowMs: 60_000, max: 5 }));
 
 // Health check with DB connectivity
 app.get('/health', async (c) => {
@@ -71,6 +75,7 @@ app.route('/api/files', fileRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/users', userRoutes);
+app.route('/admin', adminRoutes);
 
 // WebSocket endpoint
 app.get('/ws', upgradeWebSocket((c) => {
@@ -98,6 +103,8 @@ async function main() {
   logger.info('Running database migrations...', { migrationsFolder });
   await migrate(db, { migrationsFolder });
   logger.info('Database migrations complete');
+
+  await initAdminSecret();
 
   const server = serve({
     fetch: app.fetch,

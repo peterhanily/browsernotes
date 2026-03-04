@@ -10,6 +10,7 @@ services:
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       FILE_STORAGE_PATH: /data/files
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      ADMIN_SECRET: ${ADMIN_SECRET:-}
       # LLM API keys (optional)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

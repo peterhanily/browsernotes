@@ -14,6 +14,12 @@ export interface RestoreResult {
 
 const SYNCED_TABLES = ['notes', 'tasks', 'folders', 'tags', 'timelineEvents', 'timelines', 'whiteboards', 'standaloneIOCs', 'chatThreads'] as const;
 
+// Helper: get a Dexie table by name, returning an untyped handle for dynamic access
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getTable(name: string): any {
+  return (db as any)[name];
+}
+
 export async function restoreFullReplace(payload: BackupPayload): Promise<RestoreResult> {
   let added = 0;
   const tables: string[] = [];
@@ -25,9 +31,9 @@ export async function restoreFullReplace(payload: BackupPayload): Promise<Restor
       const items = payload.data[tableName as keyof BackupPayload['data']];
       if (!items || items.length === 0) continue;
 
-      const table = db[tableName];
+      const table = getTable(tableName);
       await table.clear();
-      await table.bulkAdd(items as never[]);
+      await table.bulkAdd(items);
       added += items.length;
       tables.push(tableName);
     }
@@ -50,7 +56,7 @@ export async function restoreMerge(payload: BackupPayload): Promise<RestoreResul
       if (!items || items.length === 0) {
         // Still check for deletedIds
         if (payload.deletedIds?.[tableName]?.length) {
-          const table = db[tableName];
+          const table = getTable(tableName);
           await table.bulkDelete(payload.deletedIds[tableName]);
           deleted += payload.deletedIds[tableName].length;
           if (!tables.includes(tableName)) tables.push(tableName);
@@ -58,23 +64,21 @@ export async function restoreMerge(payload: BackupPayload): Promise<RestoreResul
         continue;
       }
 
-      const table = db[tableName];
+      const table = getTable(tableName);
       if (!tables.includes(tableName)) tables.push(tableName);
 
       for (const item of items) {
-        const record = item as Record<string, unknown>;
-        const id = record.id as string;
+        const record = item as unknown as { id: string; updatedAt?: number };
+        const id = record.id;
         if (!id) continue;
 
-        const existing = await table.get(id);
+        const existing = await table.get(id) as { updatedAt?: number } | undefined;
         if (!existing) {
-          await table.add(item as never);
+          await table.add(item);
           added++;
         } else {
-          const existingUpdatedAt = (existing as Record<string, unknown>).updatedAt as number | undefined;
-          const incomingUpdatedAt = record.updatedAt as number | undefined;
-          if (incomingUpdatedAt && existingUpdatedAt && incomingUpdatedAt > existingUpdatedAt) {
-            await table.put(item as never);
+          if (record.updatedAt && existing.updatedAt && record.updatedAt > existing.updatedAt) {
+            await table.put(item);
             updated++;
           }
         }

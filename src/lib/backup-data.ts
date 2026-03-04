@@ -5,6 +5,12 @@
 import { db } from '../db';
 import type { BackupPayload } from './backup-crypto';
 
+// Helper: get a Dexie table by name, returning an untyped handle for dynamic access
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getTable(name: string): any {
+  return (db as any)[name];
+}
+
 export async function buildFullBackupPayload(
   scope: 'all' | 'investigation' | 'entity',
   scopeId?: string,
@@ -62,7 +68,7 @@ export async function buildFullBackupPayload(
     if (!scopeId) throw new Error('scopeId required for entity scope');
     const [tableName, entityId] = scopeId.split(':');
     if (!tableName || !entityId) throw new Error('scopeId must be "tableName:entityId"');
-    const table = (db as Record<string, { get: (id: string) => Promise<unknown> }>)[tableName];
+    const table = getTable(tableName);
     if (!table) throw new Error(`Unknown table: ${tableName}`);
     const entity = await table.get(entityId);
     if (!entity) throw new Error(`Entity not found: ${scopeId}`);
@@ -88,35 +94,37 @@ export async function buildDifferentialPayload(
   const data: BackupPayload['data'] = {};
   const deletedIds: Record<string, string[]> = {};
 
-  const tables = ['notes', 'tasks', 'folders', 'tags', 'timelineEvents', 'timelines', 'whiteboards', 'standaloneIOCs', 'chatThreads'] as const;
+  const tableNames = ['notes', 'tasks', 'folders', 'tags', 'timelineEvents', 'timelines', 'whiteboards', 'standaloneIOCs', 'chatThreads'] as const;
 
-  for (const tableName of tables) {
-    const table = db[tableName];
+  for (const tableName of tableNames) {
+    const table = getTable(tableName);
     const collection = table.where('updatedAt').above(lastBackupAt);
 
     // For investigation scope, further filter by folderId where applicable
     if (scope === 'investigation' && scopeId) {
-      const all = await collection.toArray();
-      const filtered = all.filter((item: Record<string, unknown>) => {
+      const all: Array<{ id: string; folderId?: string }> = await collection.toArray();
+      const filtered = all.filter((item) => {
         if ('folderId' in item) return item.folderId === scopeId;
         return true; // tags, timelines don't have folderId — include if updated
       });
-      data[tableName as keyof BackupPayload['data']] = filtered;
+      data[tableName as keyof BackupPayload['data']] = filtered as unknown[];
     } else {
       data[tableName as keyof BackupPayload['data']] = await collection.toArray();
     }
 
     // Collect trashed entity IDs as tombstones
-    const trashed = await table.filter((item: Record<string, unknown>) => {
-      if (!item.trashed) return false;
-      if (scope === 'investigation' && scopeId && 'folderId' in item) {
-        return item.folderId === scopeId;
-      }
-      return scope === 'all';
-    }).toArray();
+    const trashed: Array<{ id: string; trashed?: boolean; folderId?: string }> = await table.filter(
+      (item: { trashed?: boolean; folderId?: string }) => {
+        if (!item.trashed) return false;
+        if (scope === 'investigation' && scopeId && 'folderId' in item) {
+          return item.folderId === scopeId;
+        }
+        return scope === 'all';
+      },
+    ).toArray();
 
     if (trashed.length > 0) {
-      deletedIds[tableName] = trashed.map((item: Record<string, unknown>) => item.id as string);
+      deletedIds[tableName] = trashed.map((item) => item.id);
     }
   }
 

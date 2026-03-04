@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { checkInvestigationAccess } from '../middleware/access.js';
 import { db } from '../db/index.js';
-import { users, posts } from '../db/schema.js';
+import { users, posts, investigationMembers } from '../db/schema.js';
 import type { AuthUser } from '../types.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
@@ -102,20 +101,25 @@ app.get('/:id/feed', async (c) => {
     .orderBy(posts.createdAt)
     .limit(200);
 
-  // Filter out investigation-scoped posts the requesting user doesn't have access to
-  const result = [];
-  for (const post of allPosts) {
-    if (!post.folderId) {
-      // Global post — always visible
-      result.push(post);
-    } else {
-      // Investigation-scoped — check membership
-      const hasAccess = await checkInvestigationAccess(requestingUser.id, post.folderId, 'viewer');
-      if (hasAccess) {
-        result.push(post);
-      }
-    }
+  // Batch-check folder access instead of N individual queries
+  const uniqueFolderIds = [...new Set(allPosts.map((p) => p.folderId).filter(Boolean))] as string[];
+  let accessibleFolderIds = new Set<string>();
+  if (uniqueFolderIds.length > 0) {
+    const memberships = await db
+      .select({ folderId: investigationMembers.folderId })
+      .from(investigationMembers)
+      .where(
+        and(
+          eq(investigationMembers.userId, requestingUser.id),
+          inArray(investigationMembers.folderId, uniqueFolderIds)
+        )
+      );
+    accessibleFolderIds = new Set(memberships.map((m) => m.folderId));
   }
+
+  const result = allPosts.filter(
+    (post) => !post.folderId || accessibleFolderIds.has(post.folderId)
+  );
 
   // Return most recent 50
   return c.json(result.slice(-50));

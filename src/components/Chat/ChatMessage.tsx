@@ -89,6 +89,15 @@ function ToolCallBlock({ tc }: { tc: ToolCallRecord }) {
 
 // ── Entity Link Processing ─────────────────────────────────────────
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function processEntityLinks(html: string, onEntityClick?: (type: string, id: string) => void): string {
   if (!onEntityClick) return html;
   // Replace [type:id:label] with styled spans
@@ -105,7 +114,7 @@ function processEntityLinks(html: string, onEntityClick?: (type: string, id: str
       label = parts.slice(1).join(':') || id;
     }
     const color = colorMap[type] || '#6b7280';
-    return `<span class="tc-entity-link" data-entity-type="${type}" data-entity-id="${id}" style="color:${color};cursor:pointer;border-bottom:1px dashed ${color};font-weight:500">${iconMap[type] || ''} ${label}</span>`;
+    return `<span class="tc-entity-link" data-entity-type="${escapeHtml(type)}" data-entity-id="${escapeHtml(id)}" style="color:${color};cursor:pointer;border-bottom:1px dashed ${color};font-weight:500">${iconMap[type] || ''} ${escapeHtml(label)}</span>`;
   });
 }
 

@@ -70,6 +70,7 @@ export const notes = pgTable('notes', {
 }, (t) => ({
   idxNotesFolderId: index('idx_notes_folder_id').on(t.folderId),
   idxNotesUpdatedAt: index('idx_notes_updated_at').on(t.updatedAt),
+  idxNotesCreatedBy: index('idx_notes_created_by').on(t.createdBy),
 }));
 
 export const tasks = pgTable('tasks', {
@@ -105,6 +106,7 @@ export const tasks = pgTable('tasks', {
   idxTasksFolderId: index('idx_tasks_folder_id').on(t.folderId),
   idxTasksUpdatedAt: index('idx_tasks_updated_at').on(t.updatedAt),
   idxTasksAssigneeId: index('idx_tasks_assignee_id').on(t.assigneeId),
+  idxTasksCreatedBy: index('idx_tasks_created_by').on(t.createdBy),
 }));
 
 export const folders = pgTable('folders', {
@@ -130,6 +132,7 @@ export const folders = pgTable('folders', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, (t) => ({
   idxFoldersUpdatedAt: index('idx_folders_updated_at').on(t.updatedAt),
+  idxFoldersCreatedBy: index('idx_folders_created_by').on(t.createdBy),
 }));
 
 export const tags = pgTable('tags', {
@@ -144,6 +147,7 @@ export const tags = pgTable('tags', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, (t) => ({
   idxTagsUpdatedAt: index('idx_tags_updated_at').on(t.updatedAt),
+  idxTagsCreatedBy: index('idx_tags_created_by').on(t.createdBy),
 }));
 
 export const timelineEvents = pgTable('timeline_events', {
@@ -184,6 +188,7 @@ export const timelineEvents = pgTable('timeline_events', {
   idxTimelineEventsFolderId: index('idx_timeline_events_folder_id').on(t.folderId),
   idxTimelineEventsUpdatedAt: index('idx_timeline_events_updated_at').on(t.updatedAt),
   idxTimelineEventsTimelineId: index('idx_timeline_events_timeline_id').on(t.timelineId),
+  idxTimelineEventsCreatedBy: index('idx_timeline_events_created_by').on(t.createdBy),
 }));
 
 export const timelines = pgTable('timelines', {
@@ -200,6 +205,7 @@ export const timelines = pgTable('timelines', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, (t) => ({
   idxTimelinesUpdatedAt: index('idx_timelines_updated_at').on(t.updatedAt),
+  idxTimelinesCreatedBy: index('idx_timelines_created_by').on(t.createdBy),
 }));
 
 export const whiteboards = pgTable('whiteboards', {
@@ -222,6 +228,7 @@ export const whiteboards = pgTable('whiteboards', {
 }, (t) => ({
   idxWhiteboardsFolderId: index('idx_whiteboards_folder_id').on(t.folderId),
   idxWhiteboardsUpdatedAt: index('idx_whiteboards_updated_at').on(t.updatedAt),
+  idxWhiteboardsCreatedBy: index('idx_whiteboards_created_by').on(t.createdBy),
 }));
 
 export const standaloneIOCs = pgTable('standalone_iocs', {
@@ -252,6 +259,7 @@ export const standaloneIOCs = pgTable('standalone_iocs', {
 }, (t) => ({
   idxStandaloneIOCsFolderId: index('idx_standalone_iocs_folder_id').on(t.folderId),
   idxStandaloneIOCsUpdatedAt: index('idx_standalone_iocs_updated_at').on(t.updatedAt),
+  idxStandaloneIOCsCreatedBy: index('idx_standalone_iocs_created_by').on(t.createdBy),
 }));
 
 export const chatThreads = pgTable('chat_threads', {
@@ -274,6 +282,7 @@ export const chatThreads = pgTable('chat_threads', {
 }, (t) => ({
   idxChatThreadsFolderId: index('idx_chat_threads_folder_id').on(t.folderId),
   idxChatThreadsUpdatedAt: index('idx_chat_threads_updated_at').on(t.updatedAt),
+  idxChatThreadsCreatedBy: index('idx_chat_threads_created_by').on(t.createdBy),
 }));
 
 // ─── Server Settings ────────────────────────────────────────────
@@ -337,6 +346,7 @@ export const reactions = pgTable('reactions', {
 }, (t) => ({
   uqPostUserEmoji: unique('uq_post_user_emoji').on(t.postId, t.userId, t.emoji),
   idxReactionsPostId: index('idx_reactions_post_id').on(t.postId),
+  idxReactionsUserId: index('idx_reactions_user_id').on(t.userId),
 }));
 
 // ─── Notifications ──────────────────────────────────────────────

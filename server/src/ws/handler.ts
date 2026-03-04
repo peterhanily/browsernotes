@@ -8,7 +8,8 @@ import type { AuthUser } from '../types.js';
 const MAX_WS_MESSAGE_SIZE = 64 * 1024; // 64 KB
 const MAX_CONNECTIONS_PER_USER = 10;
 const MSG_RATE_WINDOW_MS = 1000;
-const MSG_RATE_MAX = 30; // max 30 messages per second
+const MSG_RATE_MAX = 30; // max 30 messages per second per connection
+const USER_MSG_RATE_MAX = 50; // max 50 messages per second per user (across all connections)
 
 interface ConnectedClient {
   ws: WSContext;
@@ -25,6 +26,8 @@ const clients = new Map<WSContext, ConnectedClient>();
 const userConnections = new Map<string, Set<WSContext>>();
 // Pending auth: ws → timeout timer (connections not yet authenticated)
 const pendingAuth = new Map<WSContext, ReturnType<typeof setTimeout>>();
+// Per-user message rate limiting (sliding window)
+const userMsgCounts = new Map<string, { count: number; windowStart: number }>();
 
 export function handleWSConnection(ws: WSContext) {
   // Give client 5 seconds to send auth message
@@ -102,7 +105,7 @@ export async function handleWSMessage(ws: WSContext, data: string) {
   const client = clients.get(ws);
   if (!client) return;
 
-  // Message rate limiting
+  // Per-connection rate limiting
   const now = Date.now();
   if (now - client.msgWindowStart > MSG_RATE_WINDOW_MS) {
     client.msgCount = 0;
@@ -111,6 +114,17 @@ export async function handleWSMessage(ws: WSContext, data: string) {
   client.msgCount++;
   if (client.msgCount > MSG_RATE_MAX) {
     return; // Silently drop messages exceeding rate limit
+  }
+
+  // Per-user rate limiting (across all connections)
+  let userRate = userMsgCounts.get(client.user.id);
+  if (!userRate || now - userRate.windowStart > MSG_RATE_WINDOW_MS) {
+    userRate = { count: 0, windowStart: now };
+    userMsgCounts.set(client.user.id, userRate);
+  }
+  userRate.count++;
+  if (userRate.count > USER_MSG_RATE_MAX) {
+    return; // Silently drop
   }
 
   try {
@@ -198,7 +212,10 @@ export function handleWSClose(ws: WSContext) {
     const conns = userConnections.get(client.user.id);
     if (conns) {
       conns.delete(ws);
-      if (conns.size === 0) userConnections.delete(client.user.id);
+      if (conns.size === 0) {
+        userConnections.delete(client.user.id);
+        userMsgCounts.delete(client.user.id);
+      }
     }
 
     clients.delete(ws);

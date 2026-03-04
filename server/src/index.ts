@@ -72,6 +72,7 @@ app.use('/api/auth/login', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/api/auth/register', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.use('/api/auth/refresh', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/llm/chat', rateLimiter({ windowMs: 60_000, max: 20 }));
+app.use('/api/feed/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
 
 // Health check with DB connectivity
 app.get('/health', async (c) => {

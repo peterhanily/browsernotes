@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, lt, desc, isNull, or } from 'drizzle-orm';
+import { eq, and, lt, desc, isNull, or, inArray, sql, count } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
@@ -61,35 +61,47 @@ app.get('/', async (c) => {
   // Simplified: just execute
   const feedPosts = await query;
 
-  // Get reaction counts for each post
-  const postsWithReactions = await Promise.all(
-    feedPosts.map(async (post) => {
-      const postReactions = await db
-        .select()
-        .from(reactions)
-        .where(eq(reactions.postId, post.id));
+  if (feedPosts.length === 0) {
+    return c.json([]);
+  }
 
-      // Count replies
-      const replies = await db
-        .select({ id: posts.id })
-        .from(posts)
-        .where(and(eq(posts.parentId, post.id), eq(posts.deleted, false)));
+  const postIds = feedPosts.map((p) => p.id);
 
-      // Group reactions by emoji
-      const reactionMap: Record<string, { count: number; userIds: string[] }> = {};
-      for (const r of postReactions) {
-        if (!reactionMap[r.emoji]) reactionMap[r.emoji] = { count: 0, userIds: [] };
-        reactionMap[r.emoji].count++;
-        reactionMap[r.emoji].userIds.push(r.userId);
-      }
+  // Batch-fetch all reactions for these posts
+  const allReactions = await db
+    .select()
+    .from(reactions)
+    .where(inArray(reactions.postId, postIds));
 
-      return {
-        ...post,
-        reactions: reactionMap,
-        replyCount: replies.length,
-      };
-    })
-  );
+  const reactionsByPost = new Map<string, Record<string, { count: number; userIds: string[] }>>();
+  for (const r of allReactions) {
+    let map = reactionsByPost.get(r.postId);
+    if (!map) {
+      map = {};
+      reactionsByPost.set(r.postId, map);
+    }
+    if (!map[r.emoji]) map[r.emoji] = { count: 0, userIds: [] };
+    map[r.emoji].count++;
+    map[r.emoji].userIds.push(r.userId);
+  }
+
+  // Batch-fetch reply counts
+  const replyCounts = await db
+    .select({ parentId: posts.parentId, cnt: count() })
+    .from(posts)
+    .where(and(inArray(posts.parentId, postIds), eq(posts.deleted, false)))
+    .groupBy(posts.parentId);
+
+  const replyCountMap = new Map<string, number>();
+  for (const r of replyCounts) {
+    if (r.parentId) replyCountMap.set(r.parentId, Number(r.cnt));
+  }
+
+  const postsWithReactions = feedPosts.map((post) => ({
+    ...post,
+    reactions: reactionsByPost.get(post.id) || {},
+    replyCount: replyCountMap.get(post.id) || 0,
+  }));
 
   return c.json(postsWithReactions);
 });
@@ -100,14 +112,45 @@ app.post('/posts', async (c) => {
   const body = await c.req.json();
   const { content, images = [], mentions = [], folderId = null, parentId = null } = body;
 
-  if (!content?.trim()) {
-    return c.json({ error: 'Content is required' }, 400);
+  // Input validation
+  if (typeof content !== 'string' || !content.trim()) {
+    return c.json({ error: 'Content is required and must be a string' }, 400);
+  }
+  if (content.length > 50_000) {
+    return c.json({ error: 'Content must be 50,000 characters or fewer' }, 400);
+  }
+  if (!Array.isArray(images) || images.length > 10 || !images.every((i: unknown) => typeof i === 'string')) {
+    return c.json({ error: 'Images must be an array of strings (max 10)' }, 400);
+  }
+  if (!Array.isArray(mentions) || mentions.length > 50 || !mentions.every((m: unknown) => typeof m === 'string')) {
+    return c.json({ error: 'Mentions must be an array of strings (max 50)' }, 400);
   }
 
   if (folderId) {
     const hasAccess = await checkInvestigationAccess(user.id, folderId, 'editor');
     if (!hasAccess) {
       return c.json({ error: 'No access to this investigation' }, 403);
+    }
+  }
+
+  // Validate parent post access (prevent IDOR)
+  let parentPost: (typeof posts.$inferSelect) | null = null;
+  if (parentId) {
+    const parentResult = await db.select().from(posts).where(eq(posts.id, parentId)).limit(1);
+    if (parentResult.length === 0 || parentResult[0].deleted) {
+      return c.json({ error: 'Parent post not found' }, 404);
+    }
+    parentPost = parentResult[0];
+    // Prevent cross-folder replies
+    if (parentPost.folderId !== folderId) {
+      return c.json({ error: 'Reply must be in the same folder as parent post' }, 400);
+    }
+    // Verify user can access parent's folder
+    if (parentPost.folderId) {
+      const hasParentAccess = await checkInvestigationAccess(user.id, parentPost.folderId, 'viewer');
+      if (!hasParentAccess) {
+        return c.json({ error: 'No access to parent post' }, 403);
+      }
     }
   }
 
@@ -152,18 +195,15 @@ app.post('/posts', async (c) => {
   }
 
   // Notify parent post author on reply
-  if (parentId) {
-    const parentPost = await db.select().from(posts).where(eq(posts.id, parentId)).limit(1);
-    if (parentPost.length > 0 && parentPost[0].authorId !== user.id) {
-      await createNotification({
-        userId: parentPost[0].authorId,
-        type: 'reply',
-        sourceUserId: user.id,
-        postId: id,
-        folderId: folderId || undefined,
-        message: `${user.displayName} replied to your post`,
-      });
-    }
+  if (parentPost && parentPost.authorId !== user.id) {
+    await createNotification({
+      userId: parentPost.authorId,
+      type: 'reply',
+      sourceUserId: user.id,
+      postId: id,
+      folderId: folderId || undefined,
+      message: `${user.displayName} replied to your post`,
+    });
   }
 
   // Broadcast

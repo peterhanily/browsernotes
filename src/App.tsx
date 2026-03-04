@@ -627,8 +627,9 @@ function AppInner() {
 
   // Auto-deselect when selected note is no longer in filtered list
   // Fixes stale editor after trash, delete, archive, restore, tag change, etc.
+  // Skip when notes list is empty (still loading after folder switch or sample import)
   useEffect(() => {
-    if (selectedNoteId && !filteredNotes.find((n) => n.id === selectedNoteId)) {
+    if (selectedNoteId && filteredNotes.length > 0 && !filteredNotes.find((n) => n.id === selectedNoteId)) {
       setSelectedNoteId(undefined);
     }
   }, [selectedNoteId, filteredNotes]);
@@ -1283,6 +1284,12 @@ function AppInner() {
             selectedFolderId={selectedFolderId}
             selectedFolder={selectedFolder}
             onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); }}
+            onNavigateToEntity={(type, id) => {
+              if (type === 'note') { setSelectedNoteId(id); navigateTo('notes', { selectedNoteId: id }); }
+              else if (type === 'task') { navigateTo('tasks'); }
+              else if (type === 'event') { const ev = timeline.events.find((e) => e.id === id); setSelectedTimelineId(ev?.timelineId); navigateTo('timeline', { selectedTimelineId: ev?.timelineId }); }
+              else if (type === 'ioc') { navigateTo('graph'); }
+            }}
           />
         ) : activeView === 'caddyshack' ? (
           <CaddyShackView

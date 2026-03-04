@@ -64,6 +64,13 @@
       "when": 1741600000000,
       "tag": "0008_add_posts_composite_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1741700000000,
+      "tag": "0009_add_activity_log_indexes",
+      "breakpoints": true
     }
   ]
 }

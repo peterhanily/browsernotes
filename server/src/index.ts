@@ -20,7 +20,7 @@ import auditRoutes from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
-import { initAdminSecret, initRegistrationMode, backfillFolderOwners } from './services/admin-secret.js';
+import { initAdminSecret, initRegistrationMode, backfillFolderOwners, initAdminSystemUser } from './services/admin-secret.js';
 import { pruneOldData } from './services/cleanup-service.js';
 import { initAdminKey } from './middleware/admin-auth.js';
 import { handleWSConnection, handleWSMessage, handleWSClose } from './ws/handler.js';
@@ -154,6 +154,7 @@ async function main() {
 
   initAdminKey();
   await initAdminSecret();
+  await initAdminSystemUser();
   await initRegistrationMode();
   await backfillFolderOwners();
 

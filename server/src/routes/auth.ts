@@ -6,7 +6,8 @@ import { nanoid } from 'nanoid';
 import { db } from '../db/index.js';
 import { users, sessions, allowedEmails } from '../db/schema.js';
 import { requireAuth, signAccessToken } from '../middleware/auth.js';
-import { getRegistrationMode, getSessionSettings } from '../services/admin-secret.js';
+import { getRegistrationMode, getSessionSettings, ADMIN_SYSTEM_USER_ID } from '../services/admin-secret.js';
+import { logActivity } from '../services/audit-service.js';
 import type { AuthUser } from '../types.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
@@ -116,6 +117,8 @@ app.post('/register', async (c) => {
   const user: AuthUser = { id: userId, email, role, displayName, avatarUrl: null };
   const tokens = await createTokenPair(user);
 
+  await logActivity({ userId, category: 'auth', action: 'register', detail: 'User registered' });
+
   return c.json({
     ...tokens,
     user: { id: userId, email, displayName, role, avatarUrl: null },
@@ -134,6 +137,7 @@ app.post('/login', async (c) => {
 
   const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (result.length === 0) {
+    await logActivity({ userId: ADMIN_SYSTEM_USER_ID, category: 'auth', action: 'login.failed', detail: `Login failed for unknown email ${email}` });
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
@@ -144,6 +148,7 @@ app.post('/login', async (c) => {
 
   const valid = await argon2.verify(user.passwordHash, password);
   if (!valid) {
+    await logActivity({ userId: user.id, category: 'auth', action: 'login.failed', detail: 'Login failed' });
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
@@ -157,6 +162,8 @@ app.post('/login', async (c) => {
     avatarUrl: user.avatarUrl,
   };
   const tokens = await createTokenPair(authUser);
+
+  await logActivity({ userId: user.id, category: 'auth', action: 'login', detail: 'User logged in' });
 
   return c.json({
     ...tokens,
@@ -209,11 +216,13 @@ app.post('/refresh', async (c) => {
 
 // POST /api/auth/logout
 app.post('/logout', requireAuth, async (c) => {
+  const authUser = c.get('user');
   const body = await c.req.json();
   const { refreshToken } = body;
   if (refreshToken) {
     await db.delete(sessions).where(eq(sessions.id, refreshToken));
   }
+  await logActivity({ userId: authUser.id, category: 'auth', action: 'logout', detail: 'User logged out' });
   return c.json({ ok: true });
 });
 

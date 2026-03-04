@@ -4,8 +4,10 @@ import { eq, and } from 'drizzle-orm';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { db } from '../db/index.js';
-import { serverSettings, folders, investigationMembers } from '../db/schema.js';
+import { serverSettings, folders, investigationMembers, users } from '../db/schema.js';
 import { logger } from '../lib/logger.js';
+
+export const ADMIN_SYSTEM_USER_ID = '__system_admin__';
 
 const SETTINGS_KEY = 'admin_secret_hash';
 
@@ -127,6 +129,23 @@ export async function backfillFolderOwners(): Promise<void> {
   if (backfilled > 0) {
     logger.info(`Backfilled owner membership for ${backfilled} folder(s)`);
   }
+}
+
+export async function initAdminSystemUser(): Promise<void> {
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, ADMIN_SYSTEM_USER_ID)).limit(1);
+  if (existing.length > 0) return;
+  const hash = await argon2.hash(nanoid(32), { type: argon2.argon2id });
+  await db.insert(users).values({
+    id: ADMIN_SYSTEM_USER_ID,
+    email: 'admin@system.local',
+    displayName: 'System Admin',
+    passwordHash: hash,
+    role: 'admin',
+    active: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).onConflictDoNothing();
+  logger.info('System admin sentinel user created');
 }
 
 export async function verifyAdminSecret(plaintext: string): Promise<boolean> {

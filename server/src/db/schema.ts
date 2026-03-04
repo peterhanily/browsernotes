@@ -314,6 +314,8 @@ export const activityLog = pgTable('activity_log', {
   idxActivityLogUserId: index('idx_activity_log_user_id').on(t.userId),
   idxActivityLogTimestamp: index('idx_activity_log_timestamp').on(t.timestamp),
   idxActivityLogFolderId: index('idx_activity_log_folder_id').on(t.folderId),
+  idxActivityLogCategory: index('idx_activity_log_category').on(t.category),
+  idxActivityLogAction: index('idx_activity_log_action').on(t.action),
 }));
 
 // ─── Social Feed ────────────────────────────────────────────────

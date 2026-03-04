@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, jsonb, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, jsonb, unique, index } from 'drizzle-orm/pg-core';
 
 // ─── Users & Sessions ───────────────────────────────────────────
 
@@ -20,7 +20,10 @@ export const sessions = pgTable('sessions', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxSessionsUserId: index('idx_sessions_user_id').on(t.userId),
+  idxSessionsExpiresAt: index('idx_sessions_expires_at').on(t.expiresAt),
+}));
 
 // ─── Investigation Membership ───────────────────────────────────
 
@@ -32,6 +35,8 @@ export const investigationMembers = pgTable('investigation_members', {
   joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uqFolderUser: unique('uq_folder_user').on(t.folderId, t.userId),
+  idxMembersFolderId: index('idx_members_folder_id').on(t.folderId),
+  idxMembersUserId: index('idx_members_user_id').on(t.userId),
 }));
 
 // ─── Entity Tables ──────────────────────────────────────────────
@@ -56,12 +61,16 @@ export const notes = pgTable('notes', {
   linkedTaskIds: jsonb('linked_task_ids').default([]),
   linkedTimelineEventIds: jsonb('linked_timeline_event_ids').default([]),
   annotations: jsonb('annotations').default([]),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxNotesFolderId: index('idx_notes_folder_id').on(t.folderId),
+  idxNotesUpdatedAt: index('idx_notes_updated_at').on(t.updatedAt),
+}));
 
 export const tasks = pgTable('tasks', {
   id: text('id').primaryKey(),
@@ -85,12 +94,16 @@ export const tasks = pgTable('tasks', {
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxTasksFolderId: index('idx_tasks_folder_id').on(t.folderId),
+  idxTasksUpdatedAt: index('idx_tasks_updated_at').on(t.updatedAt),
+}));
 
 export const folders = pgTable('folders', {
   id: text('id').primaryKey(),
@@ -107,23 +120,29 @@ export const folders = pgTable('folders', {
   closureResolution: text('closure_resolution'),
   closedReason: text('closed_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxFoldersUpdatedAt: index('idx_folders_updated_at').on(t.updatedAt),
+}));
 
 export const tags = pgTable('tags', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   color: text('color').notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxTagsUpdatedAt: index('idx_tags_updated_at').on(t.updatedAt),
+}));
 
 export const timelineEvents = pgTable('timeline_events', {
   id: text('id').primaryKey(),
@@ -153,12 +172,17 @@ export const timelineEvents = pgTable('timeline_events', {
   trashed: boolean('trashed').notNull().default(false),
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxTimelineEventsFolderId: index('idx_timeline_events_folder_id').on(t.folderId),
+  idxTimelineEventsUpdatedAt: index('idx_timeline_events_updated_at').on(t.updatedAt),
+  idxTimelineEventsTimelineId: index('idx_timeline_events_timeline_id').on(t.timelineId),
+}));
 
 export const timelines = pgTable('timelines', {
   id: text('id').primaryKey(),
@@ -166,12 +190,15 @@ export const timelines = pgTable('timelines', {
   description: text('description'),
   color: text('color'),
   order: integer('order').notNull().default(0),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxTimelinesUpdatedAt: index('idx_timelines_updated_at').on(t.updatedAt),
+}));
 
 export const whiteboards = pgTable('whiteboards', {
   id: text('id').primaryKey(),
@@ -184,12 +211,16 @@ export const whiteboards = pgTable('whiteboards', {
   trashed: boolean('trashed').notNull().default(false),
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxWhiteboardsFolderId: index('idx_whiteboards_folder_id').on(t.folderId),
+  idxWhiteboardsUpdatedAt: index('idx_whiteboards_updated_at').on(t.updatedAt),
+}));
 
 export const standaloneIOCs = pgTable('standalone_iocs', {
   id: text('id').primaryKey(),
@@ -210,12 +241,16 @@ export const standaloneIOCs = pgTable('standalone_iocs', {
   trashed: boolean('trashed').notNull().default(false),
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxStandaloneIOCsFolderId: index('idx_standalone_iocs_folder_id').on(t.folderId),
+  idxStandaloneIOCsUpdatedAt: index('idx_standalone_iocs_updated_at').on(t.updatedAt),
+}));
 
 export const chatThreads = pgTable('chat_threads', {
   id: text('id').primaryKey(),
@@ -228,12 +263,16 @@ export const chatThreads = pgTable('chat_threads', {
   trashed: boolean('trashed').notNull().default(false),
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  idxChatThreadsFolderId: index('idx_chat_threads_folder_id').on(t.folderId),
+  idxChatThreadsUpdatedAt: index('idx_chat_threads_updated_at').on(t.updatedAt),
+}));
 
 // ─── Server Settings ────────────────────────────────────────────
 
@@ -260,7 +299,11 @@ export const activityLog = pgTable('activity_log', {
   itemTitle: text('item_title'),
   folderId: text('folder_id'),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxActivityLogUserId: index('idx_activity_log_user_id').on(t.userId),
+  idxActivityLogTimestamp: index('idx_activity_log_timestamp').on(t.timestamp),
+  idxActivityLogFolderId: index('idx_activity_log_folder_id').on(t.folderId),
+}));
 
 // ─── Social Feed ────────────────────────────────────────────────
 
@@ -276,7 +319,12 @@ export const posts = pgTable('posts', {
   deleted: boolean('deleted').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxPostsAuthorId: index('idx_posts_author_id').on(t.authorId),
+  idxPostsFolderId: index('idx_posts_folder_id').on(t.folderId),
+  idxPostsCreatedAt: index('idx_posts_created_at').on(t.createdAt),
+  idxPostsParentId: index('idx_posts_parent_id').on(t.parentId),
+}));
 
 export const reactions = pgTable('reactions', {
   id: text('id').primaryKey(),
@@ -286,6 +334,7 @@ export const reactions = pgTable('reactions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uqPostUserEmoji: unique('uq_post_user_emoji').on(t.postId, t.userId, t.emoji),
+  idxReactionsPostId: index('idx_reactions_post_id').on(t.postId),
 }));
 
 // ─── Notifications ──────────────────────────────────────────────
@@ -300,7 +349,10 @@ export const notifications = pgTable('notifications', {
   message: text('message').notNull(),
   read: boolean('read').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxNotificationsUserId: index('idx_notifications_user_id').on(t.userId),
+  idxNotificationsCreatedAt: index('idx_notifications_created_at').on(t.createdAt),
+}));
 
 // ─── File Storage ───────────────────────────────────────────────
 
@@ -314,4 +366,6 @@ export const files = pgTable('files', {
   thumbnailPath: text('thumbnail_path'),
   folderId: text('folder_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  idxFilesFolderId: index('idx_files_folder_id').on(t.folderId),
+}));

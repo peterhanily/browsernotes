@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, and, or, isNull } from 'drizzle-orm';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { checkInvestigationAccess } from '../middleware/access.js';
 import { db } from '../db/index.js';
-import { users } from '../db/schema.js';
+import { users, posts } from '../db/schema.js';
 import type { AuthUser } from '../types.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
@@ -85,18 +86,39 @@ app.get('/:id', async (c) => {
 
 // GET /api/users/:id/feed — user's posts timeline
 app.get('/:id/feed', async (c) => {
-  const userId = c.req.param('id');
-  const { posts: postsTable } = await import('../db/schema.js');
-  const { desc: descFn, eq: eqFn, and: andFn } = await import('drizzle-orm');
+  const requestingUser = c.get('user');
+  const targetUserId = c.req.param('id');
 
-  const result = await db
+  // Fetch the user's non-deleted posts (global + investigation-scoped)
+  const allPosts = await db
     .select()
-    .from(postsTable)
-    .where(andFn(eqFn(postsTable.authorId, userId), eqFn(postsTable.deleted, false)))
-    .orderBy(descFn(postsTable.createdAt))
-    .limit(50);
+    .from(posts)
+    .where(
+      and(
+        eq(posts.authorId, targetUserId),
+        eq(posts.deleted, false),
+      )
+    )
+    .orderBy(posts.createdAt)
+    .limit(200);
 
-  return c.json(result);
+  // Filter out investigation-scoped posts the requesting user doesn't have access to
+  const result = [];
+  for (const post of allPosts) {
+    if (!post.folderId) {
+      // Global post — always visible
+      result.push(post);
+    } else {
+      // Investigation-scoped — check membership
+      const hasAccess = await checkInvestigationAccess(requestingUser.id, post.folderId, 'viewer');
+      if (hasAccess) {
+        result.push(post);
+      }
+    }
+  }
+
+  // Return most recent 50
+  return c.json(result.slice(-50));
 });
 
 // PATCH /api/users/:id — admin update user

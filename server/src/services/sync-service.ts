@@ -1,4 +1,4 @@
-import { eq, and, gt, inArray } from 'drizzle-orm';
+import { eq, and, gt, inArray, isNull, isNotNull } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -21,7 +21,7 @@ const TABLE_MAP: Record<string, PgTable<any>> = {
 
 // Fields managed exclusively by the server — never accept from client
 const SERVER_MANAGED_FIELDS = new Set([
-  'id', 'createdBy', 'updatedBy', 'version', 'createdAt', 'updatedAt',
+  'id', 'createdBy', 'updatedBy', 'version', 'createdAt', 'updatedAt', 'deletedAt',
 ]);
 
 function stripServerFields(data: Record<string, unknown> | undefined): Record<string, unknown> {
@@ -79,8 +79,26 @@ export async function processPush(
 
     try {
       if (op === 'delete') {
-        await db.delete(table).where(eq(table.id, entityId));
-        results.push({ entityId, status: 'accepted' });
+        // Soft-delete: set deletedAt + bump version instead of hard-deleting.
+        // This lets other clients discover the deletion on their next pull.
+        const existing = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
+        if (existing.length === 0) {
+          results.push({ entityId, status: 'accepted' });
+          continue;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const serverVersion = (existing[0] as any).version as number;
+        const now = new Date();
+        await db
+          .update(table)
+          .set({
+            deletedAt: now,
+            updatedBy: userId,
+            version: serverVersion + 1,
+            updatedAt: now,
+          })
+          .where(eq(table.id, entityId));
+        results.push({ entityId, status: 'accepted', serverVersion: serverVersion + 1 });
         continue;
       }
 
@@ -123,6 +141,7 @@ export async function processPush(
             .update(table)
             .set({
               ...cleanData,
+              deletedAt: null, // Clear tombstone if entity is being re-created/updated
               updatedBy: userId,
               version: newVersion,
               updatedAt: now,
@@ -187,7 +206,13 @@ export async function pullChanges(
 
     const rows = await query;
     for (const row of rows) {
-      changes.push({ table: tableName, op: 'put', ...(row as Record<string, unknown>) });
+      const record = row as Record<string, unknown>;
+      // If entity has been soft-deleted, send as a delete op so clients remove it
+      if (record.deletedAt) {
+        changes.push({ table: tableName, op: 'delete', id: record.id });
+      } else {
+        changes.push({ table: tableName, op: 'put', ...record });
+      }
     }
   }
 
@@ -201,12 +226,19 @@ export async function getSnapshot(folderId: string): Promise<Record<string, unkn
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const t = table as any;
     if (t.folderId) {
-      snapshot[tableName] = await db.select().from(table).where(eq(t.folderId, folderId));
+      // Only include non-deleted entities in snapshots
+      snapshot[tableName] = await db
+        .select()
+        .from(table)
+        .where(and(eq(t.folderId, folderId), isNull(t.deletedAt)));
     }
   }
 
-  // Also include the folder itself
-  snapshot.folders = await db.select().from(schema.folders).where(eq(schema.folders.id, folderId));
+  // Also include the folder itself (if not deleted)
+  snapshot.folders = await db
+    .select()
+    .from(schema.folders)
+    .where(and(eq(schema.folders.id, folderId), isNull(schema.folders.deletedAt)));
 
   return snapshot;
 }

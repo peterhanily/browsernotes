@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Globe, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchFeed, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
@@ -7,12 +7,12 @@ import { PostComposer } from './PostComposer';
 import { ReplyThread } from './ReplyThread';
 import type { Post } from '../../types';
 
-interface FeedViewProps {
+interface CaddyShackViewProps {
   folderId?: string;
   folderName?: string;
 }
 
-export function FeedView({ folderId, folderName }: FeedViewProps) {
+export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
   const { user, connected } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,10 +72,13 @@ export function FeedView({ folderId, folderName }: FeedViewProps) {
     } catch { /* ignore */ }
   };
 
+  const pinnedPosts = useMemo(() => posts.filter(p => p.pinned), [posts]);
+  const unpinnedPosts = useMemo(() => posts.filter(p => !p.pinned), [posts]);
+
   if (!connected) {
     return (
       <div className="flex-1 flex items-center justify-center text-[var(--text-tertiary)]">
-        <p>Connect to a team server to use the feed.</p>
+        <p>Connect to a team server to use CaddyShack.</p>
       </div>
     );
   }
@@ -86,8 +89,6 @@ export function FeedView({ folderId, folderName }: FeedViewProps) {
         postId={selectedPostId}
         currentUserId={user?.id}
         onBack={() => setSelectedPostId(null)}
-        onReact={handleReact}
-        onRemoveReaction={handleRemoveReaction}
       />
     );
   }
@@ -96,7 +97,7 @@ export function FeedView({ folderId, folderName }: FeedViewProps) {
     <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full p-4 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Team Feed</h2>
+        <h2 className="text-lg font-semibold text-[var(--text-primary)]">CaddyShack</h2>
         <div className="flex items-center gap-2">
           {folderId && (
             <div className="flex bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)] overflow-hidden">
@@ -140,7 +141,7 @@ export function FeedView({ folderId, folderName }: FeedViewProps) {
       ) : (
         <div className="flex flex-col gap-3">
           {/* Pinned posts first */}
-          {posts.filter(p => p.pinned).map((post) => (
+          {pinnedPosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}
@@ -154,7 +155,7 @@ export function FeedView({ folderId, folderName }: FeedViewProps) {
               onClick={setSelectedPostId}
             />
           ))}
-          {posts.filter(p => !p.pinned).map((post) => (
+          {unpinnedPosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}

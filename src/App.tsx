@@ -64,7 +64,7 @@ import { ShareReceiver } from './components/ExecMode/ShareReceiver';
 import { ShareDialog } from './components/ExecMode/ShareDialog';
 import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-const FeedView = lazy(() => import('./components/Social/FeedView').then(m => ({ default: m.FeedView })));
+const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 import { ConflictDialog } from './components/Common/ConflictDialog';
 import type { PresenceUser, InvestigationMember } from './types';
 import { configureServerApi, fetchInvestigationMembers } from './lib/server-api';
@@ -526,7 +526,7 @@ function AppInner() {
   }, [deleteTag, tags, activityLog]);
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' ? settings.defaultView : 'notes';
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
@@ -1586,8 +1586,8 @@ function AppInner() {
             selectedFolder={selectedFolder}
             onEntitiesChanged={() => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); }}
           />
-        ) : activeView === 'feed' ? (
-          <FeedView
+        ) : activeView === 'caddyshack' ? (
+          <CaddyShackView
             folderId={selectedFolderId}
             folderName={selectedFolder?.name}
           />

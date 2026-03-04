@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageCircle, Smile, Pin, Trash2, Edit3, MoreHorizontal } from 'lucide-react';
 import type { Post } from '../../types';
+import { MediaGrid } from './MediaGrid';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🔥', '👀', '🎯', '✅'];
 
@@ -57,6 +58,13 @@ export function PostCard({
       className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-secondary)] hover:border-[var(--border-hover)] transition-colors"
       onClick={() => !editing && onClick?.(post.id)}
     >
+      {/* Reply-to label */}
+      {post.replyToAuthorName && (
+        <div className="text-xs text-[var(--text-tertiary)] mb-2">
+          Replying to <span className="text-blue-400">@{post.replyToAuthorName}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium shrink-0">
@@ -71,7 +79,7 @@ export function PostCard({
         {post.pinned && (
           <Pin size={14} className="text-yellow-500 shrink-0" />
         )}
-        {(isAuthor || currentUserId) && (
+        {isAuthor && (
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
@@ -132,18 +140,9 @@ export function PostCard({
         </div>
       )}
 
-      {/* Images */}
-      {post.images && post.images.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-3">
-          {post.images.map((img) => (
-            <img
-              key={img.id}
-              src={img.url}
-              alt={img.alt || ''}
-              className="max-h-48 rounded border border-[var(--border)] object-cover"
-            />
-          ))}
-        </div>
+      {/* Attachments */}
+      {post.attachments && post.attachments.length > 0 && (
+        <MediaGrid attachments={post.attachments} />
       )}
 
       {/* Reactions */}

@@ -133,7 +133,7 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
-export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'feed';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyshack';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -574,9 +574,14 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
 
 // ─── Social / Team Types ────────────────────────────────────────
 
-export interface PostImage {
+export interface PostAttachment {
   id: string;
   url: string;
+  type: 'image' | 'video' | 'audio' | 'document';
+  mimeType: string;
+  filename: string;
+  size?: number;
+  thumbnailUrl?: string;
   alt?: string;
 }
 
@@ -584,9 +589,11 @@ export interface Post {
   id: string;
   authorId: string;
   content: string;
-  images: PostImage[];
+  attachments: PostAttachment[];
   folderId?: string | null;
   parentId?: string | null;
+  replyToId?: string | null;
+  replyToAuthorName?: string;
   mentions: string[];
   pinned: boolean;
   deleted: boolean;

@@ -1,0 +1,153 @@
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { fetchPost, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
+import { PostCard } from './PostCard';
+import { PostComposer } from './PostComposer';
+import type { Post } from '../../types';
+
+interface ReplyThreadProps {
+  postId: string;
+  currentUserId?: string;
+  onBack: () => void;
+}
+
+export function ReplyThread({ postId, currentUserId, onBack }: ReplyThreadProps) {
+  const [post, setPost] = useState<Post | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [replyTo, setReplyTo] = useState<{ id: string; authorName: string } | null>(null);
+
+  const loadPost = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPost(postId);
+      setPost(data);
+    } catch (err) {
+      console.error('Failed to load post:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [postId]);
+
+  useEffect(() => {
+    loadPost();
+  }, [loadPost]);
+
+  const handleReact = async (targetId: string, emoji: string) => {
+    try {
+      await addReaction(targetId, emoji);
+      await loadPost();
+    } catch { /* ignore */ }
+  };
+
+  const handleRemoveReaction = async (targetId: string, emoji: string) => {
+    try {
+      await removeReaction(targetId, emoji);
+      await loadPost();
+    } catch { /* ignore */ }
+  };
+
+  const handleDelete = async (targetId: string) => {
+    try {
+      await deletePost(targetId);
+      await loadPost();
+    } catch { /* ignore */ }
+  };
+
+  const handleEdit = async (targetId: string, content: string) => {
+    try {
+      await editPost(targetId, { content });
+      await loadPost();
+    } catch { /* ignore */ }
+  };
+
+  const handlePin = async (targetId: string, pinned: boolean) => {
+    try {
+      await editPost(targetId, { pinned });
+      await loadPost();
+    } catch { /* ignore */ }
+  };
+
+  const handleReplyToReply = (replyId: string) => {
+    // Find the reply to get author name
+    const reply = post?.replies?.find((r) => r.id === replyId);
+    if (reply) {
+      setReplyTo({ id: replyId, authorName: reply.authorDisplayName || 'Unknown' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[var(--text-tertiary)] text-sm">
+        Loading thread...
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-[var(--text-tertiary)] text-sm">
+        Post not found.
+      </div>
+    );
+  }
+
+  // Compute composer props based on reply target
+  const composerParentId = postId; // Always the root post for flat threading
+  const composerReplyToId = replyTo?.id || postId;
+  const composerInitialContent = replyTo ? `@${replyTo.authorName} ` : '';
+  const composerPlaceholder = replyTo
+    ? `Reply to @${replyTo.authorName}...`
+    : 'Write a reply...';
+
+  return (
+    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full p-4 gap-4">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] w-fit"
+      >
+        <ArrowLeft size={16} /> Back to CaddyShack
+      </button>
+
+      {/* Original post */}
+      <PostCard
+        post={post}
+        currentUserId={currentUserId}
+        onReact={handleReact}
+        onRemoveReaction={handleRemoveReaction}
+        onDelete={handleDelete}
+        onEdit={handleEdit}
+        onPin={handlePin}
+      />
+
+      {/* Reply composer */}
+      <PostComposer
+        key={composerReplyToId}
+        parentId={composerParentId}
+        replyToId={composerReplyToId}
+        folderId={post.folderId}
+        placeholder={composerPlaceholder}
+        initialContent={composerInitialContent}
+        onPostCreated={() => { setReplyTo(null); loadPost(); }}
+      />
+
+      {/* Replies — flat list with full actions */}
+      {post.replies && post.replies.length > 0 && (
+        <div className="flex flex-col gap-2 pl-4 border-l-2 border-[var(--border)]">
+          {post.replies.map((reply) => (
+            <PostCard
+              key={reply.id}
+              post={reply}
+              currentUserId={currentUserId}
+              onReply={handleReplyToReply}
+              onReact={handleReact}
+              onRemoveReaction={handleRemoveReaction}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+              onPin={handlePin}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -50,6 +50,13 @@
       "when": 1741400000000,
       "tag": "0006_backups_table",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1741500000000,
+      "tag": "0007_rename_images_to_attachments",
+      "breakpoints": true
     }
   ]
 }

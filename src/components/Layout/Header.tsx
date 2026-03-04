@@ -4,7 +4,7 @@ import { ThemeToggle } from '../Common/ThemeToggle';
 import { ScreenshareToggle } from '../Common/ScreenshareToggle';
 import { CreateDropdown } from '../Common/CreateDropdown';
 import { cn } from '../../lib/utils';
-import { NotificationBell } from '../Social/NotificationBell';
+import { NotificationBell } from '../CaddyShack/NotificationBell';
 import { PresenceIndicator } from '../Common/PresenceIndicator';
 import type { PresenceUser } from '../../types';
 import logoSvgRaw from '/logo.svg?raw';

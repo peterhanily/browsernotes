@@ -1,20 +1,31 @@
-import { useState, useRef } from 'react';
-import { Send, Image, AtSign, X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Paperclip, AtSign, X, FileText, Film, Music } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createPost, uploadFile, searchUsers } from '../../lib/server-api';
-import type { TeamUser } from '../../types';
+import type { TeamUser, PostAttachment } from '../../types';
+
+const ACCEPTED_FILE_TYPES = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.xml,.yaml,.yml,.log';
+
+function getAttachmentType(mimeType: string): PostAttachment['type'] {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  return 'document';
+}
 
 interface PostComposerProps {
   folderId?: string | null;
   parentId?: string | null;
+  replyToId?: string | null;
   placeholder?: string;
+  initialContent?: string;
   onPostCreated?: () => void;
 }
 
-export function PostComposer({ folderId, parentId, placeholder, onPostCreated }: PostComposerProps) {
+export function PostComposer({ folderId, parentId, replyToId, placeholder, initialContent, onPostCreated }: PostComposerProps) {
   const { user, serverUrl } = useAuth();
-  const [content, setContent] = useState('');
-  const [images, setImages] = useState<Array<{ id: string; url: string; alt?: string }>>([]);
+  const [content, setContent] = useState(initialContent || '');
+  const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const [mentions, setMentions] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
@@ -22,6 +33,12 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (initialContent !== undefined) {
+      setContent(initialContent);
+    }
+  }, [initialContent]);
 
   if (!user || !serverUrl) return null;
 
@@ -31,13 +48,14 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
     try {
       await createPost({
         content,
-        images: images.length > 0 ? images : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
         mentions: mentions.length > 0 ? mentions : undefined,
         folderId: folderId || null,
         parentId: parentId || null,
+        replyToId: replyToId || null,
       });
       setContent('');
-      setImages([]);
+      setAttachments([]);
       setMentions([]);
       onPostCreated?.();
     } catch (err) {
@@ -47,17 +65,25 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
       try {
         const result = await uploadFile(file, folderId || undefined);
-        setImages((prev) => [...prev, { id: result.id, url: result.url }]);
+        const att: PostAttachment = {
+          id: result.id,
+          url: result.url,
+          type: getAttachmentType(result.mimeType),
+          mimeType: result.mimeType,
+          filename: result.filename,
+          size: result.size,
+          thumbnailUrl: result.thumbnailUrl || undefined,
+        };
+        setAttachments((prev) => [...prev, att]);
       } catch (err) {
-        console.error('Failed to upload image:', err);
+        console.error('Failed to upload file:', err);
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -83,6 +109,19 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
     textareaRef.current?.focus();
   };
 
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const AttachmentIcon = ({ type }: { type: PostAttachment['type'] }) => {
+    switch (type) {
+      case 'video': return <Film size={14} className="text-purple-400" />;
+      case 'audio': return <Music size={14} className="text-green-400" />;
+      case 'document': return <FileText size={14} className="text-blue-400" />;
+      default: return null;
+    }
+  };
+
   return (
     <div className="border border-[var(--border)] rounded-lg bg-[var(--bg-secondary)] p-3">
       <div className="flex items-start gap-3">
@@ -105,14 +144,21 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
             }}
           />
 
-          {/* Image previews */}
-          {images.length > 0 && (
+          {/* Attachment previews */}
+          {attachments.length > 0 && (
             <div className="flex gap-2 flex-wrap mb-2">
-              {images.map((img, i) => (
-                <div key={i} className="relative">
-                  <img src={img.url} alt="" className="h-16 rounded border border-[var(--border)] object-cover" />
+              {attachments.map((att, i) => (
+                <div key={i} className="relative group">
+                  {att.type === 'image' ? (
+                    <img src={att.thumbnailUrl || att.url} alt={att.alt || ''} className="h-16 rounded border border-[var(--border)] object-cover" />
+                  ) : (
+                    <div className="h-16 w-20 rounded border border-[var(--border)] bg-[var(--bg-primary)] flex flex-col items-center justify-center gap-1 px-1">
+                      <AttachmentIcon type={att.type} />
+                      <span className="text-[9px] text-[var(--text-tertiary)] truncate w-full text-center">{att.filename}</span>
+                    </div>
+                  )}
                   <button
-                    onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClick={() => removeAttachment(i)}
                     className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"
                   >
                     <X size={10} className="text-white" />
@@ -158,9 +204,9 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-1.5 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-              title="Attach image"
+              title="Attach file"
             >
-              <Image size={16} />
+              <Paperclip size={16} />
             </button>
             <button
               onClick={() => setShowMentions(!showMentions)}
@@ -183,10 +229,10 @@ export function PostComposer({ folderId, parentId, placeholder, onPostCreated }:
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={ACCEPTED_FILE_TYPES}
             multiple
             className="hidden"
-            onChange={handleImageUpload}
+            onChange={handleFileUpload}
           />
         </div>
       </div>

@@ -3,7 +3,7 @@ import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
   Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
   PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Info, Dices, RotateCcw, Search,
-  LayoutDashboard, MessageSquare, Rss, FolderOpen, FolderClosed,
+  LayoutDashboard, MessageSquare, MessagesSquare, FolderOpen, FolderClosed,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -243,7 +243,7 @@ export function Sidebar({
     { view: 'chat', icon: MessageSquare, label: 'AI Chat', badge: chatCount },
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
-    { view: 'feed', icon: Rss, label: 'Team Feed' },
+    { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
   ];
 
   // --- Collapsed: icon-only rail ---
@@ -567,12 +567,12 @@ export function Sidebar({
             onClick={() => nav(() => navToView('activity'))}
           />
         </div>
-        <div data-tour="feed">
+        <div data-tour="caddyshack">
           <NavItem
-            icon={<Rss size={16} />}
-            label="Team Feed"
-            active={activeView === 'feed'}
-            onClick={() => nav(() => navToView('feed'))}
+            icon={<MessagesSquare size={16} />}
+            label="CaddyShack"
+            active={activeView === 'caddyshack'}
+            onClick={() => nav(() => navToView('caddyshack'))}
           />
         </div>
 

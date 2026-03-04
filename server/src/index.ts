@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
 import investigationRoutes from './routes/investigations.js';
-import feedRoutes from './routes/feed.js';
+import caddyshackRoutes from './routes/caddyshack.js';
 import llmRoutes from './routes/llm.js';
 import fileRoutes from './routes/files.js';
 import backupRoutes from './routes/backups.js';
@@ -74,7 +74,7 @@ app.use('/api/auth/login', rateLimiter({ windowMs: 60_000, max: 10 }));
 app.use('/api/auth/register', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.use('/api/auth/refresh', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/llm/chat', rateLimiter({ windowMs: 60_000, max: 20 }));
-app.use('/api/feed/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
+app.use('/api/caddyshack/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
 app.use('/api/backups', rateLimiter({ windowMs: 60_000, max: 5 }));
 
 // Health check with DB connectivity
@@ -91,7 +91,7 @@ app.get('/health', async (c) => {
 app.route('/api/auth', authRoutes);
 app.route('/api/sync', syncRoutes);
 app.route('/api/investigations', investigationRoutes);
-app.route('/api/feed', feedRoutes);
+app.route('/api/caddyshack', caddyshackRoutes);
 app.route('/api/llm', llmRoutes);
 app.route('/api/files', fileRoutes);
 app.route('/api/backups', backupRoutes);

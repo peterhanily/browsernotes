@@ -13,11 +13,11 @@ const app = new Hono<{ Variables: { user: AuthUser } }>();
 
 app.use('*', requireAuth);
 
-// GET /api/feed — paginated feed
+// GET /api/caddyshack — paginated feed
 app.get('/', async (c) => {
   const user = c.get('user');
   const cursor = c.req.query('cursor');
-  const limit = parseInt(c.req.query('limit') || '20', 10);
+  const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '20', 10), 1), 100);
   const folderId = c.req.query('folderId');
 
   if (folderId) {
@@ -32,9 +32,10 @@ app.get('/', async (c) => {
       id: posts.id,
       authorId: posts.authorId,
       content: posts.content,
-      images: posts.images,
+      attachments: posts.attachments,
       folderId: posts.folderId,
       parentId: posts.parentId,
+      replyToId: posts.replyToId,
       mentions: posts.mentions,
       pinned: posts.pinned,
       deleted: posts.deleted,
@@ -58,7 +59,6 @@ app.get('/', async (c) => {
     .orderBy(desc(posts.createdAt))
     .limit(limit);
 
-  // Simplified: just execute
   const feedPosts = await query;
 
   if (feedPosts.length === 0) {
@@ -106,11 +106,11 @@ app.get('/', async (c) => {
   return c.json(postsWithReactions);
 });
 
-// POST /api/feed/posts — create post
+// POST /api/caddyshack/posts — create post
 app.post('/posts', async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
-  const { content, images = [], mentions = [], folderId = null, parentId = null } = body;
+  const { content, attachments = [], mentions = [], folderId = null, parentId = null, replyToId = null } = body;
 
   // Input validation
   if (typeof content !== 'string' || !content.trim()) {
@@ -119,8 +119,29 @@ app.post('/posts', async (c) => {
   if (content.length > 50_000) {
     return c.json({ error: 'Content must be 50,000 characters or fewer' }, 400);
   }
-  if (!Array.isArray(images) || images.length > 10 || !images.every((i: unknown) => typeof i === 'string')) {
-    return c.json({ error: 'Images must be an array of strings (max 10)' }, 400);
+  if (!Array.isArray(attachments) || attachments.length > 10) {
+    return c.json({ error: 'Attachments must be an array (max 10)' }, 400);
+  }
+  const validAttTypes = new Set(['image', 'video', 'audio', 'document']);
+  for (const att of attachments) {
+    if (
+      !att || typeof att !== 'object' ||
+      typeof att.id !== 'string' ||
+      typeof att.url !== 'string' ||
+      typeof att.type !== 'string' ||
+      typeof att.mimeType !== 'string' ||
+      typeof att.filename !== 'string'
+    ) {
+      return c.json({ error: 'Each attachment must have id, url, type, mimeType, and filename' }, 400);
+    }
+    if (!validAttTypes.has(att.type)) {
+      return c.json({ error: 'Attachment type must be image, video, audio, or document' }, 400);
+    }
+    // Reject javascript: and data: URIs to prevent XSS
+    const urlLower = att.url.toLowerCase().trim();
+    if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:text/html')) {
+      return c.json({ error: 'Invalid attachment URL' }, 400);
+    }
   }
   if (!Array.isArray(mentions) || mentions.length > 50 || !mentions.every((m: unknown) => typeof m === 'string')) {
     return c.json({ error: 'Mentions must be an array of strings (max 50)' }, 400);
@@ -133,24 +154,40 @@ app.post('/posts', async (c) => {
     }
   }
 
-  // Validate parent post access (prevent IDOR)
+  // Flat threading: walk up to root post
+  let rootParentId: string | null = null;
+  let directReplyToId: string | null = replyToId;
   let parentPost: (typeof posts.$inferSelect) | null = null;
+
   if (parentId) {
+    // Find the specified parent
     const parentResult = await db.select().from(posts).where(eq(posts.id, parentId)).limit(1);
     if (parentResult.length === 0 || parentResult[0].deleted) {
       return c.json({ error: 'Parent post not found' }, 404);
     }
     parentPost = parentResult[0];
+
     // Prevent cross-folder replies
     if (parentPost.folderId !== folderId) {
       return c.json({ error: 'Reply must be in the same folder as parent post' }, 400);
     }
-    // Verify user can access parent's folder
     if (parentPost.folderId) {
       const hasParentAccess = await checkInvestigationAccess(user.id, parentPost.folderId, 'viewer');
       if (!hasParentAccess) {
         return c.json({ error: 'No access to parent post' }, 403);
       }
+    }
+
+    // Walk up to root: if parentPost itself has a parentId, use the root
+    if (parentPost.parentId) {
+      // parentPost is already a reply — its parentId is the root (flat threading)
+      rootParentId = parentPost.parentId;
+      // The direct reply target is the parentId the user specified
+      if (!directReplyToId) directReplyToId = parentId;
+    } else {
+      // parentPost is a top-level post — this is a direct reply to root
+      rootParentId = parentId;
+      if (!directReplyToId) directReplyToId = parentId;
     }
   }
 
@@ -161,9 +198,10 @@ app.post('/posts', async (c) => {
     id,
     authorId: user.id,
     content,
-    images,
+    attachments,
     folderId,
-    parentId,
+    parentId: rootParentId,
+    replyToId: directReplyToId,
     mentions,
     pinned: false,
     deleted: false,
@@ -171,13 +209,29 @@ app.post('/posts', async (c) => {
     updatedAt: now,
   });
 
+  // Look up replyTo author name for the response
+  let replyToAuthorName: string | undefined;
+  if (directReplyToId) {
+    const replyToPost = await db
+      .select({ authorId: posts.authorId, displayName: users.displayName })
+      .from(posts)
+      .innerJoin(users, eq(users.id, posts.authorId))
+      .where(eq(posts.id, directReplyToId))
+      .limit(1);
+    if (replyToPost.length > 0) {
+      replyToAuthorName = replyToPost[0].displayName;
+    }
+  }
+
   const post = {
     id,
     authorId: user.id,
     content,
-    images,
+    attachments,
     folderId,
-    parentId,
+    parentId: rootParentId,
+    replyToId: directReplyToId,
+    replyToAuthorName,
     mentions,
     pinned: false,
     deleted: false,
@@ -194,16 +248,32 @@ app.post('/posts', async (c) => {
     await notifyMentions(mentions, user.id, id, folderId, user.displayName);
   }
 
-  // Notify parent post author on reply
-  if (parentPost && parentPost.authorId !== user.id) {
+  // Notify the author of the post being replied to
+  const notifyAuthorId = parentPost?.authorId;
+  if (notifyAuthorId && notifyAuthorId !== user.id) {
     await createNotification({
-      userId: parentPost.authorId,
+      userId: notifyAuthorId,
       type: 'reply',
       sourceUserId: user.id,
       postId: id,
       folderId: folderId || undefined,
       message: `${user.displayName} replied to your post`,
     });
+  }
+
+  // If replying to a different user than the parent post author, notify them too
+  if (directReplyToId && directReplyToId !== rootParentId) {
+    const replyTarget = await db.select().from(posts).where(eq(posts.id, directReplyToId)).limit(1);
+    if (replyTarget.length > 0 && replyTarget[0].authorId !== user.id && replyTarget[0].authorId !== notifyAuthorId) {
+      await createNotification({
+        userId: replyTarget[0].authorId,
+        type: 'reply',
+        sourceUserId: user.id,
+        postId: id,
+        folderId: folderId || undefined,
+        message: `${user.displayName} replied to your comment`,
+      });
+    }
   }
 
   // Broadcast
@@ -217,7 +287,7 @@ app.post('/posts', async (c) => {
   return c.json(post, 201);
 });
 
-// GET /api/feed/posts/:id — post with replies
+// GET /api/caddyshack/posts/:id — post with all descendant replies (flat)
 app.get('/posts/:id', async (c) => {
   const postId = c.req.param('id');
 
@@ -226,9 +296,10 @@ app.get('/posts/:id', async (c) => {
       id: posts.id,
       authorId: posts.authorId,
       content: posts.content,
-      images: posts.images,
+      attachments: posts.attachments,
       folderId: posts.folderId,
       parentId: posts.parentId,
+      replyToId: posts.replyToId,
       mentions: posts.mentions,
       pinned: posts.pinned,
       deleted: posts.deleted,
@@ -254,15 +325,16 @@ app.get('/posts/:id', async (c) => {
     }
   }
 
-  // Get replies
-  const replies = await db
+  // Get all replies (flat — all posts with parentId = this post)
+  const allReplies = await db
     .select({
       id: posts.id,
       authorId: posts.authorId,
       content: posts.content,
-      images: posts.images,
+      attachments: posts.attachments,
       folderId: posts.folderId,
       parentId: posts.parentId,
+      replyToId: posts.replyToId,
       mentions: posts.mentions,
       pinned: posts.pinned,
       deleted: posts.deleted,
@@ -276,23 +348,50 @@ app.get('/posts/:id', async (c) => {
     .where(and(eq(posts.parentId, postId), eq(posts.deleted, false)))
     .orderBy(posts.createdAt);
 
-  // Get reactions
-  const postReactions = await db.select().from(reactions).where(eq(reactions.postId, postId));
-  const reactionMap: Record<string, { count: number; userIds: string[] }> = {};
-  for (const r of postReactions) {
-    if (!reactionMap[r.emoji]) reactionMap[r.emoji] = { count: 0, userIds: [] };
-    reactionMap[r.emoji].count++;
-    reactionMap[r.emoji].userIds.push(r.userId);
+  // Build a map of post id → author name for replyTo resolution
+  const allPostIds = [postId, ...allReplies.map((r) => r.id)];
+  const authorMap = new Map<string, string>();
+  // Include root post author
+  authorMap.set(postId, result[0].authorDisplayName || 'Unknown');
+  for (const reply of allReplies) {
+    authorMap.set(reply.id, reply.authorDisplayName || 'Unknown');
+  }
+
+  // Enrich replies with replyToAuthorName
+  const enrichedReplies = allReplies.map((reply) => ({
+    ...reply,
+    replyToAuthorName: reply.replyToId ? authorMap.get(reply.replyToId) || undefined : undefined,
+  }));
+
+  // Get reactions for the root post and all replies
+  const reactionRows = await db
+    .select()
+    .from(reactions)
+    .where(inArray(reactions.postId, allPostIds));
+
+  const reactionsByPost = new Map<string, Record<string, { count: number; userIds: string[] }>>();
+  for (const r of reactionRows) {
+    let map = reactionsByPost.get(r.postId);
+    if (!map) {
+      map = {};
+      reactionsByPost.set(r.postId, map);
+    }
+    if (!map[r.emoji]) map[r.emoji] = { count: 0, userIds: [] };
+    map[r.emoji].count++;
+    map[r.emoji].userIds.push(r.userId);
   }
 
   return c.json({
     ...result[0],
-    reactions: reactionMap,
-    replies,
+    reactions: reactionsByPost.get(postId) || {},
+    replies: enrichedReplies.map((reply) => ({
+      ...reply,
+      reactions: reactionsByPost.get(reply.id) || {},
+    })),
   });
 });
 
-// PATCH /api/feed/posts/:id — edit post (author only)
+// PATCH /api/caddyshack/posts/:id — edit post (author or admin only)
 app.patch('/posts/:id', async (c) => {
   const user = c.get('user');
   const postId = c.req.param('id');
@@ -315,7 +414,7 @@ app.patch('/posts/:id', async (c) => {
   return c.json({ ok: true });
 });
 
-// DELETE /api/feed/posts/:id — soft delete
+// DELETE /api/caddyshack/posts/:id — soft delete
 app.delete('/posts/:id', async (c) => {
   const user = c.get('user');
   const postId = c.req.param('id');
@@ -333,7 +432,7 @@ app.delete('/posts/:id', async (c) => {
   return c.json({ ok: true });
 });
 
-// POST /api/feed/posts/:id/reactions — add reaction
+// POST /api/caddyshack/posts/:id/reactions — add reaction
 app.post('/posts/:id/reactions', async (c) => {
   const user = c.get('user');
   const postId = c.req.param('id');
@@ -370,7 +469,7 @@ app.post('/posts/:id/reactions', async (c) => {
   return c.json({ ok: true }, 201);
 });
 
-// DELETE /api/feed/posts/:id/reactions/:emoji — remove reaction
+// DELETE /api/caddyshack/posts/:id/reactions/:emoji — remove reaction
 app.delete('/posts/:id/reactions/:emoji', async (c) => {
   const user = c.get('user');
   const postId = c.req.param('id');

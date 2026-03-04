@@ -155,26 +155,27 @@ export async function updateMemberRole(folderId: string, userId: string, role: s
   if (!resp.ok) throw new Error('Failed to update role');
 }
 
-// ─── Feed ───────────────────────────────────────────────────────
+// ─── CaddyShack ─────────────────────────────────────────────────
 
 export async function fetchFeed(opts: { cursor?: string; limit?: number; folderId?: string }) {
   const params = new URLSearchParams();
   if (opts.cursor) params.set('cursor', opts.cursor);
   if (opts.limit) params.set('limit', String(opts.limit));
   if (opts.folderId) params.set('folderId', opts.folderId);
-  const resp = await apiFetch(`/api/feed?${params}`);
+  const resp = await apiFetch(`/api/caddyshack?${params}`);
   if (!resp.ok) throw new Error('Failed to fetch feed');
   return resp.json();
 }
 
 export async function createPost(data: {
   content: string;
-  images?: Array<{ id: string; url: string; alt?: string }>;
+  attachments?: Array<{ id: string; url: string; type: string; mimeType: string; filename: string; size?: number; thumbnailUrl?: string; alt?: string }>;
   mentions?: string[];
   folderId?: string | null;
   parentId?: string | null;
+  replyToId?: string | null;
 }) {
-  const resp = await apiFetch('/api/feed/posts', {
+  const resp = await apiFetch('/api/caddyshack/posts', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -183,13 +184,13 @@ export async function createPost(data: {
 }
 
 export async function fetchPost(postId: string) {
-  const resp = await apiFetch(`/api/feed/posts/${postId}`);
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`);
   if (!resp.ok) throw new Error('Failed to fetch post');
   return resp.json();
 }
 
 export async function editPost(postId: string, updates: { content?: string; pinned?: boolean }) {
-  const resp = await apiFetch(`/api/feed/posts/${postId}`, {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
@@ -197,12 +198,12 @@ export async function editPost(postId: string, updates: { content?: string; pinn
 }
 
 export async function deletePost(postId: string) {
-  const resp = await apiFetch(`/api/feed/posts/${postId}`, { method: 'DELETE' });
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}`, { method: 'DELETE' });
   if (!resp.ok) throw new Error('Failed to delete post');
 }
 
 export async function addReaction(postId: string, emoji: string) {
-  const resp = await apiFetch(`/api/feed/posts/${postId}/reactions`, {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions`, {
     method: 'POST',
     body: JSON.stringify({ emoji }),
   });
@@ -210,7 +211,7 @@ export async function addReaction(postId: string, emoji: string) {
 }
 
 export async function removeReaction(postId: string, emoji: string) {
-  const resp = await apiFetch(`/api/feed/posts/${postId}/reactions/${encodeURIComponent(emoji)}`, {
+  const resp = await apiFetch(`/api/caddyshack/posts/${postId}/reactions/${encodeURIComponent(emoji)}`, {
     method: 'DELETE',
   });
   if (!resp.ok) throw new Error('Failed to remove reaction');

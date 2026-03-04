@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, lt, desc, isNull, or, inArray, sql, count } from 'drizzle-orm';
+import { eq, and, lt, desc, isNull, or, inArray, count } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';

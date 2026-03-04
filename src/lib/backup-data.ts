@@ -92,7 +92,7 @@ export async function buildDifferentialPayload(
 
   for (const tableName of tables) {
     const table = db[tableName];
-    let collection = table.where('updatedAt').above(lastBackupAt);
+    const collection = table.where('updatedAt').above(lastBackupAt);
 
     // For investigation scope, further filter by folderId where applicable
     if (scope === 'investigation' && scopeId) {

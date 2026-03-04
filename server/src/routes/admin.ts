@@ -3,7 +3,7 @@ import { eq, count, sql } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
 import { db } from '../db/index.js';
-import { users, folders, allowedEmails, investigationMembers } from '../db/schema.js';
+import { users, folders, allowedEmails } from '../db/schema.js';
 import {
   verifyAdminSecret, changeAdminSecret, getRegistrationMode, setRegistrationMode,
   getSessionSettings, setSessionSettings,

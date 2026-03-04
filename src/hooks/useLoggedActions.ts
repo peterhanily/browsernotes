@@ -1,7 +1,9 @@
 import { useCallback } from 'react';
 import type { Note, Task, TimelineEvent, StandaloneIOC, ChatThread, Folder, Tag, Timeline, Whiteboard } from '../types';
 
-type LogFn = (category: string, action: string, detail: string, itemId?: string, itemTitle?: string) => void;
+import type { ActivityCategory, ActivityAction } from '../types';
+
+type LogFn = (category: ActivityCategory, action: ActivityAction, detail: string, itemId?: string, itemTitle?: string) => void;
 
 /**
  * Wraps all data mutation hooks with activity logging.

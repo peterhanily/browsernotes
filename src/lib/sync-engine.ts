@@ -7,7 +7,7 @@ import { disableSync, enableSync } from './sync-middleware';
 const dynamicDb = db as unknown as DexieType;
 
 const SYNC_INTERVAL = 30_000; // 30 seconds — safety-net full sync
-const PUSH_DEBOUNCE = 1_000;  // 1 second — debounced immediate push after local changes
+const PUSH_DEBOUNCE = 200;    // 200ms — fast debounce for near real-time sync
 const META_KEY_LAST_SYNC = 'lastSyncTimestamp';
 
 interface SyncQueueEntry {
@@ -24,13 +24,13 @@ export class SyncEngine {
   private pushTimer: ReturnType<typeof setTimeout> | null = null;
   private pushing = false;
   private onConflict: ((conflicts: SyncResult[]) => void) | null = null;
-  private onRemoteChange: ((changes: Record<string, unknown>[]) => void) | null = null;
+  private onRemoteChange: ((changes: Record<string, unknown>[], tables: Set<string>) => void) | null = null;
 
   setConflictHandler(handler: (conflicts: SyncResult[]) => void) {
     this.onConflict = handler;
   }
 
-  setRemoteChangeHandler(handler: (changes: Record<string, unknown>[]) => void) {
+  setRemoteChangeHandler(handler: (changes: Record<string, unknown>[], tables: Set<string>) => void) {
     this.onRemoteChange = handler;
   }
 
@@ -135,10 +135,13 @@ export class SyncEngine {
       const { changes, serverTimestamp } = await syncPull(since);
 
       if (changes && changes.length > 0) {
+        const affectedTables = new Set<string>();
+
         // Apply remote changes to local Dexie
         for (const change of changes) {
           const { table: tableName, op, ...entityData } = change;
           const id = entityData.id as string;
+          affectedTables.add(tableName);
 
           if (op === 'delete') {
             await dynamicDb.table(tableName).delete(id);
@@ -157,7 +160,7 @@ export class SyncEngine {
         }
 
         if (this.onRemoteChange) {
-          this.onRemoteChange(changes);
+          this.onRemoteChange(changes, affectedTables);
         }
       }
 
@@ -193,7 +196,7 @@ export class SyncEngine {
         await dynamicDb.table(tableName).put(localData);
       }
       if (this.onRemoteChange) {
-        this.onRemoteChange([{ table: tableName, op, id: entityId, ...data }]);
+        this.onRemoteChange([{ table: tableName, op, id: entityId, ...data }], new Set([tableName]));
       }
     } finally {
       enableSync();

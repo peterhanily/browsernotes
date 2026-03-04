@@ -150,17 +150,17 @@ function AppInner() {
       configureServerApi(auth.serverUrl, auth.getAccessToken);
       enableSync();
       syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
-      syncEngine.setRemoteChangeHandler(() => {
-        // Reload all entity hooks when remote changes arrive
-        notes.reload();
-        tasks.reload();
-        timeline.reload();
-        reloadTimelines();
-        reloadWhiteboards();
-        standaloneIOCsHook.reload();
-        chatsHook.reload();
-        reloadFolders();
-        reloadTags();
+      syncEngine.setRemoteChangeHandler((_changes, tables) => {
+        // Targeted reload: only refresh hooks for tables that changed
+        if (tables.has('notes')) notes.reload();
+        if (tables.has('tasks')) tasks.reload();
+        if (tables.has('timelineEvents')) timeline.reload();
+        if (tables.has('timelines')) reloadTimelines();
+        if (tables.has('whiteboards')) reloadWhiteboards();
+        if (tables.has('standaloneIOCs')) standaloneIOCsHook.reload();
+        if (tables.has('chatThreads')) chatsHook.reload();
+        if (tables.has('folders')) reloadFolders();
+        if (tables.has('tags')) reloadTags();
       });
       syncEngine.start();
 

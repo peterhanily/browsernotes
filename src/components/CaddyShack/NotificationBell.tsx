@@ -18,30 +18,46 @@ export function NotificationBell() {
     try {
       const data = await fetchNotifications(false, 20);
       setNotifications(data);
-    } catch { /* ignore */ } finally {
+    } catch {
+      console.warn('NotificationBell: failed to load notifications');
+    } finally {
       setLoading(false);
     }
   }, [connected]);
 
+  // Initial load + listen for WS push events
   useEffect(() => {
     loadNotifications();
-    // Poll every 30s
-    const interval = setInterval(loadNotifications, 30_000);
-    return () => clearInterval(interval);
+
+    const handleWsNotification = () => {
+      loadNotifications();
+    };
+    window.addEventListener('ws-notification', handleWsNotification);
+
+    // Fallback poll every 60s in case WS drops
+    const interval = setInterval(loadNotifications, 60_000);
+    return () => {
+      window.removeEventListener('ws-notification', handleWsNotification);
+      clearInterval(interval);
+    };
   }, [loadNotifications]);
 
   const handleMarkRead = async (id: string) => {
     try {
       await markNotificationRead(id);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
-    } catch { /* ignore */ }
+    } catch {
+      console.warn('NotificationBell: failed to mark notification read');
+    }
   };
 
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch { /* ignore */ }
+    } catch {
+      console.warn('NotificationBell: failed to mark all read');
+    }
   };
 
   if (!connected) return null;

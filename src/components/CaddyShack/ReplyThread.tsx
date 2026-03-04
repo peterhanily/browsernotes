@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import { fetchPost, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
@@ -12,6 +13,7 @@ interface ReplyThreadProps {
 }
 
 export function ReplyThread({ postId, currentUserId, onBack }: ReplyThreadProps) {
+  const { addToast } = useToast();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [replyTo, setReplyTo] = useState<{ id: string; authorName: string } | null>(null);
@@ -36,35 +38,35 @@ export function ReplyThread({ postId, currentUserId, onBack }: ReplyThreadProps)
     try {
       await addReaction(targetId, emoji);
       await loadPost();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to add reaction'); }
   };
 
   const handleRemoveReaction = async (targetId: string, emoji: string) => {
     try {
       await removeReaction(targetId, emoji);
       await loadPost();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to remove reaction'); }
   };
 
   const handleDelete = async (targetId: string) => {
     try {
       await deletePost(targetId);
       await loadPost();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to delete post'); }
   };
 
   const handleEdit = async (targetId: string, content: string) => {
     try {
       await editPost(targetId, { content });
       await loadPost();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to edit post'); }
   };
 
   const handlePin = async (targetId: string, pinned: boolean) => {
     try {
       await editPost(targetId, { pinned });
       await loadPost();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to update pin status'); }
   };
 
   const handleReplyToReply = (replyId: string) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Globe, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { fetchFeed, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
@@ -14,6 +15,7 @@ interface CaddyShackViewProps {
 
 export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
   const { user, connected } = useAuth();
+  const { addToast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -41,35 +43,35 @@ export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
     try {
       await addReaction(postId, emoji);
       await loadFeed();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to add reaction'); }
   };
 
   const handleRemoveReaction = async (postId: string, emoji: string) => {
     try {
       await removeReaction(postId, emoji);
       await loadFeed();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to remove reaction'); }
   };
 
   const handleDelete = async (postId: string) => {
     try {
       await deletePost(postId);
       await loadFeed();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to delete post'); }
   };
 
   const handleEdit = async (postId: string, content: string) => {
     try {
       await editPost(postId, { content });
       await loadFeed();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to edit post'); }
   };
 
   const handlePin = async (postId: string, pinned: boolean) => {
     try {
       await editPost(postId, { pinned });
       await loadFeed();
-    } catch { /* ignore */ }
+    } catch { addToast('error', 'Failed to update pin status'); }
   };
 
   const pinnedPosts = useMemo(() => posts.filter(p => p.pinned), [posts]);

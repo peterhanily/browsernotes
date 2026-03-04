@@ -185,7 +185,7 @@ function AppInner() {
             setPresenceUsers((msg.users as PresenceUser[]) || []);
           });
           ws.on('notification', () => {
-            // NotificationBell polls on its own
+            window.dispatchEvent(new CustomEvent('ws-notification'));
           });
           wsClientRef.current = ws;
         }

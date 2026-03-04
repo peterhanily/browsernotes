@@ -57,6 +57,13 @@
       "when": 1741500000000,
       "tag": "0007_rename_images_to_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1741600000000,
+      "tag": "0008_add_posts_composite_indexes",
+      "breakpoints": true
     }
   ]
 }

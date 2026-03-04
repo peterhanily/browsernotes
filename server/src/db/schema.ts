@@ -336,6 +336,8 @@ export const posts = pgTable('posts', {
   idxPostsFolderId: index('idx_posts_folder_id').on(t.folderId),
   idxPostsCreatedAt: index('idx_posts_created_at').on(t.createdAt),
   idxPostsParentId: index('idx_posts_parent_id').on(t.parentId),
+  idxPostsDeletedCreatedAt: index('idx_posts_deleted_created_at').on(t.deleted, t.createdAt),
+  idxPostsParentIdDeleted: index('idx_posts_parent_id_deleted').on(t.parentId, t.deleted),
 }));
 
 export const reactions = pgTable('reactions', {

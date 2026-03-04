@@ -57,6 +57,11 @@ export class SyncEngine {
 
   async sync() {
     try {
+      // Cancel any pending debounced push — we're doing a full sync now
+      if (this.pushTimer) {
+        clearTimeout(this.pushTimer);
+        this.pushTimer = null;
+      }
       await this.push();
       await this.pull();
     } catch (err) {
@@ -70,7 +75,7 @@ export class SyncEngine {
     if (this.pushTimer) clearTimeout(this.pushTimer);
     this.pushTimer = setTimeout(() => {
       this.pushTimer = null;
-      if (this.running && !this.pushing) {
+      if (this.running) {
         this.push().catch((err) => console.error('SyncEngine: immediate push error', err));
       }
     }, PUSH_DEBOUNCE);
@@ -94,20 +99,21 @@ export class SyncEngine {
 
       const { results } = await syncPush(changes);
 
-      // Remove accepted entries from queue
-      const acceptedSeqs: number[] = [];
+      // Remove accepted AND rejected entries from queue (only conflicts stay)
+      const seqsToRemove: number[] = [];
       const conflicts: SyncResult[] = [];
 
       for (let i = 0; i < results.length; i++) {
-        if (results[i].status === 'accepted') {
-          if (queue[i].seq) acceptedSeqs.push(queue[i].seq!);
+        const status = results[i].status;
+        if (status === 'accepted' || status === 'rejected') {
+          if (queue[i].seq) seqsToRemove.push(queue[i].seq!);
         } else {
           conflicts.push(results[i]);
         }
       }
 
-      if (acceptedSeqs.length > 0) {
-        await dynamicDb.table('_syncQueue').bulkDelete(acceptedSeqs);
+      if (seqsToRemove.length > 0) {
+        await dynamicDb.table('_syncQueue').bulkDelete(seqsToRemove);
       }
 
       if (conflicts.length > 0 && this.onConflict) {
@@ -273,7 +279,7 @@ export class SyncEngine {
     if (changes.length === 0) return;
 
     const { results } = await syncPush(changes);
-    const conflicts = results.filter((r) => r.status !== 'accepted');
+    const conflicts = results.filter((r) => r.status === 'conflict');
     if (conflicts.length > 0 && this.onConflict) {
       this.onConflict(conflicts);
     }

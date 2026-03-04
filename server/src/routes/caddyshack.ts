@@ -406,8 +406,21 @@ app.patch('/posts/:id', async (c) => {
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (body.content !== undefined) updates.content = body.content;
-  if (body.pinned !== undefined) updates.pinned = body.pinned;
+  if (body.content !== undefined) {
+    if (typeof body.content !== 'string' || !body.content.trim()) {
+      return c.json({ error: 'Content must be a non-empty string' }, 400);
+    }
+    if (body.content.length > 50_000) {
+      return c.json({ error: 'Content must be 50,000 characters or fewer' }, 400);
+    }
+    updates.content = body.content;
+  }
+  if (body.pinned !== undefined) {
+    if (typeof body.pinned !== 'boolean') {
+      return c.json({ error: 'Pinned must be a boolean' }, 400);
+    }
+    updates.pinned = body.pinned;
+  }
 
   await db.update(posts).set(updates).where(eq(posts.id, postId));
 

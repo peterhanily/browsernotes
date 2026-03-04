@@ -73,6 +73,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     setLoading(true);
     try {
       await login(email, password);
+      setPassword('');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -85,6 +86,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     setLoading(true);
     try {
       await register(email, displayName, password);
+      setPassword('');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -99,6 +101,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     try {
       await login(lastSession.email, password, lastSession.serverUrl);
       onUpdateSettings({ serverUrl: lastSession.serverUrl });
+      setPassword('');
     } catch (err) {
       setError((err as Error).message);
     } finally {

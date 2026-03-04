@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [serverUrl, setServerUrlState] = useState<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null);
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -169,37 +170,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // If we have a token, return it (rely on 401 to trigger refresh in API wrapper)
     if (accessTokenRef.current) return accessTokenRef.current;
 
+    // If a refresh is already in flight, share the same promise
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+
     // Try to refresh
-    try {
-      const resp = await fetch(`${serverUrl}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshTokenRef.current }),
-      });
+    const refreshPromise = (async () => {
+      try {
+        const resp = await fetch(`${serverUrl}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: refreshTokenRef.current }),
+        });
 
-      if (!resp.ok) {
-        // Refresh failed — logged out
-        setUser(null);
+        if (!resp.ok) {
+          // Refresh failed — logged out
+          setUser(null);
+          setConnected(false);
+          accessTokenRef.current = null;
+          refreshTokenRef.current = null;
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+
+        const data = await resp.json();
+        accessTokenRef.current = data.accessToken;
+        refreshTokenRef.current = data.refreshToken;
+
+        if (user) {
+          persist(serverUrl, data.accessToken, data.refreshToken, user);
+        }
+
+        return data.accessToken as string | null;
+      } catch {
         setConnected(false);
-        accessTokenRef.current = null;
-        refreshTokenRef.current = null;
-        localStorage.removeItem(STORAGE_KEY);
         return null;
+      } finally {
+        refreshPromiseRef.current = null;
       }
+    })();
 
-      const data = await resp.json();
-      accessTokenRef.current = data.accessToken;
-      refreshTokenRef.current = data.refreshToken;
-
-      if (user) {
-        persist(serverUrl, data.accessToken, data.refreshToken, user);
-      }
-
-      return data.accessToken;
-    } catch {
-      setConnected(false);
-      return null;
-    }
+    refreshPromiseRef.current = refreshPromise;
+    return refreshPromise;
   }, [serverUrl, user, persist]);
 
   return (

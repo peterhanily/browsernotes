@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 function cloudflareAnalytics(): Plugin {
   return {
@@ -16,7 +17,31 @@ function cloudflareAnalytics(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cloudflareAnalytics()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    cloudflareAnalytics(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      manifest: false,
+      injectRegister: 'auto',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,woff,woff2}'],
+        globIgnores: ['**/excalidraw-*', '**/locales/**'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: /^.*\/api\/.*/,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^.*\/ws.*/,
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
+    }),
+  ],
   base: './',
   build: {
     rollupOptions: {
@@ -24,6 +49,9 @@ export default defineConfig({
         manualChunks: {
           excalidraw: ['@excalidraw/excalidraw'],
           cytoscape: ['cytoscape', 'cytoscape-cose-bilkent'],
+          leaflet: ['leaflet', 'react-leaflet'],
+          markdown: ['marked', 'dompurify'],
+          compression: ['pako'],
         },
       },
     },

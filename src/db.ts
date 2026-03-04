@@ -129,6 +129,11 @@ db.version(16).stores({
   _syncMeta: 'key',
 });
 
+// Version 17: Task assignees
+db.version(17).stores({
+  tasks: 'id, title, folderId, status, priority, completed, trashed, archived, order, createdAt, updatedAt, *tags, *iocTypes, createdBy, assigneeId',
+});
+
 // Encryption-at-rest middleware (transparent to all CRUD hooks)
 installEncryptionMiddleware(db);
 

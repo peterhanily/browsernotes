@@ -3,7 +3,10 @@
   "short_name": "ThreatCaddy",
   "description": "Threat Investigation Workspace. Notes, IOCs, Timelines & Graphs. No server. No tracking.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
+  "categories": ["productivity", "security"],
   "theme_color": "#030712",
   "background_color": "#030712",
   "icons": [

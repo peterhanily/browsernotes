@@ -1,13 +1,13 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { AppLayout } from './components/Layout/AppLayout';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { NoteList } from './components/Notes/NoteList';
 import { NoteEditor } from './components/Notes/NoteEditor';
 import { TaskListView } from './components/Tasks/TaskList';
-import { TimelineView } from './components/Timeline/TimelineView';
-import { WhiteboardView } from './components/Whiteboard/WhiteboardView';
-import { ActivityLogView } from './components/Activity/ActivityLogView';
+const TimelineView = lazy(() => import('./components/Timeline/TimelineView').then(m => ({ default: m.TimelineView })));
+const WhiteboardView = lazy(() => import('./components/Whiteboard/WhiteboardView').then(m => ({ default: m.WhiteboardView })));
+const ActivityLogView = lazy(() => import('./components/Activity/ActivityLogView').then(m => ({ default: m.ActivityLogView })));
 import { QuickCapture } from './components/Clips/QuickCapture';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { useNotes } from './hooks/useNotes';
@@ -27,7 +27,7 @@ import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, StandaloneIOC, ChatThread } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
-import { DashboardView } from './components/Dashboard/DashboardView';
+const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import { exportJSON, importJSON, downloadFile, exportInvestigationJSON } from './lib/export';
@@ -40,12 +40,12 @@ import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ActiveFilterBar } from './components/Common/ActiveFilterBar';
 import { InvestigationDetailPanel } from './components/Investigation/InvestigationDetailPanel';
 import type { InvestigationStatus } from './types';
-import { GraphView } from './components/Graph/GraphView';
-import { ChatView } from './components/Chat/ChatView';
-import { IOCStatsView } from './components/Analysis/IOCStatsView';
+const GraphView = lazy(() => import('./components/Graph/GraphView').then(m => ({ default: m.GraphView })));
+const ChatView = lazy(() => import('./components/Chat/ChatView').then(m => ({ default: m.ChatView })));
+const IOCStatsView = lazy(() => import('./components/Analysis/IOCStatsView').then(m => ({ default: m.IOCStatsView })));
 import { StandaloneIOCForm } from './components/Analysis/StandaloneIOCForm';
 import { StandaloneIOCList } from './components/Analysis/StandaloneIOCList';
-import { TrashArchiveView } from './components/TrashArchive/TrashArchiveView';
+const TrashArchiveView = lazy(() => import('./components/TrashArchive/TrashArchiveView').then(m => ({ default: m.TrashArchiveView })));
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -59,15 +59,15 @@ import { ToastProvider, useToast } from './contexts/ToastContext';
 import { ToastContainer } from './components/Common/Toast';
 import { generateInvestigationReport } from './lib/report';
 import { useIsMobile } from './hooks/useIsMobile';
-import { ExecDashboard } from './components/ExecMode/ExecDashboard';
+const ExecDashboard = lazy(() => import('./components/ExecMode/ExecDashboard').then(m => ({ default: m.ExecDashboard })));
 import { ShareReceiver } from './components/ExecMode/ShareReceiver';
 import { ShareDialog } from './components/ExecMode/ShareDialog';
 import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { FeedView } from './components/Social/FeedView';
+const FeedView = lazy(() => import('./components/Social/FeedView').then(m => ({ default: m.FeedView })));
 import { ConflictDialog } from './components/Common/ConflictDialog';
-import type { PresenceUser } from './types';
-import { configureServerApi } from './lib/server-api';
+import type { PresenceUser, InvestigationMember } from './types';
+import { configureServerApi, fetchInvestigationMembers } from './lib/server-api';
 import { syncEngine } from './lib/sync-engine';
 import { enableSync, disableSync, installSyncHooks } from './lib/sync-middleware';
 
@@ -169,9 +169,17 @@ function AppInner() {
         if (token && auth.serverUrl) {
           const ws = new WSClient(auth.serverUrl, token);
           ws.connect();
-          ws.on('entity-change', () => {
-            // Trigger sync pull on entity changes
-            syncEngine.sync();
+          ws.on('entity-change', (msg) => {
+            // Fast-path: apply the entity change directly to Dexie
+            const { table, op, entityId, data } = msg as { table: string; op: 'put' | 'delete'; entityId: string; data?: Record<string, unknown> };
+            if (table && op && entityId) {
+              syncEngine.applyRemoteChange(table, op, entityId, data).catch(() => {
+                // Fall back to full sync on error
+                syncEngine.sync();
+              });
+            } else {
+              syncEngine.sync();
+            }
           });
           ws.on('presence', (msg) => {
             setPresenceUsers((msg.users as PresenceUser[]) || []);
@@ -551,6 +559,18 @@ function AppInner() {
   const [folderStatusFilter, setFolderStatusFilter] = useState<InvestigationStatus[]>(['active']);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const demoProcessedRef = useRef(false);
+
+  // Fetch investigation members for task assignee support
+  const [investigationMembers, setInvestigationMembers] = useState<InvestigationMember[]>([]);
+  useEffect(() => {
+    if (!auth.connected || !selectedFolderId) {
+      setInvestigationMembers([]);
+      return;
+    }
+    fetchInvestigationMembers(selectedFolderId)
+      .then((data) => setInvestigationMembers(data.members || []))
+      .catch(() => setInvestigationMembers([]));
+  }, [auth.connected, selectedFolderId]);
 
   const effectiveClsLevels = useMemo(() => getEffectiveClsLevels(settings.tiClsLevels), [settings.tiClsLevels]);
 
@@ -1334,6 +1354,7 @@ function AppInner() {
     return (
       <ScreenshareContext.Provider value={screenshareCtx}>
       <ActivityLogContext.Provider value={activityLog.log}>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <ExecDashboard
           folders={folders}
           allNotes={notes.notes}
@@ -1354,6 +1375,7 @@ function AppInner() {
             }
           }}
         />
+        </Suspense>
       </ActivityLogContext.Provider>
       <ToastContainer />
       </ScreenshareContext.Provider>
@@ -1410,6 +1432,7 @@ function AppInner() {
         }
       >
         <ErrorBoundary>
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <div className={activeView === 'graph' && !showSettings ? 'hidden' : 'flex flex-col flex-1 overflow-hidden'}>
         {filterBar}
         {showSettings ? (
@@ -1590,6 +1613,8 @@ function AppInner() {
             selectedFolderId={selectedFolderId}
             openNewForm={pendingNewTask}
             onNewFormOpened={() => setPendingNewTask(false)}
+            members={investigationMembers}
+            currentUserId={auth.user?.id}
           />
         ) : (
           /* Notes view — responsive: list OR editor on mobile */
@@ -1672,6 +1697,7 @@ function AppInner() {
             onUpdateEvent={timeline.updateEvent}
           />
         </div>
+        </Suspense>
         </ErrorBoundary>
       </AppLayout>
 

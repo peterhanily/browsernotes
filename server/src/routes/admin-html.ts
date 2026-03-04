@@ -139,6 +139,19 @@ export function getAdminHtml(nonce: string): string {
   </div>
 
   <div class="settings-section">
+    <h2>Data Retention</h2>
+    <div class="setting-row">
+      <label>Notifications (days)</label>
+      <input type="number" id="notifRetention" min="1" max="3650" value="90">
+    </div>
+    <div class="setting-row">
+      <label>Audit log (days)</label>
+      <input type="number" id="auditRetention" min="1" max="3650" value="365">
+      <button id="saveRetentionBtn" class="btn btn-primary btn-sm">Save</button>
+    </div>
+  </div>
+
+  <div class="settings-section">
     <h2>Change Admin Secret</h2>
     <div class="setting-row">
       <label>Current secret</label>
@@ -366,6 +379,8 @@ function loadSettings() {
     toggleEmailSection(data.registrationMode);
     document.getElementById('sessionTtl').value = data.ttlHours || 24;
     document.getElementById('maxSessions').value = data.maxPerUser || 0;
+    document.getElementById('notifRetention').value = data.notificationRetentionDays || 90;
+    document.getElementById('auditRetention').value = data.auditLogRetentionDays || 365;
   }).catch(function(err) { toast(err.message, 'error'); });
 }
 
@@ -392,6 +407,22 @@ function saveSessionSettings() {
   if (isNaN(max) || max < 0) { toast('Max sessions must be 0 or more', 'error'); return; }
   api('/settings', { method: 'PATCH', body: JSON.stringify({ ttlHours: ttl, maxPerUser: max }) })
     .then(function() { toast('Session settings updated'); })
+    .catch(function(err) { toast(err.message, 'error'); });
+}
+
+/* ─── Retention settings ───────────────────────────── */
+
+document.getElementById('saveRetentionBtn').addEventListener('click', function() {
+  saveRetentionSettings();
+});
+
+function saveRetentionSettings() {
+  var notif = parseInt(document.getElementById('notifRetention').value, 10);
+  var audit = parseInt(document.getElementById('auditRetention').value, 10);
+  if (isNaN(notif) || notif < 1 || notif > 3650) { toast('Notification retention must be 1-3650 days', 'error'); return; }
+  if (isNaN(audit) || audit < 1 || audit > 3650) { toast('Audit log retention must be 1-3650 days', 'error'); return; }
+  api('/settings', { method: 'PATCH', body: JSON.stringify({ notificationRetentionDays: notif, auditLogRetentionDays: audit }) })
+    .then(function() { toast('Retention settings updated'); })
     .catch(function(err) { toast(err.message, 'error'); });
 }
 

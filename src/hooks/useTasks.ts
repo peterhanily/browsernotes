@@ -144,6 +144,7 @@ export function useTasks() {
       search?: string;
       showTrashed?: boolean;
       showArchived?: boolean;
+      assigneeId?: string;
     }) => {
       let filtered = tasks;
 
@@ -166,6 +167,10 @@ export function useTasks() {
 
       if (opts.status) {
         filtered = filtered.filter((t) => t.status === opts.status);
+      }
+
+      if (opts.assigneeId) {
+        filtered = filtered.filter((t) => t.assigneeId === opts.assigneeId);
       }
 
       if (opts.search) {

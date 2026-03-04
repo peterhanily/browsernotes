@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, MessageSquare, Archive, RotateCcw, Search } from 'lucide-react';
-import type { Task, Priority } from '../../types';
+import type { Task, Priority, InvestigationMember } from '../../types';
 import { PRIORITY_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { ClsBadge } from '../Common/ClsBadge';
@@ -18,6 +18,7 @@ interface TaskItemProps {
   active?: boolean;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  members?: InvestigationMember[];
 }
 
 const priorityLabels: Record<Priority, string> = {
@@ -27,9 +28,10 @@ const priorityLabels: Record<Priority, string> = {
   high: 'High',
 };
 
-export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, onTrash, onRestore, onToggleArchive, active, draggable, onDragStart }: TaskItemProps) {
+export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, onTrash, onRestore, onToggleArchive, active, draggable, onDragStart, members }: TaskItemProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const overdue = isOverdue(task.dueDate) && !task.completed;
+  const assignee = task.assigneeId && members ? members.find((m) => m.userId === task.assigneeId) : undefined;
 
   return (
     <div
@@ -75,6 +77,14 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
           <span className="flex items-center gap-0.5 text-[10px] text-gray-400 bg-gray-700/50 px-1.5 py-0.5 rounded">
             <MessageSquare size={10} />
             {task.comments?.length}
+          </span>
+        )}
+        {assignee && (
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400"
+            title={assignee.displayName}
+          >
+            {assignee.displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
           </span>
         )}
         {task.priority !== 'none' && (

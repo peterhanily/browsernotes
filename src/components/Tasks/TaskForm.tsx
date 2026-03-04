@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { X, MessageSquare, Trash2, Search } from 'lucide-react';
-import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment } from '../../types';
+import type { Task, Note, TimelineEvent, Priority, TaskStatus, Tag, Folder, IOCTarget, IOCAnalysis, IOCType, TaskComment, InvestigationMember } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { IOCPanel } from '../Analysis/IOCPanel';
@@ -24,6 +24,7 @@ interface TaskFormProps {
   allNotes?: Note[];
   allTimelineEvents?: TimelineEvent[];
   defaultFolderId?: string;
+  investigationMembers?: InvestigationMember[];
 }
 
 function formatRelativeTime(ts: number): string {
@@ -37,7 +38,7 @@ function formatRelativeTime(ts: number): string {
   return `${days}d ago`;
 }
 
-export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete, allNotes = [], allTimelineEvents = [], defaultFolderId }: TaskFormProps) {
+export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel, onUpdateTask, onDelete, allNotes = [], allTimelineEvents = [], defaultFolderId, investigationMembers }: TaskFormProps) {
   const { settings: taskFormSettings } = useSettings();
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
@@ -47,6 +48,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
   const [folderId, setFolderId] = useState(task?.folderId || defaultFolderId || '');
   const [tags, setTags] = useState<string[]>(task?.tags || []);
   const [clsLevel, setClsLevel] = useState(task?.clsLevel || '');
+  const [assigneeId, setAssigneeId] = useState(task?.assigneeId || '');
   const [showIOCPanel, setShowIOCPanel] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -75,6 +77,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
       setFolderId(task.folderId || '');
       setTags(task.tags);
       setClsLevel(task.clsLevel || '');
+      setAssigneeId(task.assigneeId || '');
     }
   }, [task]);
 
@@ -90,6 +93,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
       folderId: folderId || undefined,
       tags,
       clsLevel: clsLevel || undefined,
+      assigneeId: assigneeId || undefined,
     });
   };
 
@@ -227,6 +231,17 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
               ))}
             </select>
           </div>
+          {investigationMembers && investigationMembers.length > 0 && (
+            <div>
+              <label className={labelClass}>Assignee</label>
+              <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={inputClass}>
+                <option value="">Unassigned</option>
+                {investigationMembers.map((m) => (
+                  <option key={m.userId} value={m.userId}>{m.displayName}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div>

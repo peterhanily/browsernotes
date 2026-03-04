@@ -125,7 +125,7 @@ app.post('/push', async (c) => {
           table: change.table,
           op: change.op,
           entityId: change.entityId,
-          data: change.data,
+          data: result.serverRecord || change.data,
           updatedBy: user.id,
         }, user.id);
       }

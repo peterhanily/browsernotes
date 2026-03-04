@@ -94,6 +94,7 @@ export const tasks = pgTable('tasks', {
   trashedAt: timestamp('trashed_at', { withTimezone: true }),
   archived: boolean('archived').notNull().default(false),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdBy: text('created_by').notNull().references(() => users.id),
   updatedBy: text('updated_by').notNull().references(() => users.id),
@@ -103,6 +104,7 @@ export const tasks = pgTable('tasks', {
 }, (t) => ({
   idxTasksFolderId: index('idx_tasks_folder_id').on(t.folderId),
   idxTasksUpdatedAt: index('idx_tasks_updated_at').on(t.updatedAt),
+  idxTasksAssigneeId: index('idx_tasks_assignee_id').on(t.assigneeId),
 }));
 
 export const folders = pgTable('folders', {

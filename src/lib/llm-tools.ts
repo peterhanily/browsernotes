@@ -144,6 +144,7 @@ export const TOOL_DEFINITIONS = [
         description: { type: 'string', description: 'Task description' },
         priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'Priority level (default: none)' },
         status: { type: 'string', enum: ['todo', 'in-progress', 'done'], description: 'Status (default: todo)' },
+        assigneeId: { type: 'string', description: 'User ID to assign the task to (optional)' },
       },
       required: ['title'],
     },
@@ -159,6 +160,7 @@ export const TOOL_DEFINITIONS = [
         description: { type: 'string', description: 'New description (optional)' },
         status: { type: 'string', enum: ['todo', 'in-progress', 'done'], description: 'New status (optional)' },
         priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'New priority (optional)' },
+        assigneeId: { type: 'string', description: 'User ID to assign the task to (optional, empty string to unassign)' },
       },
       required: ['id'],
     },
@@ -668,6 +670,7 @@ async function executeCreateTask(input: Record<string, unknown>, folderId?: stri
     tags: [],
     trashed: false,
     archived: false,
+    assigneeId: input.assigneeId ? String(input.assigneeId) : undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -690,6 +693,7 @@ async function executeUpdateTask(input: Record<string, unknown>): Promise<string
     updates.completed = input.status === 'done';
   }
   if (input.priority !== undefined) updates.priority = input.priority as Priority;
+  if (input.assigneeId !== undefined) updates.assigneeId = input.assigneeId ? String(input.assigneeId) : undefined;
 
   await db.tasks.update(id, updates);
   return JSON.stringify({ success: true, id, title: updates.title || task.title });

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ListChecks, LayoutGrid, Plus, Filter } from 'lucide-react';
-import type { Task, Note, TimelineEvent, TaskStatus, TaskViewMode, Tag, Folder } from '../../types';
+import type { Task, Note, TimelineEvent, TaskStatus, TaskViewMode, Tag, Folder, InvestigationMember } from '../../types';
 import { TaskItem } from './TaskItem';
 import { TaskForm } from './TaskForm';
 import { KanbanBoard } from './KanbanBoard';
@@ -29,6 +29,8 @@ interface TaskListProps {
   selectedFolderId?: string;
   openNewForm?: boolean;
   onNewFormOpened?: () => void;
+  members?: InvestigationMember[];
+  currentUserId?: string;
 }
 
 export function TaskListView({
@@ -52,6 +54,8 @@ export function TaskListView({
   selectedFolderId,
   openNewForm,
   onNewFormOpened,
+  members,
+  currentUserId,
 }: TaskListProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showNewTask, setShowNewTask] = useState(false);
@@ -64,10 +68,14 @@ export function TaskListView({
     onNewFormOpened?.();
   }, [openNewForm, onNewFormOpened]);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
 
-  const filteredTasks = statusFilter
-    ? tasks.filter((t) => t.status === statusFilter)
-    : tasks;
+  const filteredTasks = tasks.filter((t) => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (assigneeFilter === '__me__' && t.assigneeId !== currentUserId) return false;
+    if (assigneeFilter && assigneeFilter !== '__me__' && t.assigneeId !== assigneeFilter) return false;
+    return true;
+  });
 
   const handleSelect = (id: string) => {
     const task = tasks.find((t) => t.id === id);
@@ -128,6 +136,20 @@ export function TaskListView({
               <option value="in-progress">In Progress</option>
               <option value="done">Done</option>
             </select>
+            {members && members.length > 0 && (
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-gray-300 focus:outline-none"
+                aria-label="Filter by assignee"
+              >
+                <option value="">All assignees</option>
+                {currentUserId && <option value="__me__">Assigned to me</option>}
+                {members.map((m) => (
+                  <option key={m.userId} value={m.userId}>{m.displayName}</option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 
@@ -164,6 +186,7 @@ export function TaskListView({
                       onTrash={onTrashTask}
                       onRestore={onRestoreTask}
                       onToggleArchive={onToggleArchiveTask}
+                      members={members}
                     />
                   </div>
                 )}
@@ -198,6 +221,7 @@ export function TaskListView({
             onDelete={(id) => { onDeleteTask(id); setEditingTask(null); }}
             allNotes={allNotes}
             allTimelineEvents={allTimelineEvents}
+            investigationMembers={members}
           />
         )}
       </Modal>
@@ -211,6 +235,7 @@ export function TaskListView({
           onSave={handleSaveNew}
           onCancel={() => setShowNewTask(false)}
           defaultFolderId={selectedFolderId}
+          investigationMembers={members}
         />
       </Modal>
 

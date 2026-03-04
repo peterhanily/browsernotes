@@ -8,6 +8,7 @@ import {
   verifyAdminSecret, changeAdminSecret, getRegistrationMode, setRegistrationMode,
   getSessionSettings, setSessionSettings,
 } from '../services/admin-secret.js';
+import { getRetentionSettings, setRetentionSettings } from '../services/cleanup-service.js';
 import { signAdminToken, requireAdminAuth } from '../middleware/admin-auth.js';
 import { getAdminHtml } from './admin-html.js';
 import { logger } from '../lib/logger.js';
@@ -143,7 +144,8 @@ app.get('/api/stats', requireAdminAuth, async (c) => {
 app.get('/api/settings', requireAdminAuth, async (c) => {
   const registrationMode = await getRegistrationMode();
   const sessionSettings = await getSessionSettings();
-  return c.json({ registrationMode, ...sessionSettings });
+  const retentionSettings = await getRetentionSettings();
+  return c.json({ registrationMode, ...sessionSettings, ...retentionSettings });
 });
 
 // PATCH /admin/api/settings
@@ -167,9 +169,24 @@ app.patch('/api/settings', requireAdminAuth, async (c) => {
     logger.info('Admin action: session settings changed', { ttlHours, maxPerUser });
   }
 
+  if (body.notificationRetentionDays !== undefined || body.auditLogRetentionDays !== undefined) {
+    const current = await getRetentionSettings();
+    const notifDays = typeof body.notificationRetentionDays === 'number' &&
+      Number.isInteger(body.notificationRetentionDays) &&
+      body.notificationRetentionDays >= 1 && body.notificationRetentionDays <= 3650
+      ? body.notificationRetentionDays : current.notificationRetentionDays;
+    const auditDays = typeof body.auditLogRetentionDays === 'number' &&
+      Number.isInteger(body.auditLogRetentionDays) &&
+      body.auditLogRetentionDays >= 1 && body.auditLogRetentionDays <= 3650
+      ? body.auditLogRetentionDays : current.auditLogRetentionDays;
+    await setRetentionSettings(notifDays, auditDays);
+    logger.info('Admin action: retention settings changed', { notifDays, auditDays });
+  }
+
   const registrationMode = await getRegistrationMode();
   const sessionSettings = await getSessionSettings();
-  return c.json({ ok: true, registrationMode, ...sessionSettings });
+  const retentionSettings = await getRetentionSettings();
+  return c.json({ ok: true, registrationMode, ...sessionSettings, ...retentionSettings });
 });
 
 // GET /admin/api/allowed-emails

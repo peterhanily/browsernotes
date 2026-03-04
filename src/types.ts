@@ -74,6 +74,7 @@ export interface Task {
   trashed: boolean;
   trashedAt?: number;
   archived: boolean;
+  assigneeId?: string;
   createdBy?: string;
   updatedBy?: string;
   createdAt: number;

@@ -118,7 +118,8 @@ export async function processPush(
           createdAt: now,
           updatedAt: now,
         });
-        results.push({ entityId, status: 'accepted', serverVersion: 1 });
+        const inserted = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
+        results.push({ entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
       } else {
         // Existing — check version for conflict
         const serverEntity = existing[0];
@@ -165,7 +166,8 @@ export async function processPush(
               results.push({ entityId, status: 'conflict' });
             }
           } else {
-            results.push({ entityId, status: 'accepted', serverVersion: newVersion });
+            const freshRow = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
+            results.push({ entityId, status: 'accepted', serverVersion: newVersion, serverRecord: freshRow[0] as Record<string, unknown> });
           }
         }
       }

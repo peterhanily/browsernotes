@@ -29,6 +29,7 @@ export interface SyncResult {
   status: 'accepted' | 'conflict' | 'rejected';
   serverVersion?: number;
   serverData?: Record<string, unknown>;
+  serverRecord?: Record<string, unknown>;
 }
 
 // WebSocket message types

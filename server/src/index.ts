@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 import { initAdminSecret, initRegistrationMode, backfillFolderOwners } from './services/admin-secret.js';
+import { pruneOldData } from './services/cleanup-service.js';
 import { initAdminKey } from './middleware/admin-auth.js';
 import { handleWSConnection, handleWSMessage, handleWSClose } from './ws/handler.js';
 import { db, sql as pgSql } from './db/index.js';
@@ -167,6 +168,13 @@ async function main() {
     logger.info(`Admin panel running on http://localhost:${info.port}`, { port: info.port });
   });
 
+  // Data pruning on startup (fire-and-forget) + every 6 hours
+  pruneOldData().catch(() => {});
+  const dataPruning = setInterval(() => {
+    pruneOldData().catch(() => {});
+  }, 6 * 60 * 60 * 1000);
+  dataPruning.unref();
+
   // Periodic expired session cleanup (every hour)
   const sessionCleanup = setInterval(async () => {
     try {
@@ -187,6 +195,7 @@ async function main() {
   const shutdown = async () => {
     logger.info('Shutting down...');
     clearInterval(sessionCleanup);
+    clearInterval(dataPruning);
     server.close();
     adminServer.close();
     await pgSql.end();

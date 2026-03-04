@@ -55,6 +55,18 @@ app.patch('/:id/read', async (c) => {
   return c.json({ ok: true });
 });
 
+// DELETE /api/notifications/read — delete all read notifications for current user
+app.delete('/read', async (c) => {
+  const user = c.get('user');
+
+  const deleted = await db
+    .delete(notifications)
+    .where(and(eq(notifications.userId, user.id), eq(notifications.read, true)))
+    .returning({ id: notifications.id });
+
+  return c.json({ ok: true, deleted: deleted.length });
+});
+
 // POST /api/notifications/mark-all-read
 app.post('/mark-all-read', async (c) => {
   const user = c.get('user');

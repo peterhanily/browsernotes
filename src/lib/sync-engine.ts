@@ -1,6 +1,7 @@
 import { db } from '../db';
 import type { Dexie as DexieType } from 'dexie';
 import { syncPush, syncPull, type SyncChange, type SyncResult } from './server-api';
+import { disableSync, enableSync } from './sync-middleware';
 
 // Cast db for dynamic table access (sync tables aren't in the typed schema)
 const dynamicDb = db as unknown as DexieType;
@@ -135,6 +136,38 @@ export class SyncEngine {
       await dynamicDb.table('_syncMeta').put({ key: META_KEY_LAST_SYNC, value: serverTimestamp });
     } catch (err) {
       console.error('SyncEngine: pull error', err);
+    }
+  }
+
+  /**
+   * Fast-path: apply a single entity change from a WebSocket broadcast
+   * directly to Dexie, bypassing sync hooks so we don't re-push it.
+   */
+  async applyRemoteChange(
+    tableName: string,
+    op: 'put' | 'delete',
+    entityId: string,
+    data?: Record<string, unknown>,
+  ) {
+    disableSync();
+    try {
+      if (op === 'delete') {
+        await dynamicDb.table(tableName).delete(entityId);
+      } else if (data) {
+        // Normalize ISO timestamp strings to ms for Dexie
+        const localData = { ...data };
+        for (const key of ['createdAt', 'updatedAt', 'trashedAt', 'completedAt', 'closedAt'] as const) {
+          if (localData[key] && typeof localData[key] === 'string') {
+            localData[key] = new Date(localData[key] as string).getTime();
+          }
+        }
+        await dynamicDb.table(tableName).put(localData);
+      }
+      if (this.onRemoteChange) {
+        this.onRemoteChange([{ table: tableName, op, id: entityId, ...data }]);
+      }
+    } finally {
+      enableSync();
     }
   }
 

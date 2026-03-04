@@ -184,6 +184,7 @@ function sanitizeTask(raw: unknown): Task | null {
     trashed: bool(r.trashed),
     archived: bool(r.archived),
     completedAt: r.completedAt != null ? num(r.completedAt) : undefined,
+    assigneeId: r.assigneeId != null ? str(r.assigneeId) : undefined,
   };
 }
 

@@ -72,6 +72,7 @@ export interface SyncChange {
 }
 
 export interface SyncResult {
+  table?: string;
   entityId: string;
   status: 'accepted' | 'conflict';
   serverVersion?: number;

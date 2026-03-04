@@ -83,7 +83,7 @@ export async function processPush(
         // This lets other clients discover the deletion on their next pull.
         const existing = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
         if (existing.length === 0) {
-          results.push({ entityId, status: 'accepted' });
+          results.push({ table: change.table, entityId, status: 'accepted' });
           continue;
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,7 +98,7 @@ export async function processPush(
             updatedAt: now,
           })
           .where(eq(table.id, entityId));
-        results.push({ entityId, status: 'accepted', serverVersion: serverVersion + 1 });
+        results.push({ table: change.table, entityId, status: 'accepted', serverVersion: serverVersion + 1 });
         continue;
       }
 
@@ -119,7 +119,7 @@ export async function processPush(
           updatedAt: now,
         });
         const inserted = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
-        results.push({ entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
+        results.push({ table: change.table, entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
       } else {
         // Existing — check version for conflict
         const serverEntity = existing[0];
@@ -129,6 +129,7 @@ export async function processPush(
         if (clientVersion !== undefined && clientVersion !== serverVersion) {
           // Conflict
           results.push({
+            table: change.table,
             entityId,
             status: 'conflict',
             serverVersion,
@@ -157,23 +158,24 @@ export async function processPush(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const currentVersion = (current[0] as any).version as number;
               results.push({
+                table: change.table,
                 entityId,
                 status: 'conflict',
                 serverVersion: currentVersion,
                 serverData: current[0] as Record<string, unknown>,
               });
             } else {
-              results.push({ entityId, status: 'conflict' });
+              results.push({ table: change.table, entityId, status: 'conflict' });
             }
           } else {
             const freshRow = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
-            results.push({ entityId, status: 'accepted', serverVersion: newVersion, serverRecord: freshRow[0] as Record<string, unknown> });
+            results.push({ table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: freshRow[0] as Record<string, unknown> });
           }
         }
       }
     } catch (err) {
       logger.error(`Sync error for ${change.table}/${entityId}`, { error: String(err) });
-      results.push({ entityId, status: 'conflict' });
+      results.push({ table: change.table, entityId, status: 'conflict' });
     }
   }
 

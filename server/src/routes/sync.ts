@@ -90,7 +90,7 @@ app.post('/push', async (c) => {
     if (authorized[i]) {
       results.push(processedResults[processedIdx++]);
     } else {
-      results.push({ entityId: changes[i].entityId, status: 'rejected' });
+      results.push({ table: changes[i].table, entityId: changes[i].entityId, status: 'rejected' });
     }
   }
 

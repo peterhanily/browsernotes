@@ -211,11 +211,18 @@ function AppInner() {
     };
   }, [auth.serverUrl, auth.connected]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleResolveConflict = useCallback((entityId: string, _choice: 'mine' | 'theirs') => {
-    // For now, just dismiss the conflict (full resolution would re-push or accept server version)
+  const handleResolveConflict = useCallback(async (entityId: string, choice: 'mine' | 'theirs') => {
+    const conflict = syncConflicts.find((c) => c.entityId === entityId);
+    if (conflict) {
+      await syncEngine.resolveConflicts([conflict], choice);
+    }
     setSyncConflicts((prev) => prev.filter((c) => c.entityId !== entityId));
-  }, []);
+  }, [syncConflicts]);
+
+  const handleResolveAllConflicts = useCallback(async (choice: 'mine' | 'theirs') => {
+    await syncEngine.resolveConflicts(syncConflicts, choice);
+    setSyncConflicts([]);
+  }, [syncConflicts]);
 
   // Share receiver state — listen for hash changes to support re-navigation
   const [shareData, setShareData] = useState<string | null>(initialShareData);
@@ -1860,6 +1867,7 @@ function AppInner() {
       <ConflictDialog
         conflicts={syncConflicts}
         onResolve={handleResolveConflict}
+        onResolveAll={handleResolveAllConflicts}
         onClose={() => setSyncConflicts([])}
       />
     )}

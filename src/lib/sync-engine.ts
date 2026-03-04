@@ -171,6 +171,44 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Resolve sync conflicts by clearing them from the queue.
+   * If choice is 'theirs', also applies server data to local Dexie.
+   */
+  async resolveConflicts(
+    conflicts: Array<{ table?: string; entityId: string; serverData?: Record<string, unknown> }>,
+    choice: 'mine' | 'theirs',
+  ) {
+    const entityIds = new Set(conflicts.map((c) => c.entityId));
+
+    // Remove matching entries from the sync queue
+    const queue: SyncQueueEntry[] = await dynamicDb.table('_syncQueue').toArray();
+    const seqsToDelete = queue.filter((e) => entityIds.has(e.entityId)).map((e) => e.seq!).filter(Boolean);
+    if (seqsToDelete.length > 0) {
+      await dynamicDb.table('_syncQueue').bulkDelete(seqsToDelete);
+    }
+
+    // If accepting theirs, overwrite local data with server version
+    if (choice === 'theirs') {
+      disableSync();
+      try {
+        for (const conflict of conflicts) {
+          if (!conflict.table || !conflict.serverData) continue;
+          const localData = { ...conflict.serverData };
+          // Normalize ISO timestamps to ms for Dexie
+          for (const key of ['createdAt', 'updatedAt', 'trashedAt', 'completedAt', 'closedAt'] as const) {
+            if (localData[key] && typeof localData[key] === 'string') {
+              localData[key] = new Date(localData[key] as string).getTime();
+            }
+          }
+          await dynamicDb.table(conflict.table).put(localData);
+        }
+      } finally {
+        enableSync();
+      }
+    }
+  }
+
   // Manually enqueue a change (called by sync middleware)
   async enqueue(table: string, entityId: string, op: 'put' | 'delete', data?: Record<string, unknown>) {
     await dynamicDb.table('_syncQueue').add({

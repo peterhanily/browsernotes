@@ -35,7 +35,7 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
 
-  "optional_host_permissions": ["*://*/*"],
+  "optional_host_permissions": ["*://*/*", "file:///*"],
 
   "content_scripts": [{
     "matches": [

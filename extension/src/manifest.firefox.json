@@ -42,7 +42,7 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
 
-  "optional_permissions": ["*://*/*"],
+  "optional_permissions": ["*://*/*", "file:///*"],
 
   "content_scripts": [{
     "matches": [

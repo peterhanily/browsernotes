@@ -342,7 +342,7 @@ function AppInner() {
       if (event.source !== window) return;
       const isFileProtocol = window.location.protocol === 'file:';
       if (!isFileProtocol && event.origin !== window.location.origin) return;
-      if (event.data?.type !== 'BROWSERNOTES_IMPORT_CLIPS') return;
+      if (event.data?.type !== 'THREATCADDY_IMPORT_CLIPS' && event.data?.type !== 'BROWSERNOTES_IMPORT_CLIPS') return;
       const clips = event.data.clips;
       if (!Array.isArray(clips) || clips.length === 0) return;
 

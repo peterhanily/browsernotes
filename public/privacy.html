@@ -88,9 +88,16 @@
 
     <h2>Data Storage</h2>
     <ul>
-      <li>All notes, tasks, timelines, and investigation data are stored locally in your browser using IndexedDB. Nothing is sent to any server.</li>
+      <li>By default, all notes, tasks, timelines, and investigation data are stored locally in your browser using IndexedDB. No data leaves your device unless you choose otherwise.</li>
       <li>Extension clips are stored in <code>chrome.storage.local</code> on your device.</li>
-      <li>There are no user accounts, no server-side storage, and no cookies.</li>
+      <li>The standalone HTML file and the default web app require no accounts and use no cookies.</li>
+    </ul>
+
+    <h2>Optional Team Server</h2>
+    <ul>
+      <li>You may optionally connect to a self-hosted team server for real-time sync and collaboration. This is entirely opt-in — no data is sent until you configure a server URL and sign in.</li>
+      <li>When connected, notes, tasks, timelines, IOCs, and other investigation entities are transmitted to the server you configure. Authentication tokens are stored in your browser.</li>
+      <li>The team server is open-source and self-hosted. ThreatCaddy does not operate any hosted server infrastructure and has no access to your data.</li>
     </ul>
 
     <h2>API Keys &amp; AI Features</h2>
@@ -117,6 +124,7 @@
     <ul>
       <li>AI chat requests sent to the LLM provider endpoint you configure (e.g., <code>api.openai.com</code>).</li>
       <li>URL fetch requests you explicitly initiate through AI chat tools.</li>
+      <li>Sync traffic to a self-hosted team server, if you choose to configure one.</li>
     </ul>
 
     <div class="disclaimer">

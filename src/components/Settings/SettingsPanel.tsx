@@ -235,7 +235,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           </div>
 
           <p className="text-[10px] text-gray-600">
-            Keys are auto-saved to localStorage, never leave your device. LLM calls are proxied through the browser extension to bypass CORS.
+            Keys are saved locally and sent only to your chosen provider. LLM calls are proxied through the browser extension to bypass CORS.
           </p>
           {(settings.llmAnthropicApiKey || settings.llmOpenAIApiKey || settings.llmGeminiApiKey || settings.llmMistralApiKey) && (
             <p className="text-[10px] text-accent-green font-medium">API key saved</p>
@@ -306,7 +306,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           ThreatCaddy v1.0 — Threat Investigation Workspace. Notes, IOCs, Timelines & Graphs.
           All data stored locally in your browser using IndexedDB.
         </p>
-        <p className="text-xs text-gray-600">No server. No tracking. Your notes are yours.</p>
+        <p className="text-xs text-gray-600">Local-first. Your data stays in your browser unless you connect a self-hosted server.</p>
         <div className="flex items-center gap-4 pt-2">
           <a
             href="https://github.com/peterhanily/threatcaddy"

@@ -963,7 +963,7 @@ async function sendToTarget(targetUrl, captures) {
 
   // Proactively inject bridge.js — static content_scripts only cover threatcaddy.com,
   // so for custom targets (self-hosted, localhost, file://) we must inject explicitly.
-  // For threatcaddy.com this is harmless (duplicate listeners are fine).
+  // bridge.js has a duplicate-injection guard so re-injection on threatcaddy.com is safe.
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['bridge.js'] });
     await new Promise(r => setTimeout(r, 200));

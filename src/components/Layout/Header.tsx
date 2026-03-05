@@ -1,4 +1,4 @@
-import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield } from 'lucide-react';
+import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield, RefreshCw } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ThemeToggle } from '../Common/ThemeToggle';
 import { ScreenshareToggle } from '../Common/ScreenshareToggle';
@@ -124,16 +124,41 @@ export function Header({
           <Github size={15} />
           <span className="hidden lg:inline">GitHub</span>
         </a>
-        <a
-          data-tour="standalone"
-          href="./threatcaddy-standalone.html"
-          download
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-          title="Download standalone HTML"
-        >
-          <Download size={15} />
-          <span className="hidden lg:inline">Standalone</span>
-        </a>
+        {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
+          <button
+            onClick={async () => {
+              try {
+                const resp = await fetch('https://threatcaddy.com/threatcaddy-standalone.html');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'threatcaddy-standalone.html';
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                alert('Failed to download update. Visit https://threatcaddy.com to get the latest version.');
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
+            title="Download latest standalone version"
+          >
+            <RefreshCw size={15} />
+            <span className="hidden lg:inline">Update</span>
+          </button>
+        ) : (
+          <a
+            data-tour="standalone"
+            href="./threatcaddy-standalone.html"
+            download
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
+            title="Download standalone HTML"
+          >
+            <Download size={15} />
+            <span className="hidden lg:inline">Standalone</span>
+          </a>
+        )}
         <a
           data-tour="extension"
           href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme"

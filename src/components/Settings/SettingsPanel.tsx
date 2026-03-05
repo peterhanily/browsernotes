@@ -1,4 +1,4 @@
-import { Github, Download, FlaskConical, Trash2, Bot, X, Shield } from 'lucide-react';
+import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw } from 'lucide-react';
 import type { Settings, Note } from '../../types';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
@@ -317,14 +317,38 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <Github size={16} />
             GitHub
           </a>
-          <a
-            href="./threatcaddy-standalone.html"
-            download
-            className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
-          >
-            <Download size={16} />
-            Download Standalone
-          </a>
+          {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
+            <button
+              onClick={async () => {
+                try {
+                  const resp = await fetch('https://threatcaddy.com/threatcaddy-standalone.html');
+                  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                  const blob = await resp.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'threatcaddy-standalone.html';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  alert('Failed to download update. Visit https://threatcaddy.com to get the latest version.');
+                }
+              }}
+              className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+            >
+              <RefreshCw size={16} />
+              Update
+            </button>
+          ) : (
+            <a
+              href="./threatcaddy-standalone.html"
+              download
+              className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+            >
+              <Download size={16} />
+              Download Standalone
+            </a>
+          )}
           <a
             href="https://threatcaddy.com/privacy.html"
             target="_blank"

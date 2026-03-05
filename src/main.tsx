@@ -4,6 +4,11 @@ import './index.css'
 import { AppShell } from './components/Encryption/AppShell'
 import { migrateStorageKeys } from './lib/storage-migration'
 import { migrateIndexedDB } from './lib/db-migration'
+import { clipBuffer } from './lib/clipBuffer'
+
+// Start buffering clip messages immediately — before React mounts and before
+// the encryption lock screen is dismissed — so no postMessage events are lost.
+clipBuffer.startListening();
 
 // Migrate legacy BrowserNotes data before React renders
 migrateStorageKeys();

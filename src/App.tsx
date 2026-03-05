@@ -26,6 +26,7 @@ import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import { isEncryptionEnabled } from './lib/encryptionStore';
+import { clipBuffer } from './lib/clipBuffer';
 import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
@@ -465,6 +466,8 @@ function AppInner() {
     };
 
     window.addEventListener('message', handler);
+    // Replay any clips that arrived while the encryption lock screen was shown
+    clipBuffer.flush();
     return () => window.removeEventListener('message', handler);
   }, [findOrCreateFolder, loggedCreateNote, loggedCreateTask, loggedCreateEvent, timelines, navigateTo, addToast]);
 

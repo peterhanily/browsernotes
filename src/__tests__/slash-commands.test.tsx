@@ -270,6 +270,10 @@ describe('Slash command transforms', () => {
     '/iocs':     (t) => `Extract IOCs from the following text:\n${t}`,
     '/summary':  ()  => `Give me a summary of this investigation`,
     '/timeline': ()  => `List the timeline events in this investigation`,
+    '/report':   ()  => `Generate a comprehensive investigation report. Analyze all notes, tasks, IOCs, and timeline events, then use the generate_report tool to create a structured report note.`,
+    '/triage':   (t) => `Auto-triage the following alert/email. Extract all IOCs, create them as standalone IOCs using bulk_create_iocs, create relevant timeline events, and provide a triage summary:\n\n${t}`,
+    '/graph':    ()  => `Analyze the entity relationship graph for this investigation. Identify the most connected entities, any isolated nodes, and interesting clusters or patterns.`,
+    '/link':     (t) => `Search across all entities for "${t}" and suggest which ones should be linked together. Then use the link_entities tool to create the cross-references.`,
   };
 
   function transformSlashCommand(text: string): string {
@@ -305,6 +309,27 @@ describe('Slash command transforms', () => {
 
   it('transforms /timeline with no args', () => {
     expect(transformSlashCommand('/timeline')).toBe('List the timeline events in this investigation');
+  });
+
+  it('transforms /report with no args', () => {
+    expect(transformSlashCommand('/report')).toContain('Generate a comprehensive investigation report');
+  });
+
+  it('transforms /triage with alert text', () => {
+    const input = '/triage Suspicious email from attacker@evil.com';
+    const result = transformSlashCommand(input);
+    expect(result).toContain('Auto-triage');
+    expect(result).toContain('attacker@evil.com');
+  });
+
+  it('transforms /graph with no args', () => {
+    expect(transformSlashCommand('/graph')).toContain('entity relationship graph');
+  });
+
+  it('transforms /link with description', () => {
+    const result = transformSlashCommand('/link APT29 infrastructure');
+    expect(result).toContain('APT29 infrastructure');
+    expect(result).toContain('link_entities');
   });
 
   it('leaves unknown slash commands unchanged', () => {

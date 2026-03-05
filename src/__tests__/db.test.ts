@@ -12,6 +12,7 @@ beforeEach(async () => {
   await db.whiteboards.clear();
   await db.activityLog.clear();
   await db.standaloneIOCs.clear();
+  await db.chatThreads.clear();
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ function makeTimelineEvent(overrides: Partial<Parameters<typeof db.timelineEvent
 // ── Schema: all tables exist ────────────────────────────────────────
 
 describe('Database schema', () => {
-  it('exposes all 9 tables', () => {
+  it('exposes all 10 tables', () => {
     expect(db.notes).toBeDefined();
     expect(db.tasks).toBeDefined();
     expect(db.folders).toBeDefined();
@@ -57,6 +58,7 @@ describe('Database schema', () => {
     expect(db.whiteboards).toBeDefined();
     expect(db.activityLog).toBeDefined();
     expect(db.standaloneIOCs).toBeDefined();
+    expect(db.chatThreads).toBeDefined();
   });
 
   it('is at version 17', () => {

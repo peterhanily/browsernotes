@@ -141,6 +141,30 @@ describe('useChats', () => {
     expect(result.current.threads[0].title).toBe('Help me analyze this malware sample');
   });
 
+  it('auto-title truncates at 60 characters and replaces newlines', async () => {
+    const { result } = renderHook(() => useChats());
+    await act(async () => {});
+
+    let threadId: string;
+    await act(async () => {
+      const t = await result.current.createThread();
+      threadId = t.id;
+    });
+
+    const longMessage = 'A'.repeat(80) + '\nwith newline';
+    await act(async () => {
+      await result.current.addMessage(threadId!, {
+        id: 'msg-1',
+        role: 'user',
+        content: longMessage,
+        createdAt: Date.now(),
+      });
+    });
+
+    expect(result.current.threads[0].title).toBe('A'.repeat(60));
+    expect(result.current.threads[0].title).not.toContain('\n');
+  });
+
   it('does not re-title if title was already changed', async () => {
     const { result } = renderHook(() => useChats());
     await act(async () => {});

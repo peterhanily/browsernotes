@@ -254,7 +254,7 @@ export function buildGraphData(
   for (const note of activeNotes) {
     if (note.iocAnalysis?.iocs) allIOCEntries.push(...note.iocAnalysis.iocs);
   }
-  for (const task of tasks) {
+  for (const task of activeTasks) {
     if (task.iocAnalysis?.iocs) allIOCEntries.push(...task.iocAnalysis.iocs);
   }
   for (const event of timelineEvents) {
@@ -314,7 +314,7 @@ export function buildGraphData(
     for (const id of note.linkedTaskIds || []) addEntityLink(noteNodeId, `task:${id}`);
     for (const id of note.linkedTimelineEventIds || []) addEntityLink(noteNodeId, `event:${id}`);
   }
-  for (const task of tasks) {
+  for (const task of activeTasks) {
     const taskNodeId = `task:${task.id}`;
     for (const id of task.linkedNoteIds || []) addEntityLink(taskNodeId, `note:${id}`);
     for (const id of task.linkedTaskIds || []) addEntityLink(taskNodeId, `task:${id}`);

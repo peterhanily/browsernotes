@@ -90,6 +90,8 @@ describe('unifiedSearch', () => {
   const tasks: Task[] = [
     makeTask({ id: 't1', title: 'Fix auth bug', description: 'Login page crashes on submit', updatedAt: now - 1500 }),
     makeTask({ id: 't2', title: 'Write documentation', tags: ['docs'], updatedAt: now - 2500 }),
+    makeTask({ id: 't-trashed', title: 'Fix auth old', description: 'Old task', trashed: true, updatedAt: now }),
+    makeTask({ id: 't-archived', title: 'Fix auth archived', description: 'Archived task', archived: true, updatedAt: now }),
   ];
 
   it('returns empty for blank query', () => {
@@ -124,6 +126,20 @@ describe('unifiedSearch', () => {
     expect(result.results).toHaveLength(1);
     expect(result.results[0].type).toBe('task');
     expect(result.results[0].id).toBe('t1');
+  });
+
+  it('excludes trashed and archived tasks', () => {
+    const result = unifiedSearch(notes, tasks, 'clips-folder', { mode: 'simple', raw: 'auth' });
+    const ids = result.results.map((r) => r.id);
+    expect(ids).not.toContain('t-trashed');
+    expect(ids).not.toContain('t-archived');
+  });
+
+  it('returns error for queries exceeding MAX_QUERY_LEN', () => {
+    const longQuery = 'a'.repeat(1001);
+    const result = unifiedSearch(notes, tasks, 'clips-folder', { mode: 'simple', raw: longQuery });
+    expect(result.results).toHaveLength(0);
+    expect(result.error).toBe('Query too long');
   });
 
   it('sorts results by type group then updatedAt', () => {

@@ -454,6 +454,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     (async () => {
       try {
+        // Ensure we have host permission for this origin
+        const origin = parsed.origin + '/*';
+        const hasPermission = await chrome.permissions.contains({ origins: [origin] });
+        if (!hasPermission) {
+          // Try to request it (works from service worker if triggered by user gesture chain)
+          const granted = await chrome.permissions.request({ origins: [origin] }).catch(() => false);
+          if (!granted) {
+            sendResponse({
+              success: false,
+              error: 'URL access permission required. Open the ThreatCaddy extension popup and enable "Allow URL fetching", then try again.',
+            });
+            return;
+          }
+        }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 15000);
         const resp = await fetch(message.url, {

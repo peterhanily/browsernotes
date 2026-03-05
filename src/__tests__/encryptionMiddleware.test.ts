@@ -82,7 +82,7 @@ afterEach(() => {
 // ── ENCRYPTED_FIELDS constant ───────────────────────────────────────
 
 describe('ENCRYPTED_FIELDS', () => {
-  it('covers all 9 tables', () => {
+  it('covers all 10 tables', () => {
     const tables = Object.keys(ENCRYPTED_FIELDS);
     expect(tables).toContain('notes');
     expect(tables).toContain('tasks');
@@ -93,7 +93,8 @@ describe('ENCRYPTED_FIELDS', () => {
     expect(tables).toContain('tags');
     expect(tables).toContain('activityLog');
     expect(tables).toContain('chatThreads');
-    expect(tables).toHaveLength(9);
+    expect(tables).toContain('standaloneIOCs');
+    expect(tables).toHaveLength(10);
   });
 
   it('notes table encrypts sensitive fields', () => {

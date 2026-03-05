@@ -263,7 +263,7 @@ function parseNDJSON(text: string): ParseResult {
     rows,
     truncated: totalRowCount > MAX_IMPORT_ROWS,
     totalRowCount,
-    error: errors.length > 0 ? `${errors.length} lines failed to parse` : undefined,
+    error: errors.length > 0 ? `${errors.length} ${errors.length === 1 ? 'line' : 'lines'} failed to parse` : undefined,
   };
 }
 

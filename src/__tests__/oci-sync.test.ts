@@ -208,6 +208,11 @@ describe('buildObjectKey', () => {
     expect(key).toMatch(/^threatcaddy\/shared\/ioc-reports\/n2-\d+\.json$/);
   });
 
+  it('falls back to default label when label is empty', () => {
+    const key = buildObjectKey('full-backup', '', '');
+    expect(key).toMatch(/^threatcaddy\/backups\/default-\d+\.json$/);
+  });
+
   it('sanitizes unsafe label characters', () => {
     const key = buildObjectKey('full-backup', '', 'My Team / Backup!');
     // The label portion should not contain slashes or special chars

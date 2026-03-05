@@ -139,3 +139,51 @@ setInterval(loadStats, 2000);
 // Show platform-appropriate shortcut
 const isMac = /Mac/i.test(navigator.platform);
 document.getElementById('shortcut-kbd').textContent = isMac ? '⌃+Shift+X' : 'Alt+Shift+X';
+
+// ── URL fetching permission toggle ──────────────────────────────────────
+const urlPermToggle = document.getElementById('url-perm-toggle');
+const urlPermSlider = document.getElementById('url-perm-slider');
+
+function updateSliderStyle(granted) {
+  urlPermSlider.style.backgroundColor = granted ? '#8b5cf6' : '#4b5563';
+  // Thumb
+  const thumb = '::after';
+  urlPermSlider.style.setProperty('--thumb-left', granted ? '20px' : '2px');
+}
+
+// Use a real pseudo-element by injecting a style rule once
+(function initSliderStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    #url-perm-slider::after {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 2px; bottom: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    #url-perm-toggle:checked + #url-perm-slider::after {
+      transform: translateX(18px);
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Check current permission state
+chrome.permissions.contains({ origins: ['*://*/*'] }, (granted) => {
+  urlPermToggle.checked = granted;
+  urlPermSlider.style.backgroundColor = granted ? '#8b5cf6' : '#4b5563';
+});
+
+urlPermToggle.addEventListener('change', async () => {
+  if (urlPermToggle.checked) {
+    const granted = await chrome.permissions.request({ origins: ['*://*/*'] }).catch(() => false);
+    urlPermToggle.checked = granted;
+    urlPermSlider.style.backgroundColor = granted ? '#8b5cf6' : '#4b5563';
+  } else {
+    await chrome.permissions.remove({ origins: ['*://*/*'] }).catch(() => {});
+    urlPermSlider.style.backgroundColor = '#4b5563';
+  }
+});

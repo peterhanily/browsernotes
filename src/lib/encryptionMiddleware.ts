@@ -23,6 +23,7 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   tags: ['name'],
   activityLog: ['detail', 'itemTitle'],
   chatThreads: ['title', 'messages'],
+  standaloneIOCs: ['value', 'analystNotes', 'clsLevel'],
 };
 
 // ── Session key (in-memory only, lost on tab close) ──────────────────

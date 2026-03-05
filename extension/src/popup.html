@@ -438,6 +438,20 @@
   </section>
 
   <section>
+    <h2>Permissions</h2>
+    <div class="help-text" style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+      <div>
+        <strong>Allow URL fetching</strong><br>
+        <span style="font-size:11px;color:#9ca3af;">Required for the /fetch command and non-localhost local LLMs.</span>
+      </div>
+      <label style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;">
+        <input type="checkbox" id="url-perm-toggle" style="opacity:0;width:0;height:0;">
+        <span id="url-perm-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#4b5563;border-radius:11px;transition:background-color .2s;"></span>
+      </label>
+    </div>
+  </section>
+
+  <section>
     <div class="help-text">
       <strong>How to use:</strong><br>
       Select text and right-click "Save to ThreatCaddy"<br>

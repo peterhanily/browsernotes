@@ -52,11 +52,21 @@ describe('migrateStorageKeys', () => {
     expect(sessionStorage.getItem('browsernotes-session-cache')).toBeNull();
   });
 
+  it('migrates browsernotes-nav-state in sessionStorage', () => {
+    sessionStorage.setItem('browsernotes-nav-state', '{"view":"notes"}');
+
+    migrateStorageKeys();
+
+    expect(sessionStorage.getItem('threatcaddy-nav-state')).toBe('{"view":"notes"}');
+    expect(sessionStorage.getItem('browsernotes-nav-state')).toBeNull();
+  });
+
   it('migrates all keys in a single call', () => {
     localStorage.setItem('browsernotes-encryption', 'enc');
     localStorage.setItem('browsernotes-settings', 'settings');
     localStorage.setItem('browsernotes-saved-searches', 'searches');
     sessionStorage.setItem('browsernotes-session-cache', 'cache');
+    sessionStorage.setItem('browsernotes-nav-state', 'nav');
 
     migrateStorageKeys();
 
@@ -64,12 +74,14 @@ describe('migrateStorageKeys', () => {
     expect(localStorage.getItem('threatcaddy-settings')).toBe('settings');
     expect(localStorage.getItem('threatcaddy-saved-searches')).toBe('searches');
     expect(sessionStorage.getItem('threatcaddy-session-cache')).toBe('cache');
+    expect(sessionStorage.getItem('threatcaddy-nav-state')).toBe('nav');
 
     // All old keys removed
     expect(localStorage.getItem('browsernotes-encryption')).toBeNull();
     expect(localStorage.getItem('browsernotes-settings')).toBeNull();
     expect(localStorage.getItem('browsernotes-saved-searches')).toBeNull();
     expect(sessionStorage.getItem('browsernotes-session-cache')).toBeNull();
+    expect(sessionStorage.getItem('browsernotes-nav-state')).toBeNull();
   });
 
   it('skips migration when new key already exists (no overwrite)', () => {

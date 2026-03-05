@@ -132,7 +132,7 @@ describe('parseInput', () => {
     const result = parseInput('{"a":1}\nnot json\n{"a":3}');
     expect(result.format).toBe('ndjson');
     expect(result.rows).toHaveLength(2); // 2 valid lines
-    expect(result.error).toContain('1 lines failed');
+    expect(result.error).toContain('1 line failed');
   });
 });
 

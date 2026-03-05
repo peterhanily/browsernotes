@@ -42,6 +42,7 @@ export function unifiedSearch(
   if (query.raw.length > MAX_QUERY_LEN) return { results: [], error: 'Query too long' };
 
   const activeNotes = notes.filter((n) => !n.trashed && !n.archived);
+  const activeTasks = tasks.filter((t) => !t.trashed && !t.archived);
   const results: SearchResult[] = [];
   let error: string | undefined;
 
@@ -53,7 +54,7 @@ export function unifiedSearch(
         results.push(noteToResult(note, clipsFolderId, matchField, query.raw));
       }
     }
-    for (const task of tasks) {
+    for (const task of activeTasks) {
       const matchField = findSimpleTaskMatchField(task, lower);
       if (matchField) {
         results.push(taskToResult(task, matchField, query.raw));
@@ -89,7 +90,7 @@ export function unifiedSearch(
         results.push(noteToResult(note, clipsFolderId, matchField, query.raw));
       }
     }
-    for (const task of tasks) {
+    for (const task of activeTasks) {
       const matchField = findRegexTaskMatchField(task, regex);
       if (matchField) {
         results.push(taskToResult(task, matchField, query.raw));
@@ -128,7 +129,7 @@ export function unifiedSearch(
         results.push(noteToResult(note, clipsFolderId, 'content', query.raw));
       }
     }
-    for (const task of tasks) {
+    for (const task of activeTasks) {
       const fields: FieldSet = {
         title: task.title,
         content: task.description || '',

@@ -323,6 +323,203 @@ describe('executeTool — write tools', () => {
   });
 });
 
+describe('executeTool — update tools', () => {
+  beforeEach(async () => {
+    await db.notes.clear();
+    await db.tasks.clear();
+  });
+
+  it('update_note updates title and content', async () => {
+    await db.notes.add({
+      id: 'n1', title: 'Original', content: 'Old content',
+      tags: [], pinned: false, archived: false, trashed: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('update_note', { id: 'n1', title: 'Updated', content: 'New content' }),
+    );
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+
+    const stored = await db.notes.get('n1');
+    expect(stored!.title).toBe('Updated');
+    expect(stored!.content).toBe('New content');
+  });
+
+  it('update_note appends content', async () => {
+    await db.notes.add({
+      id: 'n1', title: 'Note', content: 'Line 1',
+      tags: [], pinned: false, archived: false, trashed: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await executeTool(makeToolUse('update_note', { id: 'n1', appendContent: 'Line 2' }));
+    const stored = await db.notes.get('n1');
+    expect(stored!.content).toBe('Line 1\nLine 2');
+  });
+
+  it('update_note returns error for missing id', async () => {
+    const { result } = await executeTool(makeToolUse('update_note', {}));
+    expect(JSON.parse(result).error).toContain('id');
+  });
+
+  it('update_task updates status and marks completed', async () => {
+    await db.tasks.add({
+      id: 't1', title: 'Task', completed: false, priority: 'none', status: 'todo',
+      order: 0, tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('update_task', { id: 't1', status: 'done', priority: 'high' }),
+    );
+    expect(isError).toBe(false);
+    expect(JSON.parse(result).success).toBe(true);
+
+    const stored = await db.tasks.get('t1');
+    expect(stored!.status).toBe('done');
+    expect(stored!.completed).toBe(true);
+    expect(stored!.priority).toBe('high');
+  });
+
+  it('update_task returns error for missing task', async () => {
+    const { result } = await executeTool(makeToolUse('update_task', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+});
+
+describe('executeTool — bulk_create_iocs', () => {
+  beforeEach(async () => {
+    await db.standaloneIOCs.clear();
+  });
+
+  it('creates multiple IOCs', async () => {
+    const { result, isError } = await executeTool(
+      makeToolUse('bulk_create_iocs', {
+        iocs: [
+          { type: 'ipv4', value: '10.0.0.1', confidence: 'high' },
+          { type: 'domain', value: 'evil.com', confidence: 'medium' },
+        ],
+      }),
+      'f1',
+    );
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.count).toBe(2);
+    expect(parsed.iocs).toHaveLength(2);
+
+    const stored = await db.standaloneIOCs.toArray();
+    expect(stored).toHaveLength(2);
+  });
+
+  it('returns error for empty iocs array', async () => {
+    const { result } = await executeTool(makeToolUse('bulk_create_iocs', { iocs: [] }));
+    expect(JSON.parse(result).error).toContain('iocs');
+  });
+});
+
+describe('executeTool — link_entities', () => {
+  beforeEach(async () => {
+    await db.notes.clear();
+    await db.tasks.clear();
+  });
+
+  it('links a note to a task', async () => {
+    await db.notes.add({
+      id: 'n1', title: 'Note', content: '',
+      tags: [], pinned: false, archived: false, trashed: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+    await db.tasks.add({
+      id: 't1', title: 'Task', completed: false, priority: 'none', status: 'todo',
+      order: 0, tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('link_entities', {
+        links: [{ sourceType: 'note', sourceId: 'n1', targetType: 'task', targetId: 't1' }],
+      }),
+    );
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.linked).toBe(1);
+
+    const stored = await db.notes.get('n1');
+    expect(stored!.linkedTaskIds).toContain('t1');
+  });
+
+  it('returns error for empty links', async () => {
+    const { result } = await executeTool(makeToolUse('link_entities', { links: [] }));
+    expect(JSON.parse(result).error).toContain('links');
+  });
+});
+
+describe('executeTool — search_all', () => {
+  beforeEach(async () => {
+    await db.notes.clear();
+    await db.tasks.clear();
+    await db.standaloneIOCs.clear();
+    await db.timelineEvents.clear();
+  });
+
+  it('searches across all entity types', async () => {
+    await db.notes.add({
+      id: 'n1', title: 'Malware Note', content: '',
+      folderId: 'f1', tags: [], pinned: false, archived: false, trashed: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+    await db.tasks.add({
+      id: 't1', title: 'Malware Task', completed: false, priority: 'none', status: 'todo',
+      order: 0, folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('search_all', { query: 'malware' }), 'f1');
+    const parsed = JSON.parse(result);
+    expect(parsed.notes.count).toBeGreaterThanOrEqual(1);
+    expect(parsed.tasks.count).toBeGreaterThanOrEqual(1);
+    expect(parsed.totalMatches).toBeGreaterThanOrEqual(2);
+  });
+
+  it('requires a query', async () => {
+    const { result } = await executeTool(makeToolUse('search_all', {}));
+    expect(JSON.parse(result).error).toContain('query');
+  });
+});
+
+describe('executeTool — analyze_graph', () => {
+  it('requires folderId', async () => {
+    const { result } = await executeTool(makeToolUse('analyze_graph'));
+    expect(JSON.parse(result).error).toContain('investigation');
+  });
+});
+
+describe('executeTool — generate_report', () => {
+  beforeEach(async () => {
+    await db.notes.clear();
+    await db.folders.clear();
+  });
+
+  it('requires folderId', async () => {
+    const { result } = await executeTool(makeToolUse('generate_report'));
+    expect(JSON.parse(result).error).toContain('investigation');
+  });
+
+  it('creates a report note', async () => {
+    await db.folders.add({ id: 'f1', name: 'Test Case', order: 0, createdAt: Date.now() });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('generate_report', { title: 'Test Report', executiveSummary: 'Summary here' }),
+      'f1',
+    );
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.title).toBe('Test Report');
+
+    const stored = await db.notes.get(parsed.id);
+    expect(stored!.content).toContain('Summary here');
+  });
+});
+
 describe('executeTool — extract_iocs', () => {
   it('extracts IOCs from text', async () => {
     const { result, isError } = await executeTool(

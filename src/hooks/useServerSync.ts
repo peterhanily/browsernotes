@@ -35,6 +35,8 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
   const wsClientRef = useRef<WSClient | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     if (auth.serverUrl && auth.connected) {
       configureServerApi(auth.serverUrl, auth.getAccessToken);
       enableSync();
@@ -53,6 +55,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
       syncEngine.start();
 
       auth.getAccessToken().then((token) => {
+        if (!active) return;  // Effect was cleaned up — discard stale token
         if (token && auth.serverUrl) {
           const ws = new WSClient(auth.serverUrl, token);
           ws.onStatusChange((ok) => auth.setReachable(ok));
@@ -76,6 +79,8 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
           });
           wsClientRef.current = ws;
         }
+      }).catch((err) => {
+        console.warn('[sync] Failed to get access token for WebSocket:', err);
       });
     } else {
       disableSync();
@@ -90,6 +95,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
     }
 
     return () => {
+      active = false;
       syncEngine.stop();
       syncEngine.setWSClient(null);
       disableSync();

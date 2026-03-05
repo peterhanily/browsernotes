@@ -176,12 +176,13 @@ describe('cacheSessionKey', () => {
     expect(cache.expiresAt).toBeGreaterThan(Date.now() + eightHours - 1000);
   });
 
-  it('"24h" stores with ~24 hour TTL', () => {
+  it('"24h" is capped at 8h TTL for security', () => {
     cacheSessionKey('mykey', '24h');
 
     const cache = JSON.parse(sessionStorage.getItem('threatcaddy-session-cache')!);
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    expect(cache.expiresAt).toBeGreaterThan(Date.now() + twentyFourHours - 1000);
+    const eightHours = 8 * 60 * 60 * 1000;
+    expect(cache.expiresAt).toBeGreaterThan(Date.now() + eightHours - 1000);
+    expect(cache.expiresAt).toBeLessThan(Date.now() + eightHours + 5000);
   });
 
   it('uses sessionStorage, not localStorage', () => {

@@ -42,7 +42,7 @@ export function installSyncHooks() {
       const entityId = (obj.id as string) || _primKey;
       const data = { ...obj };
       setTimeout(() => {
-        syncEngine.enqueue(tableName, entityId, 'put', data).catch(() => {});
+        syncEngine.enqueue(tableName, entityId, 'put', data).catch((err) => console.warn('[sync] enqueue failed:', err));
       }, 0);
     });
 
@@ -56,7 +56,7 @@ export function installSyncHooks() {
       if (!syncEnabled) return;
       const merged = { ...obj, ...modifications };
       setTimeout(() => {
-        syncEngine.enqueue(tableName, primKey, 'put', merged).catch(() => {});
+        syncEngine.enqueue(tableName, primKey, 'put', merged).catch((err) => console.warn('[sync] enqueue failed:', err));
       }, 0);
     });
 
@@ -64,7 +64,7 @@ export function installSyncHooks() {
     table.hook('deleting', function (primKey: string) {
       if (!syncEnabled) return;
       setTimeout(() => {
-        syncEngine.enqueue(tableName, primKey, 'delete').catch(() => {});
+        syncEngine.enqueue(tableName, primKey, 'delete').catch((err) => console.warn('[sync] enqueue failed:', err));
       }, 0);
     });
   }

@@ -85,7 +85,7 @@ export function ServerBackup() {
 
   const handleCreate = async () => {
     setCreateError('');
-    if (password.length < 8) { setCreateError('Password must be at least 8 characters'); return; }
+    if (password.length < 12) { setCreateError('Password must be at least 12 characters'); return; }
     if (password !== confirmPassword) { setCreateError('Passwords do not match'); return; }
     if (scope === 'investigation' && !selectedFolderId) { setCreateError('Select an investigation'); return; }
 
@@ -265,7 +265,7 @@ export function ServerBackup() {
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Password (min 8 chars)</label>
+          <label className="block text-xs text-gray-500 mb-1">Password (min 12 chars)</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} placeholder="Encryption password" />
         </div>
         <div>

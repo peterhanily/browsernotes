@@ -14,6 +14,7 @@ export function IOCBadge({ type, count, active, onClick }: IOCBadgeProps) {
   return (
     <button
       onClick={onClick}
+      aria-label={`${label} IOC filter${count !== undefined && count > 0 ? `, ${count} found` : ''}${active ? ', active' : ''}`}
       className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap"
       style={{
         backgroundColor: active ? `${color}30` : `${color}15`,

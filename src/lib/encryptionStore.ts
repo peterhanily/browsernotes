@@ -72,9 +72,10 @@ export function cacheSessionKey(rawKeyBase64: string, duration: SessionDuration)
   }
 
   const ttlMs = DURATION_MS[duration];
+  const cappedTtl = ttlMs ? Math.min(ttlMs, 8 * 60 * 60 * 1000) : undefined;
   const cache: SessionCache = {
     key: rawKeyBase64,
-    expiresAt: ttlMs ? Date.now() + ttlMs : 0,
+    expiresAt: cappedTtl ? Date.now() + cappedTtl : 0,
   };
   const payload = JSON.stringify(cache);
 

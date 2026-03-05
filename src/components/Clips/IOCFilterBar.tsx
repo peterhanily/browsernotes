@@ -31,6 +31,7 @@ export function IOCFilterBar({ selectedTypes, onChange }: IOCFilterBarProps) {
       {selectedTypes.length > 0 && (
         <button
           onClick={() => onChange([])}
+          aria-label="Clear IOC type filters"
           className="text-[11px] text-gray-500 hover:text-gray-300 px-2 whitespace-nowrap"
         >
           Clear

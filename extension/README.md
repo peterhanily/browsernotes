@@ -4,7 +4,7 @@ Clip text, images, and selections from any web page directly into ThreatCaddy. W
 
 ## Install — Chrome
 
-1. **[Download threatcaddy-chrome.zip](./dist/threatcaddy-chrome.zip)**
+1. **[Download threatcaddy-chrome.zip](./threatcaddy-chrome.zip)**
 2. Unzip the file
 3. Open `chrome://extensions` in Chrome
 4. Enable **Developer mode** (toggle in top-right)
@@ -13,7 +13,7 @@ Clip text, images, and selections from any web page directly into ThreatCaddy. W
 
 ## Install — Firefox
 
-1. **[Download threatcaddy-firefox.zip](./dist/threatcaddy-firefox.zip)**
+1. **[Download threatcaddy-firefox.zip](./threatcaddy-firefox.zip)**
 2. Unzip the file
 3. Open `about:debugging#/runtime/this-firefox` in Firefox
 4. Click **Load Temporary Add-on...**

@@ -509,34 +509,42 @@ chrome.runtime.onConnect.addListener((port) => {
   if (!port.name.startsWith('llm-')) return;
 
   let abortController = new AbortController();
+  let portDisconnected = false;
 
   port.onDisconnect.addListener(() => {
+    portDisconnected = true;
     abortController.abort();
   });
+
+  // Safe wrapper — silently drops messages if the port already disconnected
+  function safeSend(msg) {
+    if (portDisconnected) return;
+    try { port.postMessage(msg); } catch { portDisconnected = true; }
+  }
 
   port.onMessage.addListener(async (payload) => {
     try {
       if (payload.provider === 'anthropic') {
-        await streamAnthropic(port, payload, abortController.signal);
+        await streamAnthropic(safeSend, payload, abortController.signal);
       } else if (payload.provider === 'openai') {
-        await streamOpenAI(port, payload, abortController.signal);
+        await streamOpenAI(safeSend, payload, abortController.signal);
       } else if (payload.provider === 'gemini') {
-        await streamGemini(port, payload, abortController.signal);
+        await streamGemini(safeSend, payload, abortController.signal);
       } else if (payload.provider === 'mistral') {
-        await streamMistral(port, payload, abortController.signal);
+        await streamMistral(safeSend, payload, abortController.signal);
       } else if (payload.provider === 'local') {
-        await streamLocal(port, payload, abortController.signal);
+        await streamLocal(safeSend, payload, abortController.signal);
       } else {
-        port.postMessage({ type: 'error', error: `Unknown provider: ${payload.provider}` });
+        safeSend({ type: 'error', error: `Unknown provider: ${payload.provider}` });
       }
     } catch (err) {
       if (err.name === 'AbortError') return;
-      try { port.postMessage({ type: 'error', error: err.message || 'Unknown error' }); } catch {}
+      safeSend({ type: 'error', error: err.message || 'Unknown error' });
     }
   });
 });
 
-async function streamAnthropic(port, payload, signal) {
+async function streamAnthropic(send, payload, signal) {
   // Support both API keys (sk-ant-...) and OAuth/Bearer tokens
   const isApiKey = payload.apiKey.startsWith('sk-ant-');
   const authHeaders = isApiKey
@@ -574,7 +582,7 @@ async function streamAnthropic(port, payload, signal) {
 
   if (!resp.ok) {
     const respBody = await resp.text().catch(() => '');
-    port.postMessage({ type: 'error', error: `Anthropic API ${resp.status}: ${respBody}` });
+    send({ type: 'error', error: `Anthropic API ${resp.status}: ${respBody}` });
     return;
   }
 
@@ -616,7 +624,7 @@ async function streamAnthropic(port, payload, signal) {
           const block = contentBlocks[parsed.index];
           if (parsed.delta?.type === 'text_delta' && parsed.delta.text) {
             if (block) block.text += parsed.delta.text;
-            port.postMessage({ type: 'chunk', content: parsed.delta.text });
+            send({ type: 'chunk', content: parsed.delta.text });
           } else if (parsed.delta?.type === 'input_json_delta' && parsed.delta.partial_json) {
             if (block) block.input += parsed.delta.partial_json;
           }
@@ -636,11 +644,11 @@ async function streamAnthropic(port, payload, signal) {
     }
   }
 
-  port.postMessage({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
+  send({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
 }
 
 // Shared streamer for OpenAI-compatible APIs (OpenAI, Mistral, Local/Ollama/vLLM)
-async function streamOpenAICompatible(port, payload, signal, endpoint, headers, providerLabel) {
+async function streamOpenAICompatible(send, payload, signal, endpoint, headers, providerLabel) {
   const messages = [];
   if (payload.systemPrompt) {
     messages.push({ role: 'system', content: payload.systemPrompt });
@@ -694,7 +702,7 @@ async function streamOpenAICompatible(port, payload, signal, endpoint, headers, 
 
   if (!resp.ok) {
     const respBody = await resp.text().catch(() => '');
-    port.postMessage({ type: 'error', error: `${providerLabel} API ${resp.status}: ${respBody}` });
+    send({ type: 'error', error: `${providerLabel} API ${resp.status}: ${respBody}` });
     return;
   }
 
@@ -723,7 +731,7 @@ async function streamOpenAICompatible(port, payload, signal, endpoint, headers, 
 
         const content = choice.delta?.content;
         if (content) {
-          port.postMessage({ type: 'chunk', content });
+          send({ type: 'chunk', content });
         }
 
         if (choice.delta?.tool_calls) {
@@ -757,40 +765,40 @@ async function streamOpenAICompatible(port, payload, signal, endpoint, headers, 
     : stopReason === 'stop' ? 'end_turn'
     : stopReason || 'end_turn';
 
-  port.postMessage({ type: 'done', stopReason: normalizedStop, contentBlocks });
+  send({ type: 'done', stopReason: normalizedStop, contentBlocks });
 }
 
-async function streamOpenAI(port, payload, signal) {
+async function streamOpenAI(send, payload, signal) {
   await streamOpenAICompatible(
-    port, payload, signal,
+    send, payload, signal,
     'https://api.openai.com/v1/chat/completions',
     { 'Authorization': `Bearer ${payload.apiKey}` },
     'OpenAI'
   );
 }
 
-async function streamMistral(port, payload, signal) {
+async function streamMistral(send, payload, signal) {
   await streamOpenAICompatible(
-    port, payload, signal,
+    send, payload, signal,
     'https://api.mistral.ai/v1/chat/completions',
     { 'Authorization': `Bearer ${payload.apiKey}` },
     'Mistral'
   );
 }
 
-async function streamLocal(port, payload, signal) {
+async function streamLocal(send, payload, signal) {
   const base = (payload.endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
   const headers = {};
   if (payload.apiKey) headers['Authorization'] = `Bearer ${payload.apiKey}`;
   await streamOpenAICompatible(
-    port, payload, signal,
+    send, payload, signal,
     `${base}/chat/completions`,
     headers,
     'Local LLM'
   );
 }
 
-async function streamGemini(port, payload, signal) {
+async function streamGemini(send, payload, signal) {
   const model = payload.model;
   const apiKey = payload.apiKey;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -843,7 +851,7 @@ async function streamGemini(port, payload, signal) {
 
   if (!resp.ok) {
     const respBody = await resp.text().catch(() => '');
-    port.postMessage({ type: 'error', error: `Gemini API ${resp.status}: ${respBody}` });
+    send({ type: 'error', error: `Gemini API ${resp.status}: ${respBody}` });
     return;
   }
 
@@ -873,7 +881,7 @@ async function streamGemini(port, payload, signal) {
         if (candidate.content?.parts) {
           for (const part of candidate.content.parts) {
             if (part.text) {
-              port.postMessage({ type: 'chunk', content: part.text });
+              send({ type: 'chunk', content: part.text });
               // Accumulate text into a single text block
               let textBlock = contentBlocks.find(b => b.type === 'text');
               if (!textBlock) {
@@ -906,7 +914,7 @@ async function streamGemini(port, payload, signal) {
   const hasToolUse = contentBlocks.some(b => b.type === 'tool_use');
   if (hasToolUse && stopReason !== 'max_tokens') stopReason = 'tool_use';
 
-  port.postMessage({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
+  send({ type: 'done', stopReason: stopReason || 'end_turn', contentBlocks });
 }
 
 async function sendToTarget(targetUrl, captures) {

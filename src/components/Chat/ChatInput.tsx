@@ -63,6 +63,13 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
     return models;
   }, [localModelName, configuredProviders]);
 
+  // Auto-switch to a valid model when the current one isn't in the filtered list
+  useEffect(() => {
+    if (MODELS.length > 0 && !MODELS.some(m => m.value === model)) {
+      onModelChange(MODELS[0].value, MODELS[0].provider);
+    }
+  }, [MODELS, model, onModelChange]);
+
   const [text, setText] = useState('');
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);

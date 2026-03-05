@@ -61,10 +61,32 @@ export function ChatView({
     if (error) setLocalError(error);
   }, [error]);
 
+  // Compute which providers have API keys configured (must be before handleNewChat)
+  const configuredProviders = useMemo(() => {
+    const providers = new Set<string>();
+    if (settings.llmAnthropicApiKey?.trim()) providers.add('anthropic');
+    if (settings.llmOpenAIApiKey?.trim()) providers.add('openai');
+    if (settings.llmGeminiApiKey?.trim()) providers.add('gemini');
+    if (settings.llmMistralApiKey?.trim()) providers.add('mistral');
+    if (settings.llmLocalEndpoint?.trim()) providers.add('local');
+    return providers;
+  }, [settings.llmAnthropicApiKey, settings.llmOpenAIApiKey, settings.llmGeminiApiKey, settings.llmMistralApiKey, settings.llmLocalEndpoint]);
+
   const handleNewChat = useCallback(async () => {
     try {
-      const defaultModel = settings.llmDefaultModel || 'claude-sonnet-4-6';
-      const defaultProvider = settings.llmDefaultProvider || 'anthropic';
+      let defaultModel = settings.llmDefaultModel || 'claude-sonnet-4-6';
+      let defaultProvider: LLMProvider = (settings.llmDefaultProvider as LLMProvider) || 'anthropic';
+      // If the default provider has no API key, pick the first configured provider
+      if (configuredProviders.size > 0 && !configuredProviders.has(defaultProvider)) {
+        const first = configuredProviders.values().next().value!;
+        defaultProvider = first as LLMProvider;
+        // Pick a sensible model for that provider
+        const modelMap: Record<string, string> = {
+          anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1', gemini: 'gemini-2.5-flash-preview-05-20',
+          mistral: 'mistral-large-latest', local: settings.llmLocalModelName || 'local',
+        };
+        defaultModel = modelMap[defaultProvider] || defaultModel;
+      }
       const thread = await onCreateThread({
         model: defaultModel,
         provider: defaultProvider,
@@ -75,7 +97,7 @@ export function ChatView({
       console.error('Failed to create chat thread:', err);
       setLocalError('Failed to create chat thread. Try refreshing the page.');
     }
-  }, [onCreateThread, onSelectThread, settings, selectedFolderId]);
+  }, [onCreateThread, onSelectThread, settings, selectedFolderId, configuredProviders]);
 
   const getApiKeyForProvider = useCallback((provider: LLMProvider, s: Settings): string | undefined => {
     switch (provider) {
@@ -87,17 +109,6 @@ export function ChatView({
       default: return undefined;
     }
   }, []);
-
-  // Compute which providers have API keys configured
-  const configuredProviders = useMemo(() => {
-    const providers = new Set<string>();
-    if (settings.llmAnthropicApiKey?.trim()) providers.add('anthropic');
-    if (settings.llmOpenAIApiKey?.trim()) providers.add('openai');
-    if (settings.llmGeminiApiKey?.trim()) providers.add('gemini');
-    if (settings.llmMistralApiKey?.trim()) providers.add('mistral');
-    if (settings.llmLocalEndpoint?.trim()) providers.add('local');
-    return providers;
-  }, [settings.llmAnthropicApiKey, settings.llmOpenAIApiKey, settings.llmGeminiApiKey, settings.llmMistralApiKey, settings.llmLocalEndpoint]);
 
   const getProviderLabel = useCallback((provider: LLMProvider): string => {
     switch (provider) {

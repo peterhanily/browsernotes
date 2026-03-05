@@ -237,7 +237,7 @@ export function ShareReceiver({ encodedData, theme, onDismiss, onSave }: ShareRe
                   )}
                 >
                   <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block mb-1">
-                    {msg.role === 'user' ? 'You' : 'Assistant'}
+                    {msg.role === 'user' ? 'You' : 'CaddyAI'}
                   </span>
                   {msg.role === 'assistant' ? (
                     <div

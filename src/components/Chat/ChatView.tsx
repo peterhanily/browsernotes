@@ -277,7 +277,7 @@ export function ChatView({
     let content = `# Chat: ${activeThread.title}\n\n`;
     content += `*Exported on ${new Date().toLocaleDateString()} — Model: ${activeThread.model}*\n\n---\n\n`;
     for (const msg of activeThread.messages) {
-      const label = msg.role === 'user' ? '**You:**' : '**Caddy:**';
+      const label = msg.role === 'user' ? '**You:**' : '**CaddyAI:**';
       content += `${label}\n\n${msg.content}\n\n`;
       if (msg.toolCalls && msg.toolCalls.length > 0) {
         for (const tc of msg.toolCalls) {

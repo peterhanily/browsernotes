@@ -33,6 +33,7 @@ interface TimelineViewProps {
   onToggleArchiveEvent?: (id: string) => void;
   onToggleStar: (id: string) => void;
   getFilteredEvents: (opts: {
+    folderId?: string;
     eventTypes?: TimelineEventType[];
     starred?: boolean;
     search?: string;
@@ -191,6 +192,7 @@ export function TimelineView({
 
   const filteredEvents = useMemo(
     () => getFilteredEvents({
+      folderId: selectedFolderId,
       eventTypes: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
       starred: showStarredOnly || undefined,
       search: searchQuery || undefined,
@@ -199,7 +201,7 @@ export function TimelineView({
       dateStart,
       dateEnd,
     }),
-    [getFilteredEvents, selectedEventTypes, showStarredOnly, searchQuery, sortDir, selectedTimelineId, dateStart, dateEnd]
+    [getFilteredEvents, selectedFolderId, selectedEventTypes, showStarredOnly, searchQuery, sortDir, selectedTimelineId, dateStart, dateEnd]
   );
 
   const heatmapDetailEvents = useMemo(() => {

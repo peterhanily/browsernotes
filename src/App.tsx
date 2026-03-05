@@ -3,7 +3,7 @@ import { AppLayout } from './components/Layout/AppLayout';
 import { Header } from './components/Layout/Header';
 import { Sidebar } from './components/Layout/Sidebar';
 import { NoteList } from './components/Notes/NoteList';
-import { NoteEditor } from './components/Notes/NoteEditor';
+const NoteEditor = lazy(() => import('./components/Notes/NoteEditor').then(m => ({ default: m.NoteEditor })));
 import { TaskListView } from './components/Tasks/TaskList';
 const TimelineView = lazy(() => import('./components/Timeline/TimelineView').then(m => ({ default: m.TimelineView })));
 const WhiteboardView = lazy(() => import('./components/Whiteboard/WhiteboardView').then(m => ({ default: m.WhiteboardView })));

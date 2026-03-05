@@ -96,6 +96,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <label className={labelClass}>Anthropic API Key</label>
             <input
               type="password"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={settings.llmAnthropicApiKey || ''}
               onChange={(e) => onUpdateSettings({ llmAnthropicApiKey: e.target.value.trim() || undefined })}
               placeholder="sk-ant-..."
@@ -107,6 +110,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <label className={labelClass}>OpenAI API Key</label>
             <input
               type="password"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={settings.llmOpenAIApiKey || ''}
               onChange={(e) => onUpdateSettings({ llmOpenAIApiKey: e.target.value.trim() || undefined })}
               placeholder="sk-..."
@@ -118,6 +124,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <label className={labelClass}>Google Gemini API Key</label>
             <input
               type="password"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={settings.llmGeminiApiKey || ''}
               onChange={(e) => onUpdateSettings({ llmGeminiApiKey: e.target.value.trim() || undefined })}
               placeholder="AIza..."
@@ -129,6 +138,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
             <label className={labelClass}>Mistral API Key</label>
             <input
               type="password"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={settings.llmMistralApiKey || ''}
               onChange={(e) => onUpdateSettings({ llmMistralApiKey: e.target.value.trim() || undefined })}
               placeholder="..."
@@ -152,6 +164,9 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
               <label className={labelClass}>API Key (optional)</label>
               <input
                 type="password"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
                 value={settings.llmLocalApiKey || ''}
                 onChange={(e) => onUpdateSettings({ llmLocalApiKey: e.target.value.trim() || undefined })}
                 placeholder="Optional — some servers require one"

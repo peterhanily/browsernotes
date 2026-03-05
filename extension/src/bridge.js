@@ -1,10 +1,23 @@
 // Content script (ISOLATED world) — bridges postMessage between web app and background SW
 
+// Protocol version — increment when message shapes change in breaking ways.
+// The webapp reads this to know which features/messages the extension supports.
+var TC_PROTOCOL_VERSION = 1;
+var TC_CAPABILITIES = ['llm_streaming', 'fetch_url', 'clip_import'];
+
+function readyPayload() {
+  return {
+    type: 'TC_EXTENSION_READY',
+    protocolVersion: TC_PROTOCOL_VERSION,
+    capabilities: TC_CAPABILITIES,
+  };
+}
+
 // Guard against duplicate injection (static content_scripts + dynamic executeScript)
 if (document.documentElement.dataset.tcBridgeLoaded) {
   // Already loaded — just re-signal readiness and bail out
   if (chrome && chrome.runtime && chrome.runtime.id) {
-    window.postMessage({ type: 'TC_EXTENSION_READY' }, '*');
+    window.postMessage(readyPayload(), '*');
   }
 } else {
 document.documentElement.dataset.tcBridgeLoaded = '1';
@@ -21,20 +34,20 @@ function isExtensionValid() {
 
 // Signal extension presence
 if (isExtensionValid()) {
-  window.postMessage({ type: 'TC_EXTENSION_READY' }, '*');
+  window.postMessage(readyPayload(), '*');
 }
 
 // Re-signal readiness when page is restored from BFCache (back/forward navigation)
 document.addEventListener('pageshow', function (event) {
   if (event.persisted && isExtensionValid()) {
-    window.postMessage({ type: 'TC_EXTENSION_READY' }, '*');
+    window.postMessage(readyPayload(), '*');
   }
 });
 
 // Re-signal when tab becomes visible again (covers additional edge cases)
 document.addEventListener('visibilitychange', function () {
   if (!document.hidden && isExtensionValid()) {
-    window.postMessage({ type: 'TC_EXTENSION_READY' }, '*');
+    window.postMessage(readyPayload(), '*');
   }
 });
 
@@ -42,7 +55,7 @@ document.addEventListener('visibilitychange', function () {
 window.addEventListener('message', function (event) {
   if (event.source === window && event.data && event.data.type === 'TC_EXTENSION_PING') {
     if (isExtensionValid()) {
-      window.postMessage({ type: 'TC_EXTENSION_READY' }, '*');
+      window.postMessage(readyPayload(), '*');
     }
   }
 });

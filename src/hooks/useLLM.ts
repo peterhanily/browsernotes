@@ -33,8 +33,14 @@ interface AgentResult {
 
 const MAX_TOOL_TURNS = 8;
 
+export interface ExtensionInfo {
+  protocolVersion: number;
+  capabilities: string[];
+}
+
 export function useLLM() {
   const [extensionAvailable, setExtensionAvailable] = useState(false);
+  const [extensionInfo, setExtensionInfo] = useState<ExtensionInfo | null>(null);
   const [streamingContent, setStreamingContent] = useState('');
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -195,6 +201,10 @@ export function useLLM() {
 
       if (event.data.type === 'TC_EXTENSION_READY') {
         setExtensionAvailable(true);
+        setExtensionInfo({
+          protocolVersion: event.data.protocolVersion || 1,
+          capabilities: event.data.capabilities || [],
+        });
         return;
       }
 
@@ -315,6 +325,7 @@ export function useLLM() {
 
   return {
     extensionAvailable,
+    extensionInfo,
     streamingContent,
     activeRequestId,
     error,

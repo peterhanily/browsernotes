@@ -35,10 +35,13 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
 
-  "optional_host_permissions": ["*://*/*", "file:///*"],
+  "optional_host_permissions": ["*://*/*"],
 
   "content_scripts": [{
-    "matches": ["<all_urls>"],
+    "matches": [
+      "https://threatcaddy.com/*",
+      "https://www.threatcaddy.com/*"
+    ],
     "js": ["bridge.js"],
     "run_at": "document_idle"
   }],

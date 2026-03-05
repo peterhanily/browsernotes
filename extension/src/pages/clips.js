@@ -107,6 +107,21 @@ async function saveSettings() {
     showToast('Invalid target URL — only http, https, and file:// allowed', true);
     return;
   }
+
+  // Request host permission for non-default URLs so dynamic bridge registration works
+  const isDefaultUrl = targetUrl === DEFAULT_TARGET_URL
+    || targetUrl === 'https://www.threatcaddy.com'
+    || targetUrl.startsWith('file://');
+  if (!isDefaultUrl) {
+    try {
+      const granted = await requestHostPermission(targetUrl);
+      if (!granted) {
+        showToast('Permission denied — extension needs access to this site', true);
+        return;
+      }
+    } catch { /* Firefox may not need explicit permission */ }
+  }
+
   await chrome.storage.local.set({ settings: { targetUrl } });
   settingsSaved.classList.add('show');
   setTimeout(() => settingsSaved.classList.remove('show'), 2000);

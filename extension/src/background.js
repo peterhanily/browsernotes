@@ -2,6 +2,87 @@
 
 const MAX_CAPTURES = 500;
 
+// ── Dynamic bridge.js registration (MV3) ────────────────────────────────
+// Static content_scripts only cover threatcaddy.com. For self-hosted,
+// localhost, or file:// targets we register bridge.js dynamically.
+
+const DYNAMIC_BRIDGE_SCRIPT_ID = 'dynamic-bridge';
+const STATIC_BRIDGE_PATTERNS = new Set([
+  'https://threatcaddy.com/*',
+  'https://www.threatcaddy.com/*',
+]);
+
+function targetUrlToMatchPattern(targetUrl) {
+  if (!targetUrl) return null;
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.protocol === 'file:') return null;
+    if (!/^https?:$/.test(parsed.protocol)) return null;
+    const pattern = `${parsed.protocol}//${parsed.host}/*`;
+    return STATIC_BRIDGE_PATTERNS.has(pattern) ? null : pattern;
+  } catch { return null; }
+}
+
+async function registerBridgeForPattern(matchPattern) {
+  if (!matchPattern) return;
+  try {
+    const existing = await chrome.scripting.getRegisteredContentScripts(
+      { ids: [DYNAMIC_BRIDGE_SCRIPT_ID] }
+    );
+    if (existing.length > 0) {
+      if (existing[0].matches?.[0] === matchPattern) return; // already correct
+      await chrome.scripting.updateContentScripts([{
+        id: DYNAMIC_BRIDGE_SCRIPT_ID,
+        matches: [matchPattern], js: ['bridge.js'], runAt: 'document_idle',
+      }]);
+    } else {
+      await chrome.scripting.registerContentScripts([{
+        id: DYNAMIC_BRIDGE_SCRIPT_ID,
+        matches: [matchPattern], js: ['bridge.js'], runAt: 'document_idle',
+      }]);
+    }
+  } catch (err) { console.warn('Dynamic bridge registration failed:', err); }
+}
+
+async function unregisterDynamicBridge() {
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [DYNAMIC_BRIDGE_SCRIPT_ID] });
+  } catch { /* not registered */ }
+}
+
+async function syncBridgeRegistration() {
+  const { settings = {} } = await chrome.storage.local.get(['settings']);
+  const targetUrl = settings.targetUrl;
+  if (!targetUrl || targetUrl === 'https://threatcaddy.com'
+      || targetUrl === 'https://www.threatcaddy.com') {
+    await unregisterDynamicBridge();
+    return;
+  }
+  const pattern = targetUrlToMatchPattern(targetUrl);
+  if (pattern) await registerBridgeForPattern(pattern);
+  else await unregisterDynamicBridge();
+}
+
+// Sync on every SW startup
+syncBridgeRegistration();
+
+// Re-sync when settings change (user saves new target URL in clips page)
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.settings) syncBridgeRegistration();
+});
+
+// Auto-inject bridge.js on file:// targets (can't use registerContentScripts for file://)
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== 'complete' || !tab.url?.startsWith('file://')) return;
+  const { settings = {} } = await chrome.storage.local.get(['settings']);
+  if (!settings.targetUrl?.startsWith('file://')) return;
+  if (tab.url.startsWith(settings.targetUrl) || tab.url === settings.targetUrl) {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['bridge.js'] });
+    } catch { /* no file access or restricted page */ }
+  }
+});
+
 // Injected into the page to capture selection as markdown with inline images
 async function getSelectionAsMarkdown() {
   const sel = window.getSelection();
@@ -222,6 +303,8 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Save to ThreatCaddy',
     contexts: ['selection']
   });
+  // Re-sync dynamic bridge registration on install/update
+  syncBridgeRegistration();
 });
 
 // Handle context menu click
@@ -858,8 +941,18 @@ async function sendToTarget(targetUrl, captures) {
   // Wait for the web app's React to mount and register its message listener
   await new Promise(resolve => setTimeout(resolve, 2500));
 
-  // Send clips via content script bridge (works on both Chrome and Firefox)
-  await chrome.tabs.sendMessage(tab.id, { type: 'INJECT_CLIPS_TO_PAGE', clips: captures });
+  // Try sending clips — if bridge.js isn't present, inject it and retry
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'INJECT_CLIPS_TO_PAGE', clips: captures });
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['bridge.js'] });
+      await new Promise(r => setTimeout(r, 300));
+      await chrome.tabs.sendMessage(tab.id, { type: 'INJECT_CLIPS_TO_PAGE', clips: captures });
+    } catch (retryErr) {
+      throw new Error('Failed to inject clips. The target page may not be accessible.');
+    }
+  }
 
   return { success: true };
 }

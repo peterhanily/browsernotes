@@ -68,10 +68,15 @@ export function decryptSecret(encrypted: string): string {
  * Convention: keys ending in 'Key', 'Secret', 'Token', or 'Password' are secrets.
  */
 export function encryptConfigSecrets(config: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...config };
-  for (const [key, value] of Object.entries(result)) {
-    if (typeof value === 'string' && isSecretField(key) && !value.startsWith('enc:')) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recurse into nested objects
+      result[key] = encryptConfigSecrets(value as Record<string, unknown>);
+    } else if (isSecretField(key) && typeof value === 'string' && value && !value.startsWith('enc:')) {
       result[key] = encryptSecret(value);
+    } else {
+      result[key] = value;
     }
   }
   return result;
@@ -82,15 +87,20 @@ export function encryptConfigSecrets(config: Record<string, unknown>): Record<st
  * Only call this in the bot runtime — never expose decrypted config via API.
  */
 export function decryptConfigSecrets(config: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...config };
-  for (const [key, value] of Object.entries(result)) {
-    if (typeof value === 'string' && value.startsWith('enc:')) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recurse into nested objects
+      result[key] = decryptConfigSecrets(value as Record<string, unknown>);
+    } else if (typeof value === 'string' && value.startsWith('enc:')) {
       try {
         result[key] = decryptSecret(value);
       } catch (err) {
         logger.error('Failed to decrypt bot secret', { key, error: String(err) });
         result[key] = '';  // Don't crash — let the bot handle missing keys
       }
+    } else {
+      result[key] = value;
     }
   }
   return result;
@@ -101,16 +111,23 @@ export function decryptConfigSecrets(config: Record<string, unknown>): Record<st
  * Returns config with secret values replaced by '***configured***' or '***not set***'.
  */
 export function redactConfigSecrets(config: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...config };
-  for (const [key, value] of Object.entries(result)) {
-    if (isSecretField(key)) {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recurse into nested objects
+      result[key] = redactConfigSecrets(value as Record<string, unknown>);
+    } else if (isSecretField(key)) {
       result[key] = typeof value === 'string' && value.length > 0 ? '***configured***' : '***not set***';
+    } else {
+      result[key] = value;
     }
   }
   return result;
 }
 
+const SECRET_SUFFIXES = ['secret', 'password', 'token', 'apikey', 'api_key', 'auth_key', 'private_key', 'encryption_key'];
+
 function isSecretField(key: string): boolean {
   const lower = key.toLowerCase();
-  return lower.endsWith('key') || lower.endsWith('secret') || lower.endsWith('token') || lower.endsWith('password');
+  return SECRET_SUFFIXES.some(suffix => lower.endsWith(suffix) || lower === suffix);
 }

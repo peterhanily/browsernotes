@@ -27,6 +27,7 @@ export interface BotEvent {
   userId?: string;       // who triggered the event (human or bot)
   data?: Record<string, unknown>;
   timestamp: Date;
+  depth?: number;        // event chain depth — prevents infinite mutual bot loops
 }
 
 export type BotEventType =

@@ -2,14 +2,15 @@ import { Hono } from 'hono';
 import { nanoid } from 'nanoid';
 import { eq, desc } from 'drizzle-orm';
 import * as argon2 from 'argon2';
+import { timingSafeEqual } from 'node:crypto';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 import { logActivity } from '../services/audit-service.js';
-import { botManager } from '../bots/bot-manager.js';
-import { encryptConfigSecrets, redactConfigSecrets } from '../bots/secret-store.js';
-import type { BotConfig, BotCapability, BotTriggerConfig, BotType } from '../bots/types.js';
+import { botManager, validateCronExpression } from '../bots/bot-manager.js';
+import { encryptConfigSecrets, redactConfigSecrets, decryptConfigSecrets } from '../bots/secret-store.js';
+import type { BotCapability, BotTriggerConfig, BotType } from '../bots/types.js';
 
 const VALID_BOT_TYPES: BotType[] = ['enrichment', 'feed', 'monitor', 'triage', 'report', 'correlation', 'ai-agent', 'custom'];
 
@@ -21,8 +22,15 @@ const VALID_CAPABILITIES: BotCapability[] = [
 
 const app = new Hono();
 
-// All bot admin routes require admin role
-app.use('*', requireAuth);
+// All bot admin routes require auth, except webhook endpoint (uses its own secret)
+app.use('*', async (c, next) => {
+  // Webhook endpoint uses its own auth (webhook secret), not JWT
+  if (c.req.path.match(/\/[^/]+\/webhook$/) && c.req.method === 'POST') {
+    return next();
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (requireAuth as any)(c, next);
+});
 
 // ─── List all bot configs ───────────────────────────────────────
 
@@ -76,6 +84,20 @@ app.post('/', requireRole('admin'), async (c) => {
     if (!VALID_CAPABILITIES.includes(cap)) {
       return c.json({ error: `Invalid capability: ${cap}` }, 400);
     }
+  }
+
+  // Validate domain format (bare hostnames only, no protocol or path)
+  if (Array.isArray(allowedDomains)) {
+    for (const domain of allowedDomains) {
+      if (typeof domain !== 'string' || !domain.match(/^[a-zA-Z0-9]([a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}$/)) {
+        return c.json({ error: `Invalid domain: ${domain}. Use bare hostnames (e.g., api.virustotal.com)` }, 400);
+      }
+    }
+  }
+
+  if (triggers?.schedule) {
+    const cronError = validateCronExpression(triggers.schedule);
+    if (cronError) return c.json({ error: cronError }, 400);
   }
 
   // Create a bot user account
@@ -165,7 +187,13 @@ app.patch('/:id', requireRole('admin'), async (c) => {
 
   if (body.name !== undefined) updates.name = body.name.trim();
   if (body.description !== undefined) updates.description = body.description.trim();
-  if (body.triggers !== undefined) updates.triggers = body.triggers;
+  if (body.triggers !== undefined) {
+    if (body.triggers?.schedule) {
+      const cronError = validateCronExpression(body.triggers.schedule);
+      if (cronError) return c.json({ error: cronError }, 400);
+    }
+    updates.triggers = body.triggers;
+  }
   if (body.allowedDomains !== undefined) updates.allowedDomains = body.allowedDomains;
   if (body.scopeType !== undefined) updates.scopeType = body.scopeType;
   if (body.scopeFolderIds !== undefined) updates.scopeFolderIds = body.scopeFolderIds;
@@ -276,27 +304,30 @@ app.post('/:id/trigger', requireRole('admin'), async (c) => {
 
 app.post('/:id/webhook', async (c) => {
   const id = c.req.param('id');
-
   const rows = await db.select().from(schema.botConfigs).where(eq(schema.botConfigs.id, id)).limit(1);
   if (rows.length === 0) return c.json({ error: 'Not found' }, 404);
   if (!rows[0].enabled) return c.json({ error: 'Bot is disabled' }, 400);
 
-  const config = rows[0] as unknown as BotConfig;
-  if (!config.triggers.webhook) return c.json({ error: 'Webhooks not enabled for this bot' }, 400);
+  const config = rows[0];
+  const triggers = config.triggers as Record<string, unknown>;
+  if (!triggers?.webhook) return c.json({ error: 'Webhooks not enabled for this bot' }, 400);
 
-  // Validate webhook secret if configured
-  const webhookSecret = (config.config as Record<string, unknown>).webhookSecret;
+  // Decrypt config to get plaintext webhook secret
+  const decryptedConfig = decryptConfigSecrets(config.config as Record<string, unknown>);
+  const webhookSecret = decryptedConfig.webhookSecret as string | undefined;
+
   if (webhookSecret) {
-    const authHeader = c.req.header('X-Webhook-Secret');
-    if (!authHeader || authHeader !== webhookSecret) {
+    const authHeader = c.req.header('X-Webhook-Secret') || '';
+    // Timing-safe comparison
+    const secretBuf = Buffer.from(webhookSecret);
+    const headerBuf = Buffer.from(authHeader);
+    if (secretBuf.length !== headerBuf.length || !timingSafeEqual(secretBuf, headerBuf)) {
       return c.json({ error: 'Invalid webhook secret' }, 401);
     }
   }
 
   const payload = await c.req.json().catch(() => ({}));
-
   void botManager.executeBot(id, 'webhook', undefined, payload);
-
   return c.json({ ok: true, message: 'Webhook received' });
 });
 

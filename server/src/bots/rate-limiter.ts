@@ -45,6 +45,16 @@ export class BotRateLimiter {
   }
 
   /**
+   * Check if a token can be consumed without actually consuming it.
+   */
+  canConsume(key: string, count: number = 1): boolean {
+    const bucket = this.buckets.get(key);
+    if (!bucket) return true; // No limit registered = allow
+    this.refill(bucket);
+    return bucket.tokens >= count;
+  }
+
+  /**
    * Get remaining tokens for a bucket.
    */
   remaining(key: string): number {
@@ -59,7 +69,9 @@ export class BotRateLimiter {
    */
   retryAfter(key: string): number {
     const bucket = this.buckets.get(key);
-    if (!bucket || bucket.tokens >= 1) return 0;
+    if (!bucket) return 0;
+    this.refill(bucket);
+    if (bucket.tokens >= 1) return 0;
     const deficit = 1 - bucket.tokens;
     return Math.ceil(deficit / bucket.refillRate);
   }
@@ -69,7 +81,7 @@ export class BotRateLimiter {
    */
   removeBuckets(botId: string): void {
     for (const key of this.buckets.keys()) {
-      if (key.startsWith(`bot:${botId}`)) {
+      if (key.startsWith(`bot:${botId}:`)) {
         this.buckets.delete(key);
       }
     }

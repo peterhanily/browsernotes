@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, count, sql, desc, and, gte, lte, ilike, or } from 'drizzle-orm';
+import { eq, count, sql, desc, and, gte, lte, ilike, or, not } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
 import { unlink } from 'node:fs/promises';
@@ -10,7 +10,7 @@ import {
   standaloneIOCs, chatThreads, posts, files, notifications,
   botConfigs, botRuns,
 } from '../db/schema.js';
-import { botManager } from '../bots/bot-manager.js';
+import { botManager, validateCronExpression } from '../bots/bot-manager.js';
 import { encryptConfigSecrets, redactConfigSecrets } from '../bots/secret-store.js';
 import {
   verifyAdminSecret, changeAdminSecret, getRegistrationMode, setRegistrationMode,
@@ -81,7 +81,9 @@ app.get('/api/users', requireAdminAuth, async (c) => {
     active: users.active,
     lastLoginAt: users.lastLoginAt,
     createdAt: users.createdAt,
-  }).from(users).orderBy(users.createdAt);
+  }).from(users)
+    .where(not(ilike(users.email, '%@threatcaddy.internal')))
+    .orderBy(users.createdAt);
 
   return c.json({ users: allUsers });
 });
@@ -225,7 +227,9 @@ app.get('/api/users/export', requireAdminAuth, async (c) => {
     active: users.active,
     lastLoginAt: users.lastLoginAt,
     createdAt: users.createdAt,
-  }).from(users).orderBy(users.createdAt);
+  }).from(users)
+    .where(not(ilike(users.email, '%@threatcaddy.internal')))
+    .orderBy(users.createdAt);
 
   const csvEscape = (s: string | null | undefined) => {
     if (s == null) return '';
@@ -318,8 +322,8 @@ app.post('/api/change-secret', requireAdminAuth, async (c) => {
 // ─── Stats ───────────────────────────────────────────────────────
 
 app.get('/api/stats', requireAdminAuth, async (c) => {
-  const [totalResult] = await db.select({ count: count() }).from(users);
-  const [activeResult] = await db.select({ count: count() }).from(users).where(eq(users.active, true));
+  const [totalResult] = await db.select({ count: count() }).from(users).where(not(ilike(users.email, '%@threatcaddy.internal')));
+  const [activeResult] = await db.select({ count: count() }).from(users).where(and(eq(users.active, true), not(ilike(users.email, '%@threatcaddy.internal'))));
   const [invResult] = await db.select({ count: count() }).from(folders);
   const [sessionResult] = await db.select({ count: count() }).from(sessions).where(gte(sessions.expiresAt, new Date()));
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -883,6 +887,20 @@ app.post('/api/bots', requireAdminAuth, async (c) => {
     }
   }
 
+  // Validate allowedDomains
+  if (Array.isArray(allowedDomains)) {
+    for (const domain of allowedDomains) {
+      if (typeof domain !== 'string' || !domain.match(/^[a-zA-Z0-9]([a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}$/)) {
+        return c.json({ error: `Invalid domain: ${domain}. Use bare hostnames (e.g., api.virustotal.com)` }, 400);
+      }
+    }
+  }
+
+  if (triggers?.schedule) {
+    const cronError = validateCronExpression(triggers.schedule);
+    if (cronError) return c.json({ error: cronError }, 400);
+  }
+
   const botId = nanoid();
   const botUserId = nanoid();
   const now = new Date();
@@ -1044,6 +1062,10 @@ app.patch('/api/bots/:id', requireAdminAuth, async (c) => {
     updates.description = typeof body.description === 'string' ? body.description.trim() : '';
   }
   if (body.triggers !== undefined) {
+    if (body.triggers?.schedule) {
+      const cronError = validateCronExpression(body.triggers.schedule);
+      if (cronError) return c.json({ error: cronError }, 400);
+    }
     updates.triggers = body.triggers && typeof body.triggers === 'object' ? body.triggers : {};
   }
   if (body.config !== undefined) {
@@ -1063,6 +1085,13 @@ app.patch('/api/bots/:id', requireAdminAuth, async (c) => {
     updates.capabilities = body.capabilities;
   }
   if (body.allowedDomains !== undefined) {
+    if (Array.isArray(body.allowedDomains)) {
+      for (const domain of body.allowedDomains) {
+        if (typeof domain !== 'string' || !domain.match(/^[a-zA-Z0-9]([a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}$/)) {
+          return c.json({ error: `Invalid domain: ${domain}. Use bare hostnames (e.g., api.virustotal.com)` }, 400);
+        }
+      }
+    }
     updates.allowedDomains = Array.isArray(body.allowedDomains) ? body.allowedDomains : [];
   }
   if (body.scopeType !== undefined) {

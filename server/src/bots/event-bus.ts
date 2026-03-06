@@ -1,6 +1,10 @@
 import { EventEmitter } from 'node:events';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { BotEvent, BotEventType } from './types.js';
 import { logger } from '../lib/logger.js';
+
+/** Tracks current bot event chain depth to prevent infinite mutual bot loops */
+export const botEventDepth = new AsyncLocalStorage<number>();
 
 /**
  * In-process event bus for bot triggers.
@@ -78,6 +82,7 @@ export function emitEntityEvent(
     }
   }
 
+  const depth = botEventDepth.getStore() || 0;
   botEventBus.emitBotEvent({
     type,
     table,
@@ -86,5 +91,6 @@ export function emitEntityEvent(
     userId,
     data,
     timestamp: new Date(),
+    depth,
   });
 }

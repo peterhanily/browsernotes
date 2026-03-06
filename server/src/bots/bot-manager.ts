@@ -1,10 +1,10 @@
 import { nanoid } from 'nanoid';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { logActivity } from '../services/audit-service.js';
 import { logger } from '../lib/logger.js';
-import { botEventBus } from './event-bus.js';
+import { botEventBus, botEventDepth } from './event-bus.js';
 import { botRateLimiter } from './rate-limiter.js';
 import { decryptConfigSecrets } from './secret-store.js';
 import type { Bot, BotConfig, BotContext, BotEvent, BotRunStatus, BotTriggerType, BotCapability } from './types.js';
@@ -34,6 +34,19 @@ export class BotManager {
       } catch (err) {
         logger.error(`Failed to load bot ${row.name}`, { botId: row.id, error: String(err) });
       }
+    }
+
+    // Clean up stale 'running' bot_runs from previous crash
+    try {
+      const stale = await db.update(schema.botRuns)
+        .set({ status: 'error', error: 'Server restarted during execution', durationMs: 0 })
+        .where(eq(schema.botRuns.status, 'running'))
+        .returning({ id: schema.botRuns.id });
+      if (stale.length > 0) {
+        logger.info(`Cleaned up ${stale.length} stale bot run(s) from previous crash`);
+      }
+    } catch (err) {
+      logger.error('Failed to clean up stale bot runs', { error: String(err) });
     }
 
     // Listen for all events and route to bots
@@ -112,6 +125,15 @@ export class BotManager {
 
   /** Route an event to all bots that subscribe to it */
   private async routeEvent(event: BotEvent): Promise<void> {
+    const eventDepth = event.depth || 0;
+    if (eventDepth >= 5) {
+      logger.warn('Bot event chain depth limit reached, dropping event', {
+        type: event.type,
+        depth: eventDepth,
+      });
+      return;
+    }
+
     for (const [botId, config] of this.configs) {
       if (!config.enabled) continue;
       if (!config.triggers.events?.includes(event.type)) continue;
@@ -147,21 +169,23 @@ export class BotManager {
     const config = this.configs.get(botId);
     if (!config || !config.enabled) return;
 
-    // Rate limiting
-    if (!botRateLimiter.tryConsume(`bot:${botId}:hour`)) {
-      logger.warn(`Bot ${config.name} rate limited (hourly)`, { botId });
+    // Rate limiting — check both limits before consuming either to avoid
+    // consuming an hourly token when the daily limit is already exhausted
+    const hourlyKey = `bot:${botId}:hour`;
+    const dailyKey = `bot:${botId}:day`;
+    if (!botRateLimiter.canConsume(hourlyKey) || !botRateLimiter.canConsume(dailyKey)) {
+      logger.warn(`Bot ${config.name} rate limited`, { botId });
       return;
     }
-    if (!botRateLimiter.tryConsume(`bot:${botId}:day`)) {
-      logger.warn(`Bot ${config.name} rate limited (daily)`, { botId });
-      return;
-    }
+    botRateLimiter.tryConsume(hourlyKey);
+    botRateLimiter.tryConsume(dailyKey);
 
     // Concurrency limit
     if (this.activeRuns >= MAX_CONCURRENT_RUNS) {
       logger.warn('Max concurrent bot runs reached, skipping', { botId, activeRuns: this.activeRuns });
       return;
     }
+    this.activeRuns++;
 
     const runId = nanoid();
     const startTime = Date.now();
@@ -194,7 +218,6 @@ export class BotManager {
       abortController.abort();
     }, BOT_EXECUTION_TIMEOUT_MS);
 
-    this.activeRuns++;
     let status: BotRunStatus = 'success';
     let error: string | null = null;
 
@@ -210,19 +233,21 @@ export class BotManager {
         folderId: event?.folderId,
       });
 
-      // Dispatch to the right handler
-      // For now, bots are config-only (no runtime code).
-      // When specific bot implementations are added, they'll be looked up here.
-      const bot = this.bots.get(botId);
-      if (bot) {
-        if (trigger === 'event' && event && bot.onEvent) {
-          await bot.onEvent(ctx, event);
-        } else if (trigger === 'schedule' && bot.onSchedule) {
-          await bot.onSchedule(ctx);
-        } else if (trigger === 'webhook' && webhookPayload && bot.onWebhook) {
-          await bot.onWebhook(ctx, webhookPayload);
+      // Dispatch to the right handler, wrapped in botEventDepth context
+      // so any entity mutations emitted by the bot carry the incremented depth
+      const nextDepth = (event?.depth || 0) + 1;
+      await botEventDepth.run(nextDepth, async () => {
+        const bot = this.bots.get(botId);
+        if (bot) {
+          if (trigger === 'event' && event && bot.onEvent) {
+            await bot.onEvent(ctx, event);
+          } else if (trigger === 'schedule' && bot.onSchedule) {
+            await bot.onSchedule(ctx);
+          } else if (trigger === 'webhook' && webhookPayload && bot.onWebhook) {
+            await bot.onWebhook(ctx, webhookPayload);
+          }
         }
-      }
+      });
     } catch (err) {
       if (abortController.signal.aborted) {
         status = 'timeout';
@@ -239,26 +264,37 @@ export class BotManager {
       const durationMs = Date.now() - startTime;
 
       // Update run record
-      await db.update(schema.botRuns).set({
-        status,
-        durationMs,
-        error,
-        outputSummary: `Created: ${ctx.entitiesCreated}, Updated: ${ctx.entitiesUpdated}, API calls: ${ctx.apiCallsMade}`,
-        entitiesCreated: ctx.entitiesCreated,
-        entitiesUpdated: ctx.entitiesUpdated,
-        apiCallsMade: ctx.apiCallsMade,
-      }).where(eq(schema.botRuns.id, runId));
+      try {
+        await db.update(schema.botRuns).set({
+          status,
+          durationMs,
+          error,
+          outputSummary: `Created: ${ctx.entitiesCreated}, Updated: ${ctx.entitiesUpdated}, API calls: ${ctx.apiCallsMade}`,
+          entitiesCreated: ctx.entitiesCreated,
+          entitiesUpdated: ctx.entitiesUpdated,
+          apiCallsMade: ctx.apiCallsMade,
+        }).where(eq(schema.botRuns.id, runId));
+      } catch (err) {
+        logger.error(`Failed to update bot run record ${runId}`, { error: String(err) });
+      }
 
-      // Update bot config stats
-      await db.update(schema.botConfigs).set({
-        lastRunAt: new Date(),
-        lastError: error,
-        runCount: config.runCount + 1,
-        errorCount: status === 'error' || status === 'timeout' ? config.errorCount + 1 : config.errorCount,
-        updatedAt: new Date(),
-      }).where(eq(schema.botConfigs.id, botId));
+      // Update bot config stats using SQL increment to avoid race conditions
+      try {
+        const statsUpdate: Record<string, unknown> = {
+          lastRunAt: new Date(),
+          lastError: error,
+          runCount: sql`${schema.botConfigs.runCount} + 1`,
+          updatedAt: new Date(),
+        };
+        if (status === 'error' || status === 'timeout') {
+          statsUpdate.errorCount = sql`${schema.botConfigs.errorCount} + 1`;
+        }
+        await db.update(schema.botConfigs).set(statsUpdate).where(eq(schema.botConfigs.id, botId));
+      } catch (err) {
+        logger.error(`Failed to update bot config stats for ${botId}`, { error: String(err) });
+      }
 
-      // Update in-memory config
+      // Update in-memory config (best-effort cache)
       const updatedConfig = this.configs.get(botId);
       if (updatedConfig) {
         updatedConfig.runCount++;
@@ -268,15 +304,19 @@ export class BotManager {
       }
 
       // Audit: bot run completed
-      await logActivity({
-        userId: config.userId,
-        category: 'bot',
-        action: `run.${status}`,
-        detail: `Bot "${config.name}" ${status} in ${durationMs}ms — created ${ctx.entitiesCreated}, updated ${ctx.entitiesUpdated}`,
-        itemId: runId,
-        itemTitle: config.name,
-        folderId: event?.folderId,
-      });
+      try {
+        await logActivity({
+          userId: config.userId,
+          category: 'bot',
+          action: `run.${status}`,
+          detail: `Bot "${config.name}" ${status} in ${durationMs}ms — created ${ctx.entitiesCreated}, updated ${ctx.entitiesUpdated}`,
+          itemId: runId,
+          itemTitle: config.name,
+          folderId: event?.folderId,
+        });
+      } catch (err) {
+        logger.error(`Failed to log bot run audit for ${botId}`, { error: String(err) });
+      }
     }
   }
 
@@ -324,13 +364,7 @@ export class BotManager {
   }
 }
 
-/**
- * Parse a simple cron expression to interval in milliseconds.
- * Supports common patterns:
- *   '* / 5 * * * *'  → every 5 minutes
- *   '0 * / 6 * * *'  → every 6 hours
- *   '0 0 * * *'      → every 24 hours
- */
+/** Parse a simple cron expression to interval in milliseconds. */
 function parseCronToMs(cron: string): number {
   const parts = cron.trim().split(/\s+/);
   if (parts.length < 5) return 0;
@@ -340,26 +374,35 @@ function parseCronToMs(cron: string): number {
   // Every N minutes: '*/N * * * *'
   if (minute.startsWith('*/')) {
     const n = parseInt(minute.slice(2), 10);
-    if (n > 0) return n * 60 * 1000;
+    if (n > 0 && n <= 1440) return n * 60 * 1000;
   }
 
   // Every N hours: '0 */N * * *'
   if (minute === '0' && hour.startsWith('*/')) {
     const n = parseInt(hour.slice(2), 10);
-    if (n > 0) return n * 60 * 60 * 1000;
+    if (n > 0 && n <= 24) return n * 60 * 60 * 1000;
   }
 
-  // Daily: '0 0 * * *'
-  if (minute === '0' && hour === '0') {
-    return 24 * 60 * 60 * 1000;
+  // Daily at specific hour: '0 N * * *' or 'M N * * *'
+  if (/^\d+$/.test(minute) && /^\d+$/.test(hour) && parts[2] === '*') {
+    return 24 * 60 * 60 * 1000; // Run daily
   }
 
-  // Hourly: '0 * * * *'
-  if (minute === '0' && hour === '*') {
+  // Hourly: '0 * * * *' or 'N * * * *'
+  if (/^\d+$/.test(minute) && hour === '*') {
     return 60 * 60 * 1000;
   }
 
   return 0;
+}
+
+/** Validate a cron expression can be parsed. Returns error message or null. */
+export function validateCronExpression(cron: string): string | null {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 5) return 'Cron expression must have 5 fields (minute hour day month weekday)';
+  const ms = parseCronToMs(cron);
+  if (ms <= 0) return 'Unsupported cron pattern. Supported: */N * * * * (every N min), 0 */N * * * (every N hours), 0 0 * * * (daily), N * * * * (hourly at min N)';
+  return null;
 }
 
 // Singleton

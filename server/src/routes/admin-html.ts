@@ -615,7 +615,11 @@ export function getAdminHtml(nonce: string): string {
           <label><input type="checkbox" class="bot-event-check" value="entity.deleted"> Entity Deleted</label>
           <label><input type="checkbox" class="bot-event-check" value="investigation.created"> Investigation Created</label>
           <label><input type="checkbox" class="bot-event-check" value="investigation.closed"> Investigation Closed</label>
+          <label><input type="checkbox" class="bot-event-check" value="investigation.archived"> Investigation Archived</label>
           <label><input type="checkbox" class="bot-event-check" value="post.created"> Post Created</label>
+          <label><input type="checkbox" class="bot-event-check" value="member.added"> Member Added</label>
+          <label><input type="checkbox" class="bot-event-check" value="member.removed"> Member Removed</label>
+          <label><input type="checkbox" class="bot-event-check" value="webhook.received"> Webhook Received</label>
         </div>
       </div>
       <div class="form-group">
@@ -1677,7 +1681,7 @@ document.getElementById('botsBody').addEventListener('click', function(e) {
 function openBotDetail(botId) {
   api('/bots/' + botId).then(function(data) {
     var b = data.bot;
-    var runs = data.runs || [];
+    var runs = data.recentRuns || [];
     var html = '<h3>' + esc(b.name) + '</h3>';
 
     // Info grid
@@ -1764,6 +1768,7 @@ function openBotDetail(botId) {
     } else {
       html += '<button class="btn btn-primary btn-sm" onclick="toggleBotFromDetail(\\''+esc(b.id)+'\\', true)">Enable</button>';
     }
+    html += '<button class="btn btn-outline btn-sm" onclick="editBotFromDetail(\\''+esc(b.id)+'\\')">Edit</button>';
     html += '<button class="btn btn-danger btn-sm" onclick="deleteBotFromDetail(\\''+esc(b.id)+'\\', \\''+esc(b.name)+'\\')">Delete</button>';
     html += '</div>';
 
@@ -1794,7 +1799,53 @@ function deleteBotFromDetail(botId, botName) {
 
 // ─── Create Bot Modal ──────────────────────────────────────
 
+var editingBotId = null;
+
+function editBotFromDetail(botId) {
+  var b = allBots.find(function(bot) { return bot.id === botId; });
+  if (!b) { toast('Bot not found', 'error'); return; }
+
+  editingBotId = botId;
+
+  // Pre-fill the create modal
+  document.getElementById('newBotName').value = b.name || '';
+  document.getElementById('newBotDesc').value = b.description || '';
+  document.getElementById('newBotType').value = b.type || 'custom';
+
+  // Capabilities
+  document.querySelectorAll('.bot-cap-check').forEach(function(cb) {
+    cb.checked = (b.capabilities || []).indexOf(cb.value) !== -1;
+  });
+
+  // Scope
+  document.getElementById('newBotScope').value = b.scopeType || 'investigation';
+
+  // Domains
+  document.getElementById('newBotDomains').value = (b.allowedDomains || []).join(', ');
+
+  // Rate limits
+  document.getElementById('newBotRateHour').value = b.rateLimitPerHour || 100;
+  document.getElementById('newBotRateDay').value = b.rateLimitPerDay || 1000;
+
+  // Triggers
+  var triggers = b.triggers || {};
+  document.querySelectorAll('.bot-event-check').forEach(function(cb) {
+    cb.checked = (triggers.events || []).indexOf(cb.value) !== -1;
+  });
+  document.getElementById('newBotSchedule').value = triggers.schedule || '';
+  document.getElementById('newBotWebhook').checked = !!triggers.webhook;
+
+  // Change modal title and button
+  document.querySelector('#createBotModal .modal h3').textContent = 'Edit Bot';
+  document.getElementById('submitCreateBot').textContent = 'Save Changes';
+
+  document.getElementById('createBotModal').classList.add('active');
+}
+
 document.getElementById('createBotBtn').addEventListener('click', function() {
+  editingBotId = null;
+  document.querySelector('#createBotModal .modal h3').textContent = 'Create Bot';
+  document.getElementById('submitCreateBot').textContent = 'Create Bot';
   document.getElementById('newBotName').value = '';
   document.getElementById('newBotDesc').value = '';
   document.getElementById('newBotType').value = 'enrichment';
@@ -1811,6 +1862,9 @@ document.getElementById('createBotBtn').addEventListener('click', function() {
 });
 
 document.getElementById('cancelCreateBot').addEventListener('click', function() {
+  editingBotId = null;
+  document.querySelector('#createBotModal .modal h3').textContent = 'Create Bot';
+  document.getElementById('submitCreateBot').textContent = 'Create Bot';
   document.getElementById('createBotModal').classList.remove('active');
 });
 
@@ -1846,6 +1900,20 @@ document.getElementById('submitCreateBot').addEventListener('click', function() 
     rateLimitPerHour: parseInt(document.getElementById('newBotRateHour').value, 10) || 100,
     rateLimitPerDay: parseInt(document.getElementById('newBotRateDay').value, 10) || 1000,
   };
+
+  if (editingBotId) {
+    api('/bots/' + editingBotId, { method: 'PATCH', body: JSON.stringify(body) })
+      .then(function() {
+        toast('Bot updated');
+        document.getElementById('createBotModal').classList.remove('active');
+        var updatedId = editingBotId;
+        editingBotId = null;
+        loadBotsData();
+        openBotDetail(updatedId);
+      })
+      .catch(function(err) { toast(err.message, 'error'); });
+    return;
+  }
 
   api('/bots', { method: 'POST', body: JSON.stringify(body) })
     .then(function() {

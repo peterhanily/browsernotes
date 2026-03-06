@@ -345,6 +345,7 @@ export const botRuns = pgTable('bot_runs', {
   idxBotRunsBotConfigId: index('idx_bot_runs_bot_config_id').on(t.botConfigId),
   idxBotRunsStatus: index('idx_bot_runs_status').on(t.status),
   idxBotRunsCreatedAt: index('idx_bot_runs_created_at').on(t.createdAt),
+  idxBotRunsConfigCreated: index('idx_bot_runs_config_created').on(t.botConfigId, t.createdAt),
 }));
 
 // ─── Activity Log ───────────────────────────────────────────────

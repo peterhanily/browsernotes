@@ -1,7 +1,7 @@
 import { eq, lt, and, isNotNull, notInArray } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { serverSettings, notifications, activityLog, investigationMembers, folders } from '../db/schema.js';
+import { serverSettings, notifications, activityLog, investigationMembers, folders, botRuns } from '../db/schema.js';
 import { logger } from '../lib/logger.js';
 
 const NOTIF_RETENTION_KEY = 'notification_retention_days';
@@ -105,8 +105,24 @@ export async function pruneOldData(): Promise<void> {
       logger.error('Orphaned membership cleanup failed', { error: String(err) });
     }
 
-    if (deletedNotifs.length > 0 || deletedAudit.length > 0 || totalTombstones > 0 || orphanedMembers > 0) {
-      logger.info(`Data pruning: deleted ${deletedNotifs.length} notification(s), ${deletedAudit.length} audit log entry(ies), ${totalTombstones} tombstone(s), ${orphanedMembers} orphaned member(s)`);
+    // Delete bot_runs older than 90 days
+    let deletedBotRuns = 0;
+    try {
+      const botRunsCutoff = new Date(Date.now() - 90 * 86400000);
+      const deleted = await db
+        .delete(botRuns)
+        .where(lt(botRuns.createdAt, botRunsCutoff))
+        .returning({ id: botRuns.id });
+      deletedBotRuns = deleted.length;
+      if (deletedBotRuns > 0) {
+        logger.info(`Bot runs cleanup: deleted ${deletedBotRuns} bot run(s) older than 90 days`);
+      }
+    } catch (err) {
+      logger.error('Bot runs cleanup failed', { error: String(err) });
+    }
+
+    if (deletedNotifs.length > 0 || deletedAudit.length > 0 || totalTombstones > 0 || orphanedMembers > 0 || deletedBotRuns > 0) {
+      logger.info(`Data pruning: deleted ${deletedNotifs.length} notification(s), ${deletedAudit.length} audit log entry(ies), ${totalTombstones} tombstone(s), ${orphanedMembers} orphaned member(s), ${deletedBotRuns} bot run(s)`);
     }
   } catch (err) {
     logger.error('Data pruning failed', { error: String(err) });

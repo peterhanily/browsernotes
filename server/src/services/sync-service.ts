@@ -4,6 +4,7 @@ import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import type { SyncChange, SyncResult } from '../types.js';
 import { logger } from '../lib/logger.js';
+import { emitEntityEvent } from '../bots/event-bus.js';
 
 // Maps table names to Drizzle table references
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,6 +101,7 @@ export async function processPush(
           })
           .where(eq(table.id, entityId));
         results.push({ table: change.table, entityId, status: 'accepted', serverVersion: serverVersion + 1 });
+        emitEntityEvent('delete', change.table, entityId, (existing[0] as Record<string, unknown>).folderId as string | undefined, userId, false);
         continue;
       }
 
@@ -121,6 +123,7 @@ export async function processPush(
         });
         const inserted = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
         results.push({ table: change.table, entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
+        emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, true, cleanData);
       } else {
         // Existing — check version for conflict
         const serverEntity = existing[0];
@@ -170,6 +173,7 @@ export async function processPush(
           } else {
             const freshRow = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
             results.push({ table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: freshRow[0] as Record<string, unknown> });
+            emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, false, cleanData);
           }
         }
       }

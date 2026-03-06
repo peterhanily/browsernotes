@@ -19,7 +19,9 @@ import backupRoutes from './routes/backups.js';
 import auditRoutes from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
+import botRoutes from './routes/bots.js';
 import adminRoutes from './routes/admin.js';
+import { botManager } from './bots/bot-manager.js';
 import { initAdminSecret, initRegistrationMode, initServerName, getServerName, backfillFolderOwners, initAdminSystemUser } from './services/admin-secret.js';
 import { pruneOldData } from './services/cleanup-service.js';
 import { initAdminKey } from './middleware/admin-auth.js';
@@ -76,6 +78,7 @@ app.use('/api/auth/refresh', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/llm/chat', rateLimiter({ windowMs: 60_000, max: 20 }));
 app.use('/api/caddyshack/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
 app.use('/api/backups', rateLimiter({ windowMs: 60_000, max: 5 }));
+app.use('/api/bots/*/webhook', rateLimiter({ windowMs: 60_000, max: 30 }));
 
 // Health check with DB connectivity
 app.get('/health', async (c) => {
@@ -104,6 +107,7 @@ app.route('/api/backups', backupRoutes);
 app.route('/api/audit', auditRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/users', userRoutes);
+app.route('/api/bots', botRoutes);
 
 // WebSocket endpoint — token sent as first message, not in URL
 app.get('/ws', upgradeWebSocket(() => {
@@ -187,6 +191,9 @@ async function main() {
     logger.info(`Admin panel running on http://localhost:${info.port}`, { port: info.port });
   });
 
+  // Initialize bot runtime
+  await botManager.init();
+
   // Data pruning on startup (fire-and-forget) + every 6 hours
   pruneOldData().catch(() => {});
   const dataPruning = setInterval(() => {
@@ -215,6 +222,7 @@ async function main() {
     logger.info('Shutting down...');
     clearInterval(sessionCleanup);
     clearInterval(dataPruning);
+    await botManager.shutdown();
     server.close();
     adminServer.close();
     await pgSql.end();

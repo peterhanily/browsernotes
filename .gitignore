@@ -44,3 +44,4 @@ coverage
 
 # Claude / AI
 .claude/
+CLAUDE.md

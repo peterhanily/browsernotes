@@ -298,6 +298,55 @@ export const allowedEmails = pgTable('allowed_emails', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Bot System ────────────────────────────────────────────────
+
+export const botConfigs = pgTable('bot_configs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),    // enrichment, feed, monitor, triage, report, correlation, ai-agent, custom
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  enabled: boolean('enabled').notNull().default(false),
+  triggers: jsonb('triggers').notNull().default({}),
+  config: jsonb('config').notNull().default({}),    // bot-specific settings (secrets encrypted within)
+  capabilities: jsonb('capabilities').notNull().default([]),
+  allowedDomains: jsonb('allowed_domains').notNull().default([]),
+  scopeType: text('scope_type', { enum: ['global', 'investigation', 'tag-based'] }).notNull().default('investigation'),
+  scopeFolderIds: jsonb('scope_folder_ids').notNull().default([]),
+  rateLimitPerHour: integer('rate_limit_per_hour').notNull().default(100),
+  rateLimitPerDay: integer('rate_limit_per_day').notNull().default(1000),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+  lastError: text('last_error'),
+  runCount: integer('run_count').notNull().default(0),
+  errorCount: integer('error_count').notNull().default(0),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxBotConfigsUserId: index('idx_bot_configs_user_id').on(t.userId),
+  idxBotConfigsEnabled: index('idx_bot_configs_enabled').on(t.enabled),
+  idxBotConfigsType: index('idx_bot_configs_type').on(t.type),
+}));
+
+export const botRuns = pgTable('bot_runs', {
+  id: text('id').primaryKey(),
+  botConfigId: text('bot_config_id').notNull().references(() => botConfigs.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['running', 'success', 'error', 'timeout', 'cancelled'] }).notNull(),
+  trigger: text('trigger').notNull(),   // event, schedule, webhook, manual
+  inputSummary: text('input_summary').notNull().default(''),
+  outputSummary: text('output_summary').notNull().default(''),
+  durationMs: integer('duration_ms').notNull().default(0),
+  error: text('error'),
+  entitiesCreated: integer('entities_created').notNull().default(0),
+  entitiesUpdated: integer('entities_updated').notNull().default(0),
+  apiCallsMade: integer('api_calls_made').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxBotRunsBotConfigId: index('idx_bot_runs_bot_config_id').on(t.botConfigId),
+  idxBotRunsStatus: index('idx_bot_runs_status').on(t.status),
+  idxBotRunsCreatedAt: index('idx_bot_runs_created_at').on(t.createdAt),
+}));
+
 // ─── Activity Log ───────────────────────────────────────────────
 
 export const activityLog = pgTable('activity_log', {

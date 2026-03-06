@@ -79,7 +79,7 @@ function makeWhiteboard(overrides: Partial<Whiteboard> = {}): Whiteboard {
 function makeIOC(overrides: Partial<StandaloneIOC> = {}): StandaloneIOC {
   return {
     id: 'ioc1',
-    type: 'ip',
+    type: 'ipv4',
     value: '192.168.1.1',
     confidence: 'medium',
     tags: [],
@@ -294,9 +294,9 @@ describe('unifiedSearch — whiteboards', () => {
 describe('unifiedSearch — standalone IOCs', () => {
   const now = Date.now();
   const iocs: StandaloneIOC[] = [
-    makeIOC({ id: 'ioc1', value: '192.168.1.100', type: 'ip', updatedAt: now - 100 }),
+    makeIOC({ id: 'ioc1', value: '192.168.1.100', type: 'ipv4', updatedAt: now - 100 }),
     makeIOC({ id: 'ioc2', value: 'evil.example.com', type: 'domain', analystNotes: 'C2 callback domain', updatedAt: now - 200 }),
-    makeIOC({ id: 'ioc3', value: 'abc123hash', type: 'hash', attribution: 'APT29', tags: ['threat-intel'], updatedAt: now - 300 }),
+    makeIOC({ id: 'ioc3', value: 'abc123hash', type: 'sha256', attribution: 'APT29', tags: ['threat-intel'], updatedAt: now - 300 }),
   ];
 
   it('finds IOC by value', () => {

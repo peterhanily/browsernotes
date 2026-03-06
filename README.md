@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="https://threatcaddy.com/favicon.svg" alt="ThreatCaddy" width="80" height="80" />
+  <img src="public/logo.svg" alt="ThreatCaddy" width="80" height="80" />
 </p>
 
 <h1 align="center">ThreatCaddy</h1>
 
 <p align="center">
   <strong>Local-first threat investigation workspace for security analysts.</strong><br/>
-  Notes, IOCs, timelines, graphs, CaddyChat, and team collaboration — all in your browser.
+  Notes, IOCs, timelines, graphs, CaddyAI, and team collaboration — all in your browser.
 </p>
 
 <p align="center">
@@ -63,7 +63,7 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 - Priorities, due dates, and statuses with list and kanban views
 - Threaded comments on tasks
 
-### CaddyChat
+### CaddyAI
 
 - **Multi-provider** — Anthropic (Claude Opus 4, Sonnet 4, Haiku 3.5), OpenAI (GPT-5.4, GPT-5.4 Pro, GPT-5.2, o3, o4-mini), Google Gemini, Mistral, and local models (Ollama / LM Studio / vLLM)
 - **Tool calling** — Agentic loop with tools to search notes, read notes, list tasks/IOCs/timeline events, create entities, extract IOCs, and fetch URLs

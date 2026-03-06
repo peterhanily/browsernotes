@@ -569,7 +569,7 @@ async function ensureLLMPermission(url) {
   const has = await chrome.permissions.contains({ origins: [origin] });
   if (!has) {
     throw new Error(
-      'CaddyChat permission required. Open the ThreatCaddy extension popup and enable "Allow CaddyChat" under Permissions.'
+      'CaddyAI permission required. Open the ThreatCaddy extension popup and enable "Allow CaddyAI" under Permissions.'
     );
   }
 }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
 import { unifiedSearch, generateSnippet, parseAdvancedQuery } from '../lib/search';
-import type { Note, Task, TimelineEvent, Whiteboard } from '../types';
+import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread } from '../types';
 import type { FieldSet } from '../lib/search';
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -68,6 +68,37 @@ function makeWhiteboard(overrides: Partial<Whiteboard> = {}): Whiteboard {
     elements: '[]',
     tags: [],
     order: 0,
+    trashed: false,
+    archived: false,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeIOC(overrides: Partial<StandaloneIOC> = {}): StandaloneIOC {
+  return {
+    id: 'ioc1',
+    type: 'ip',
+    value: '192.168.1.1',
+    confidence: 'medium',
+    tags: [],
+    trashed: false,
+    archived: false,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    ...overrides,
+  } as StandaloneIOC;
+}
+
+function makeChatThread(overrides: Partial<ChatThread> = {}): ChatThread {
+  return {
+    id: 'chat1',
+    title: 'Test Chat',
+    messages: [],
+    model: 'test-model',
+    provider: 'openai' as ChatThread['provider'],
+    tags: [],
     trashed: false,
     archived: false,
     createdAt: Date.now(),
@@ -260,17 +291,86 @@ describe('unifiedSearch — whiteboards', () => {
   });
 });
 
+describe('unifiedSearch — standalone IOCs', () => {
+  const now = Date.now();
+  const iocs: StandaloneIOC[] = [
+    makeIOC({ id: 'ioc1', value: '192.168.1.100', type: 'ip', updatedAt: now - 100 }),
+    makeIOC({ id: 'ioc2', value: 'evil.example.com', type: 'domain', analystNotes: 'C2 callback domain', updatedAt: now - 200 }),
+    makeIOC({ id: 'ioc3', value: 'abc123hash', type: 'hash', attribution: 'APT29', tags: ['threat-intel'], updatedAt: now - 300 }),
+  ];
+
+  it('finds IOC by value', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: '192.168' }, undefined, undefined, iocs);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].type).toBe('ioc');
+    expect(result.results[0].id).toBe('ioc1');
+  });
+
+  it('finds IOC by type', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'domain' }, undefined, undefined, iocs);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('ioc2');
+  });
+
+  it('finds IOC by analystNotes', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'callback' }, undefined, undefined, iocs);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('ioc2');
+  });
+
+  it('finds IOC by attribution', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'APT29' }, undefined, undefined, iocs);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('ioc3');
+  });
+
+  it('finds IOC by tag', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'threat-intel' }, undefined, undefined, iocs);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('ioc3');
+  });
+});
+
+describe('unifiedSearch — chat threads', () => {
+  const now = Date.now();
+  const threads: ChatThread[] = [
+    makeChatThread({ id: 'c1', title: 'Incident Analysis', messages: [{ id: 'm1', role: 'user', content: 'Analyze the malware sample', createdAt: now }], updatedAt: now - 100 }),
+    makeChatThread({ id: 'c2', title: 'General Chat', messages: [{ id: 'm2', role: 'assistant', content: 'Here is the forensic report', createdAt: now }], tags: ['forensics'], updatedAt: now - 200 }),
+  ];
+
+  it('finds chat thread by title', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'Incident' }, undefined, undefined, undefined, threads);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].type).toBe('chat');
+    expect(result.results[0].id).toBe('c1');
+  });
+
+  it('finds chat thread by message content', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'forensic' }, undefined, undefined, undefined, threads);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('c2');
+  });
+
+  it('finds chat thread by tag', () => {
+    const result = unifiedSearch([], [], undefined, { mode: 'simple', raw: 'forensics' }, undefined, undefined, undefined, threads);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].id).toBe('c2');
+  });
+});
+
 describe('unifiedSearch — sort ordering with all types', () => {
   const now = Date.now();
-  it('sorts timeline after tasks and whiteboards after timeline', () => {
+  it('sorts all types in correct order: note, task, timeline, whiteboard, ioc, chat', () => {
     const notes = [makeNote({ id: 'n1', title: 'alpha test', updatedAt: now })];
     const tasks = [makeTask({ id: 't1', title: 'alpha fix', updatedAt: now })];
     const events = [makeTimelineEvent({ id: 'ev1', title: 'alpha event', updatedAt: now })];
     const boards = [makeWhiteboard({ id: 'wb1', name: 'alpha board', updatedAt: now })];
+    const iocs = [makeIOC({ id: 'ioc1', value: 'alpha indicator', updatedAt: now })];
+    const threads = [makeChatThread({ id: 'c1', title: 'alpha chat', updatedAt: now })];
 
-    const result = unifiedSearch(notes, tasks, 'no-clips', { mode: 'simple', raw: 'alpha' }, events, boards);
+    const result = unifiedSearch(notes, tasks, 'no-clips', { mode: 'simple', raw: 'alpha' }, events, boards, iocs, threads);
     const types = result.results.map((r) => r.type);
-    expect(types).toEqual(['note', 'task', 'timeline', 'whiteboard']);
+    expect(types).toEqual(['note', 'task', 'timeline', 'whiteboard', 'ioc', 'chat']);
   });
 });
 

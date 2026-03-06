@@ -1,5 +1,5 @@
 import { unifiedSearch } from '../lib/search';
-import type { Note, Task, TimelineEvent, Whiteboard } from '../types';
+import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread } from '../types';
 import type { SearchQuery } from '../lib/search';
 
 interface DataMessage {
@@ -9,6 +9,8 @@ interface DataMessage {
   clipsFolderId: string | undefined;
   timelineEvents?: TimelineEvent[];
   whiteboards?: Whiteboard[];
+  standaloneIOCs?: StandaloneIOC[];
+  chatThreads?: ChatThread[];
 }
 
 interface QueryMessage {
@@ -26,6 +28,8 @@ let cachedTasks: Task[] = [];
 let cachedClipsFolderId: string | undefined;
 let cachedTimelineEvents: TimelineEvent[] | undefined;
 let cachedWhiteboards: Whiteboard[] | undefined;
+let cachedStandaloneIOCs: StandaloneIOC[] | undefined;
+let cachedChatThreads: ChatThread[] | undefined;
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data;
@@ -35,13 +39,17 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     cachedClipsFolderId = msg.clipsFolderId;
     cachedTimelineEvents = msg.timelineEvents;
     cachedWhiteboards = msg.whiteboards;
+    cachedStandaloneIOCs = msg.standaloneIOCs;
+    cachedChatThreads = msg.chatThreads;
   } else if (msg.type === 'query') {
     const fid = msg.folderId;
     const notes = fid ? cachedNotes.filter((n) => n.folderId === fid) : cachedNotes;
     const tasks = fid ? cachedTasks.filter((t) => t.folderId === fid) : cachedTasks;
     const events = fid && cachedTimelineEvents ? cachedTimelineEvents.filter((e) => e.folderId === fid) : cachedTimelineEvents;
     const wbs = fid && cachedWhiteboards ? cachedWhiteboards.filter((w) => w.folderId === fid) : cachedWhiteboards;
-    const result = unifiedSearch(notes, tasks, cachedClipsFolderId, msg.query, events, wbs);
+    const iocs = fid && cachedStandaloneIOCs ? cachedStandaloneIOCs.filter((i) => i.folderId === fid) : cachedStandaloneIOCs;
+    const chats = fid && cachedChatThreads ? cachedChatThreads.filter((c) => c.folderId === fid) : cachedChatThreads;
+    const result = unifiedSearch(notes, tasks, cachedClipsFolderId, msg.query, events, wbs, iocs, chats);
     self.postMessage({ id: msg.id, result });
   }
 };

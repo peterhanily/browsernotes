@@ -192,7 +192,7 @@ export function Sidebar({
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
     { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
-    { view: 'chat', icon: MessageSquare, label: 'CaddyChat', badge: chatCount },
+    { view: 'chat', icon: MessageSquare, label: 'CaddyAI', badge: chatCount },
   ];
 
   // --- Collapsed: icon-only rail ---
@@ -519,7 +519,7 @@ export function Sidebar({
         <div data-tour="chat">
           <NavItem
             icon={<MessageSquare size={16} />}
-            label="CaddyChat"
+            label="CaddyAI"
             badge={chatCount}
             badgeColor="bg-purple/15 text-purple"
             active={activeView === 'chat'}

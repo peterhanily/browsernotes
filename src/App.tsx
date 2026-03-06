@@ -968,6 +968,15 @@ function AppInner() {
     navigateTo('whiteboard', { selectedWhiteboardId: id });
   }, [navigateTo]);
 
+  const handleSearchNavigateToIOC = useCallback((_id: string) => {
+    navigateTo('ioc-stats');
+  }, [navigateTo]);
+
+  const handleSearchNavigateToChat = useCallback((id: string) => {
+    setSelectedChatThreadId(id);
+    navigateTo('chat');
+  }, [navigateTo]);
+
   useKeyboardShortcuts({
     onNewNote: handleNewNote,
     onNewTask: handleNewTask,
@@ -1543,6 +1552,10 @@ function AppInner() {
         whiteboards={whiteboards}
         onNavigateToTimeline={handleSearchNavigateToTimeline}
         onNavigateToWhiteboard={handleSearchNavigateToWhiteboard}
+        standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
+        chatThreads={chatsHook.threads.filter((c) => !c.trashed && !c.archived)}
+        onNavigateToIOC={handleSearchNavigateToIOC}
+        onNavigateToChat={handleSearchNavigateToChat}
         selectedFolderId={selectedFolderId}
         scopedNotes={investigationNotes}
         scopedTasks={investigationTasks}

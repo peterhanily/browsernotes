@@ -1,4 +1,4 @@
-import type { Note, Task, TimelineEvent, Whiteboard } from '../types';
+import type { Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS } from '../types';
 
 export type SearchMode = 'simple' | 'regex' | 'advanced';
@@ -8,7 +8,7 @@ export interface SearchQuery {
   raw: string;
 }
 
-export type SearchResultType = 'note' | 'clip' | 'task' | 'timeline' | 'whiteboard';
+export type SearchResultType = 'note' | 'clip' | 'task' | 'timeline' | 'whiteboard' | 'ioc' | 'chat';
 
 export interface SearchResult {
   id: string;
@@ -37,6 +37,8 @@ export function unifiedSearch(
   query: SearchQuery,
   timelineEvents?: TimelineEvent[],
   whiteboards?: Whiteboard[],
+  standaloneIOCs?: StandaloneIOC[],
+  chatThreads?: ChatThread[],
 ): UnifiedSearchResult {
   if (!query.raw.trim()) return { results: [] };
   if (query.raw.length > MAX_QUERY_LEN) return { results: [], error: 'Query too long' };
@@ -70,6 +72,18 @@ export function unifiedSearch(
       for (const wb of whiteboards) {
         const matchField = findSimpleWhiteboardMatchField(wb, lower);
         if (matchField) results.push(whiteboardToResult(wb, matchField, query.raw));
+      }
+    }
+    if (standaloneIOCs) {
+      for (const ioc of standaloneIOCs) {
+        const matchField = findSimpleIOCMatchField(ioc, lower);
+        if (matchField) results.push(iocToResult(ioc, matchField, query.raw));
+      }
+    }
+    if (chatThreads) {
+      for (const thread of chatThreads) {
+        const matchField = findSimpleChatMatchField(thread, lower);
+        if (matchField) results.push(chatToResult(thread, matchField, query.raw));
       }
     }
   } else if (query.mode === 'regex') {
@@ -108,16 +122,28 @@ export function unifiedSearch(
         if (matchField) results.push(whiteboardToResult(wb, matchField, query.raw));
       }
     }
+    if (standaloneIOCs) {
+      for (const ioc of standaloneIOCs) {
+        const matchField = findRegexIOCMatchField(ioc, regex);
+        if (matchField) results.push(iocToResult(ioc, matchField, query.raw));
+      }
+    }
+    if (chatThreads) {
+      for (const thread of chatThreads) {
+        const matchField = findRegexChatMatchField(thread, regex);
+        if (matchField) results.push(chatToResult(thread, matchField, query.raw));
+      }
+    }
   } else if (query.mode === 'advanced') {
     let predicate: ((fields: FieldSet) => boolean) | null;
     try {
       predicate = parseAdvancedQuery(query.raw);
     } catch {
       // Fallback to simple mode on parse failure
-      return unifiedSearch(notes, tasks, clipsFolderId, { mode: 'simple', raw: query.raw });
+      return unifiedSearch(notes, tasks, clipsFolderId, { mode: 'simple', raw: query.raw }, timelineEvents, whiteboards, standaloneIOCs, chatThreads);
     }
     if (!predicate) {
-      return unifiedSearch(notes, tasks, clipsFolderId, { mode: 'simple', raw: query.raw });
+      return unifiedSearch(notes, tasks, clipsFolderId, { mode: 'simple', raw: query.raw }, timelineEvents, whiteboards, standaloneIOCs, chatThreads);
     }
     for (const note of activeNotes) {
       const fields: FieldSet = {
@@ -159,10 +185,30 @@ export function unifiedSearch(
         if (predicate(fields)) results.push(whiteboardToResult(wb, 'name', query.raw));
       }
     }
+    if (standaloneIOCs) {
+      for (const ioc of standaloneIOCs) {
+        const fields: FieldSet = {
+          title: ioc.value,
+          content: [ioc.type, ioc.analystNotes || '', ioc.attribution || ''].join(' '),
+          tags: ioc.tags.join(' '),
+        };
+        if (predicate(fields)) results.push(iocToResult(ioc, 'value', query.raw));
+      }
+    }
+    if (chatThreads) {
+      for (const thread of chatThreads) {
+        const fields: FieldSet = {
+          title: thread.title,
+          content: thread.messages.map((m) => m.content).join(' '),
+          tags: thread.tags.join(' '),
+        };
+        if (predicate(fields)) results.push(chatToResult(thread, 'title', query.raw));
+      }
+    }
   }
 
   // Sort by type group (notes, clips, tasks), then updatedAt desc
-  const typeOrder: Record<SearchResultType, number> = { note: 0, clip: 1, task: 2, timeline: 3, whiteboard: 4 };
+  const typeOrder: Record<SearchResultType, number> = { note: 0, clip: 1, task: 2, timeline: 3, whiteboard: 4, ioc: 5, chat: 6 };
   results.sort((a, b) => {
     const typeDiff = typeOrder[a.type] - typeOrder[b.type];
     if (typeDiff !== 0) return typeDiff;
@@ -246,6 +292,42 @@ function findRegexWhiteboardMatchField(wb: Whiteboard, regex: RegExp): string | 
   return null;
 }
 
+// --- IOC simple/regex helpers ---
+
+function findSimpleIOCMatchField(ioc: StandaloneIOC, lower: string): string | null {
+  if (ioc.value.toLowerCase().includes(lower)) return 'value';
+  if (ioc.type.toLowerCase().includes(lower)) return 'type';
+  if (ioc.analystNotes?.toLowerCase().includes(lower)) return 'analystNotes';
+  if (ioc.attribution?.toLowerCase().includes(lower)) return 'attribution';
+  if (ioc.tags.some((t) => t.toLowerCase().includes(lower))) return 'tags';
+  return null;
+}
+
+function findRegexIOCMatchField(ioc: StandaloneIOC, regex: RegExp): string | null {
+  if (safeRegexTest(regex, ioc.value)) return 'value';
+  if (safeRegexTest(regex, ioc.type)) return 'type';
+  if (ioc.analystNotes && safeRegexTest(regex, ioc.analystNotes)) return 'analystNotes';
+  if (ioc.attribution && safeRegexTest(regex, ioc.attribution)) return 'attribution';
+  if (ioc.tags.some((t) => safeRegexTest(regex, t))) return 'tags';
+  return null;
+}
+
+// --- Chat simple/regex helpers ---
+
+function findSimpleChatMatchField(thread: ChatThread, lower: string): string | null {
+  if (thread.title.toLowerCase().includes(lower)) return 'title';
+  if (thread.messages.some((m) => m.content.toLowerCase().includes(lower))) return 'messages';
+  if (thread.tags.some((t) => t.toLowerCase().includes(lower))) return 'tags';
+  return null;
+}
+
+function findRegexChatMatchField(thread: ChatThread, regex: RegExp): string | null {
+  if (safeRegexTest(regex, thread.title)) return 'title';
+  if (thread.messages.some((m) => safeRegexTest(regex, m.content))) return 'messages';
+  if (thread.tags.some((t) => safeRegexTest(regex, t))) return 'tags';
+  return null;
+}
+
 // --- Result builders ---
 
 function noteToResult(
@@ -308,6 +390,40 @@ function whiteboardToResult(wb: Whiteboard, matchField: string, queryRaw: string
     snippet: generateSnippet(matchField === 'tags' ? wb.tags.join(', ') : wb.name, queryRaw, 120),
     tags: wb.tags,
     updatedAt: wb.updatedAt,
+    matchField,
+  };
+}
+
+function iocToResult(ioc: StandaloneIOC, matchField: string, queryRaw: string): SearchResult {
+  const textMap: Record<string, string> = {
+    value: ioc.value,
+    type: ioc.type,
+    analystNotes: ioc.analystNotes || '',
+    attribution: ioc.attribution || '',
+    tags: ioc.tags.join(', '),
+  };
+  return {
+    id: ioc.id,
+    type: 'ioc',
+    title: ioc.value,
+    snippet: generateSnippet(textMap[matchField] || ioc.value, queryRaw, 120),
+    tags: ioc.tags,
+    updatedAt: ioc.updatedAt,
+    matchField,
+  };
+}
+
+function chatToResult(thread: ChatThread, matchField: string, queryRaw: string): SearchResult {
+  const text = matchField === 'title' ? thread.title :
+    matchField === 'messages' ? thread.messages.map((m) => m.content).join(' ') :
+    thread.tags.join(', ');
+  return {
+    id: thread.id,
+    type: 'chat',
+    title: thread.title,
+    snippet: generateSnippet(text, queryRaw, 120),
+    tags: thread.tags,
+    updatedAt: thread.updatedAt,
     matchField,
   };
 }

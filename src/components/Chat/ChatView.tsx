@@ -526,7 +526,7 @@ export function ChatView({
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-text-muted">
             <MessageSquare size={48} className="mb-3 opacity-20" />
-            <p className="text-lg font-medium">CaddyChat</p>
+            <p className="text-lg font-medium">CaddyAI</p>
             <p className="text-sm mt-1">
               {threads.length > 0
                 ? 'Select a thread to view the conversation'

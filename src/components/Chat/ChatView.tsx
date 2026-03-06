@@ -50,9 +50,9 @@ export function ChatView({
 
   const activeThread = threads.find((t) => t.id === selectedThreadId);
 
-  // Auto-select first thread when none selected and threads exist
+  // Auto-select first thread when none selected (or stale selection) and threads exist
   useEffect(() => {
-    if (!selectedThreadId && threads.length > 0) {
+    if (threads.length > 0 && (!selectedThreadId || !threads.some(t => t.id === selectedThreadId))) {
       onSelectThread(threads[0].id);
     }
   }, [selectedThreadId, threads, onSelectThread]);

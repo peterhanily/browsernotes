@@ -189,10 +189,10 @@ export function Sidebar({
     { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
     { view: 'whiteboard', icon: PenTool, label: 'Whiteboards', badge: investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount, dataTour: 'whiteboards' },
     { view: 'ioc-stats', icon: Search, label: 'IOC Stats', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
-    { view: 'chat', icon: MessageSquare, label: 'CaddyChat', badge: chatCount },
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
     { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
+    { view: 'chat', icon: MessageSquare, label: 'CaddyChat', badge: chatCount },
   ];
 
   // --- Collapsed: icon-only rail ---
@@ -494,16 +494,6 @@ export function Sidebar({
           active={activeView === 'ioc-stats'}
           onClick={() => nav(() => navToView('ioc-stats'))}
         />
-        <div data-tour="chat">
-          <NavItem
-            icon={<MessageSquare size={16} />}
-            label="CaddyChat"
-            badge={chatCount}
-            badgeColor="bg-purple/15 text-purple"
-            active={activeView === 'chat'}
-            onClick={() => nav(() => navToView('chat'))}
-          />
-        </div>
         <NavItem
           icon={<Network size={16} />}
           label="Graph"
@@ -524,6 +514,16 @@ export function Sidebar({
             label="CaddyShack"
             active={activeView === 'caddyshack'}
             onClick={() => nav(() => navToView('caddyshack'))}
+          />
+        </div>
+        <div data-tour="chat">
+          <NavItem
+            icon={<MessageSquare size={16} />}
+            label="CaddyChat"
+            badge={chatCount}
+            badgeColor="bg-purple/15 text-purple"
+            active={activeView === 'chat'}
+            onClick={() => nav(() => navToView('chat'))}
           />
         </div>
 

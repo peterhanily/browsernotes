@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import type { PlaybookTemplate } from '../../types';
 import { cn } from '../../lib/utils';

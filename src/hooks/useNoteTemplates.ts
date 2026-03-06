@@ -15,7 +15,8 @@ export function useNoteTemplates() {
   }, []);
 
   useEffect(() => {
-    loadTemplates();
+    void loadTemplates();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadTemplates]);
 
   const allTemplates = useMemo(

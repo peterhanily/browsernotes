@@ -16,7 +16,8 @@ export function usePlaybooks() {
   }, []);
 
   useEffect(() => {
-    loadPlaybooks();
+    void loadPlaybooks();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadPlaybooks]);
 
   const allPlaybooks = useMemo(

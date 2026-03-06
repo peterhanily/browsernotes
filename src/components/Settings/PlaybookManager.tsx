@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, BookOpen, X } from 'lucide-react';
-import type { PlaybookTemplate, PlaybookStep, Priority, TaskStatus } from '../../types';
+import type { PlaybookTemplate, PlaybookStep, Priority } from '../../types';
 import { Modal } from '../Common/Modal';
-import { cn } from '../../lib/utils';
+
 
 interface PlaybookManagerProps {
   playbooks: PlaybookTemplate[];

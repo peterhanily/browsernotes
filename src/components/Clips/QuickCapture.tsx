@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Modal } from '../Common/Modal';
-import { CLIP_TEMPLATES } from './ClipTemplates';
-import type { TemplateCategory } from './ClipTemplates';
-import type { Note, Folder } from '../../types';
+import type { Note, Folder, NoteTemplate } from '../../types';
 
 interface QuickCaptureProps {
   open: boolean;
@@ -10,9 +8,10 @@ interface QuickCaptureProps {
   onCapture: (data: Partial<Note>) => void;
   folders?: Folder[];
   defaultFolderId?: string;
+  templates?: NoteTemplate[];
 }
 
-export function QuickCapture({ open, onClose, onCapture, folders = [], defaultFolderId }: QuickCaptureProps) {
+export function QuickCapture({ open, onClose, onCapture, folders = [], defaultFolderId, templates = [] }: QuickCaptureProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -41,19 +40,34 @@ export function QuickCapture({ open, onClose, onCapture, folders = [], defaultFo
     onClose();
   };
 
-  const applyTemplate = (templateName: string, templateContent: string) => {
-    setContent(templateContent);
+  const applyTemplate = (tpl: NoteTemplate) => {
+    setContent(tpl.content);
     if (!titleTouchedByUser.current) {
-      setTitle(templateName);
+      setTitle(tpl.name);
     }
   };
 
-  const templatesByCategory = CLIP_TEMPLATES.reduce((acc, tpl) => {
-    (acc[tpl.category] ??= []).push(tpl);
-    return acc;
-  }, {} as Record<TemplateCategory, typeof CLIP_TEMPLATES>);
+  const templatesByCategory = useMemo(() => {
+    const map: Record<string, NoteTemplate[]> = {};
+    for (const tpl of templates) {
+      (map[tpl.category] ??= []).push(tpl);
+    }
+    return map;
+  }, [templates]);
 
-  const categoryOrder: TemplateCategory[] = ['General', 'Investigation', 'Cloud'];
+  const categoryOrder = useMemo(() => {
+    // Stable ordering: known categories first, then custom/user ones
+    const known = ['General', 'Investigation', 'Incident Response', 'Cloud', 'Custom'];
+    const cats = Object.keys(templatesByCategory);
+    const ordered: string[] = [];
+    for (const k of known) {
+      if (cats.includes(k)) ordered.push(k);
+    }
+    for (const c of cats) {
+      if (!ordered.includes(c)) ordered.push(c);
+    }
+    return ordered;
+  }, [templatesByCategory]);
 
   const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
 
@@ -67,13 +81,14 @@ export function QuickCapture({ open, onClose, onCapture, folders = [], defaultFo
             <div className="flex gap-2 flex-wrap">
               {(templatesByCategory[cat] || []).map((tpl) => (
                 <button
-                  key={tpl.name}
+                  key={tpl.id}
                   type="button"
-                  onClick={() => applyTemplate(tpl.name, tpl.content)}
+                  onClick={() => applyTemplate(tpl)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs border border-gray-700 transition-colors"
                 >
-                  <span>{tpl.icon}</span>
+                  {tpl.icon && <span>{tpl.icon}</span>}
                   {tpl.name}
+                  {tpl.source === 'user' && <span className="text-[9px] text-accent/60 ml-0.5">custom</span>}
                 </button>
               ))}
             </div>

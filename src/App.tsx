@@ -21,6 +21,9 @@ import { useFolders } from './hooks/useFolders';
 import { useTags } from './hooks/useTags';
 import { useSettings } from './hooks/useSettings';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useNoteTemplates } from './hooks/useNoteTemplates';
+import { usePlaybooks } from './hooks/usePlaybooks';
+import { PlaybookPicker } from './components/Playbooks/PlaybookPicker';
 import { useActivityLog } from './hooks/useActivityLog';
 import { ActivityLogContext } from './hooks/ActivityLogContext';
 import { ScreenshareContext } from './hooks/ScreenshareContext';
@@ -131,6 +134,8 @@ function AppInner() {
   const chatsHook = useChats();
   const { folders, createFolder, findOrCreateFolder, updateFolder, deleteFolder, trashFolderContents, archiveFolder, unarchiveFolder, reload: reloadFolders } = useFolders();
   const { tags, createTag, updateTag, deleteTag, reload: reloadTags } = useTags();
+  const noteTemplatesHook = useNoteTemplates();
+  const playbooksHook = usePlaybooks();
 
   const tour = useTour({
     onComplete: () => updateSettings({ tourCompleted: true }),
@@ -238,6 +243,7 @@ function AppInner() {
   const [editorMode, setEditorMode] = useState<EditorMode>(settings.editorMode);
   const [taskViewMode, setTaskViewMode] = useState<TaskViewMode>(settings.taskViewMode);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
+  const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
@@ -838,8 +844,10 @@ function AppInner() {
     chatsHook.reload();
     reloadFolders();
     reloadTags();
+    noteTemplatesHook.reload();
+    playbooksHook.reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadFolders, reloadTags]);
+  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadFolders, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {
@@ -1050,6 +1058,7 @@ function AppInner() {
     investigationScopedCounts,
     chatCount: chatsHook.threadCounts.total,
     serverConnected: auth.connected,
+    onNewFromPlaybook: () => setShowPlaybookPicker(true),
   }), [activeView, folders, tags, auth.connected, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts, chatsHook.threadCounts.total]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
@@ -1212,6 +1221,22 @@ function AppInner() {
             onLoadSample={handleLoadSample}
             onDeleteSample={handleDeleteSample}
             onClose={() => setShowSettings(false)}
+            templateProps={{
+              templates: noteTemplatesHook.templates,
+              userTemplates: noteTemplatesHook.userTemplates,
+              categories: noteTemplatesHook.categories,
+              onCreateTemplate: noteTemplatesHook.createTemplate,
+              onUpdateTemplate: noteTemplatesHook.updateTemplate,
+              onDeleteTemplate: noteTemplatesHook.deleteTemplate,
+              onDuplicateBuiltin: noteTemplatesHook.duplicateBuiltin,
+            }}
+            playbookProps={{
+              playbooks: playbooksHook.playbooks,
+              userPlaybooks: playbooksHook.userPlaybooks,
+              onCreatePlaybook: playbooksHook.createPlaybook,
+              onUpdatePlaybook: playbooksHook.updatePlaybook,
+              onDeletePlaybook: playbooksHook.deletePlaybook,
+            }}
           />
         ) : showTrash || showArchive ? (
           <TrashArchiveView
@@ -1435,6 +1460,10 @@ function AppInner() {
                   allTimelineEvents={screensafeTimelineEvents}
                   onNavigateToNote={handleSearchNavigateToNote}
                   onShareLink={handleShareNoteLink}
+                  onSaveAsTemplate={async (n) => {
+                    await noteTemplatesHook.saveNoteAsTemplate(n);
+                    addToast('success', `Saved "${n.title}" as a template`);
+                  }}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">
@@ -1496,7 +1525,30 @@ function AppInner() {
           onCapture={handleQuickCapture}
           folders={folders}
           defaultFolderId={selectedFolderId}
+          templates={noteTemplatesHook.templates}
         />
+      </Suspense>
+
+      <PlaybookPicker
+        open={showPlaybookPicker}
+        onClose={() => setShowPlaybookPicker(false)}
+        playbooks={playbooksHook.playbooks}
+        onSelect={async (playbookId, name) => {
+          const folder = await loggedCreateFolder(name);
+          await playbooksHook.instantiate(playbookId, folder, noteTemplatesHook.templates);
+          notes.reload();
+          tasks.reload();
+          reloadTimelines();
+          reloadFolders();
+          setSelectedFolderId(folder.id);
+          setSelectedTag(undefined);
+          setShowTrash(false);
+          setShowArchive(false);
+          addToast('success', `Created "${name}" from playbook`);
+        }}
+      />
+
+      <Suspense fallback={null}>
 
         <StandaloneIOCForm
           open={showIOCForm}

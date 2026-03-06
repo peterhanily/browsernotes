@@ -517,6 +517,59 @@ export interface SharedItemEnvelope {
   payload: Note | Note[] | Task[] | ExportData;
 }
 
+// ─── Note Templates ─────────────────────────────────────────────
+
+export type TemplateSource = 'builtin' | 'user' | 'team';
+
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  content: string;
+  category: string;
+  tags?: string[];
+  clsLevel?: string;
+  source: TemplateSource;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ─── Investigation Playbooks ────────────────────────────────────
+
+export type PlaybookStepEntity = 'task' | 'note';
+
+export interface PlaybookStep {
+  order: number;
+  entityType: PlaybookStepEntity;
+  title: string;
+  content: string;
+  priority?: Priority;
+  status?: TaskStatus;
+  tags?: string[];
+  noteTemplateId?: string;
+  phase?: string;
+}
+
+export interface PlaybookTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  investigationType: string;
+  defaultTags?: string[];
+  defaultClsLevel?: string;
+  defaultPapLevel?: string;
+  steps: PlaybookStep[];
+  source: TemplateSource;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ExportData {
   version: 1;
   exportedAt: number;
@@ -530,6 +583,8 @@ export interface ExportData {
   standaloneIOCs?: StandaloneIOC[];
   chatThreads?: ChatThread[];
   quickLinks?: QuickLink[];
+  noteTemplates?: NoteTemplate[];
+  playbookTemplates?: PlaybookTemplate[];
 }
 
 export const TAG_COLORS = [

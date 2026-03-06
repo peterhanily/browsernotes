@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, ChatThread } from './types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, ChatThread, NoteTemplate, PlaybookTemplate } from './types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
 const db = new Dexie('ThreatCaddyDB') as Dexie & {
@@ -13,6 +13,8 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   activityLog: EntityTable<ActivityLogEntry, 'id'>;
   standaloneIOCs: EntityTable<StandaloneIOC, 'id'>;
   chatThreads: EntityTable<ChatThread, 'id'>;
+  noteTemplates: EntityTable<NoteTemplate, 'id'>;
+  playbookTemplates: EntityTable<PlaybookTemplate, 'id'>;
 };
 
 db.version(1).stores({
@@ -132,6 +134,12 @@ db.version(16).stores({
 // Version 17: Task assignees
 db.version(17).stores({
   tasks: 'id, title, folderId, status, priority, completed, trashed, archived, order, createdAt, updatedAt, *tags, *iocTypes, createdBy, assigneeId',
+});
+
+// Version 18: Note templates and playbook templates
+db.version(18).stores({
+  noteTemplates: 'id, name, category, source, createdAt, updatedAt',
+  playbookTemplates: 'id, name, investigationType, source, createdAt, updatedAt',
 });
 
 // Encryption-at-rest middleware (transparent to all CRUD hooks)

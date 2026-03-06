@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw } from 'lucide-react';
-import type { Settings, Note } from '../../types';
+import type { Settings, Note, NoteTemplate, PlaybookTemplate, PlaybookStep } from '../../types';
+import { TemplateManager } from './TemplateManager';
+import { PlaybookManager } from './PlaybookManager';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/llm-tools';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
@@ -69,9 +71,25 @@ interface SettingsPanelProps {
   onLoadSample?: () => void;
   onDeleteSample?: () => void;
   onClose?: () => void;
+  templateProps?: {
+    templates: NoteTemplate[];
+    userTemplates: NoteTemplate[];
+    categories: string[];
+    onCreateTemplate: (data: Partial<NoteTemplate> & { name: string; content: string }) => Promise<NoteTemplate>;
+    onUpdateTemplate: (id: string, updates: Partial<NoteTemplate>) => Promise<void>;
+    onDeleteTemplate: (id: string) => Promise<void>;
+    onDuplicateBuiltin: (builtinId: string) => Promise<NoteTemplate | null>;
+  };
+  playbookProps?: {
+    playbooks: PlaybookTemplate[];
+    userPlaybooks: PlaybookTemplate[];
+    onCreatePlaybook: (data: Partial<PlaybookTemplate> & { name: string; steps: PlaybookStep[] }) => Promise<PlaybookTemplate>;
+    onUpdatePlaybook: (id: string, updates: Partial<PlaybookTemplate>) => Promise<void>;
+    onDeletePlaybook: (id: string) => Promise<void>;
+  };
 }
 
-export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose, templateProps, playbookProps }: SettingsPanelProps) {
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
 
@@ -316,6 +334,14 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       <ThreatIntelConfig />
 
       <hr className="border-gray-800" />
+
+      {templateProps && <TemplateManager {...templateProps} />}
+
+      {templateProps && <hr className="border-gray-800" />}
+
+      {playbookProps && <PlaybookManager {...playbookProps} />}
+
+      {playbookProps && <hr className="border-gray-800" />}
 
       <CloudBackup />
 

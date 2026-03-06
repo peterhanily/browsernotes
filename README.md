@@ -56,7 +56,15 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 - **Slash commands** — `/` menu with formatting, threat intel templates (IOC tables, MITRE references, TLP headers), and quick inserts
 - **Note annotations** — Timestamped comments on any note
 - **Defang/Refang toggle** — Preview network IOCs in defanged form (`hxxps://`, `example[.]com`)
-- **Quick capture** — Clip articles, bookmarks, code snippets, and meeting notes with 10 templates
+- **Quick capture** — Clip articles, bookmarks, code snippets, and meeting notes with 15+ built-in templates
+- **Note templates** — 15 built-in templates (host details, malware analysis, phishing reports, threat actor profiles, and more). Create, edit, and save your own custom templates. Save any note as a reusable template.
+
+### Investigation Playbooks
+
+- **Built-in playbooks** — 6 pre-built playbooks: Incident Response, Phishing Investigation, Malware Analysis, Threat Hunt, Data Breach, and Vulnerability Assessment
+- **Custom playbooks** — Create your own playbooks with ordered steps that auto-populate investigations with tasks and notes
+- **One-click instantiation** — Start a new investigation from a playbook and get a complete workspace: folder, timeline, tasks with phases/priorities, and pre-filled notes from templates
+- **Playbook management** — Create, edit, and delete custom playbooks in Settings; browse and use built-in playbooks from the sidebar
 
 ### Task Management
 
@@ -102,7 +110,7 @@ docker compose up -d   # Starts Hono server + PostgreSQL
 
 - **Encryption at rest** — Passphrase-based AES-256-GCM via PBKDF2 (600k iterations) with configurable session duration and recovery phrase
 - **Cloud backup** — OCI Object Storage, AWS S3, Azure Blob Storage, or Google Cloud Storage via pre-authenticated URLs
-- **Export & import** — Full JSON backup/restore; per-investigation export
+- **Export & import** — Full JSON backup/restore; per-investigation export; includes note templates and playbooks
 
 ### Team Server
 

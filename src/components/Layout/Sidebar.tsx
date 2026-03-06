@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
   Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
-  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Dices, Search, Shield,
+  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Dices, Search, Shield, BookOpen,
   LayoutDashboard, MessageSquare, MessagesSquare, FolderOpen, FolderClosed,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
@@ -64,6 +64,7 @@ interface SidebarProps {
   investigationScopedCounts?: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number } | null;
   chatCount?: number;
   serverConnected?: boolean;
+  onNewFromPlaybook?: () => void;
 }
 
 type SegmentedFilter = 'all' | InvestigationStatus;
@@ -117,6 +118,7 @@ export function Sidebar({
   investigationScopedCounts,
   chatCount,
   serverConnected,
+  onNewFromPlaybook,
 }: SidebarProps) {
   const [investigationsListOpen, setInvestigationsListOpen] = useState(true);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
@@ -409,6 +411,16 @@ export function Sidebar({
             >
               <Dices size={14} />
             </button>
+            {onNewFromPlaybook && (
+              <button
+                onClick={onNewFromPlaybook}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                title="New from playbook"
+                aria-label="New investigation from playbook"
+              >
+                <BookOpen size={14} />
+              </button>
+            )}
           </div>
         )}
       </div>

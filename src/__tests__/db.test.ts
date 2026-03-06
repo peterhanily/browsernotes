@@ -61,8 +61,8 @@ describe('Database schema', () => {
     expect(db.chatThreads).toBeDefined();
   });
 
-  it('is at version 17', () => {
-    expect(db.verno).toBe(17);
+  it('is at version 18', () => {
+    expect(db.verno).toBe(18);
   });
 });
 

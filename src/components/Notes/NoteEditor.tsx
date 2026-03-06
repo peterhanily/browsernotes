@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2 } from 'lucide-react';
+import { Pin, Archive, Trash2, RotateCcw, Eye, Edit3, Columns, ExternalLink, Palette, ArrowLeft, Upload, Briefcase, MessageSquare, Search, Lock, LockOpen, Share2, FileText } from 'lucide-react';
 import type { Note, Task, TimelineEvent, Tag, Folder, EditorMode, Settings, NoteAnnotation } from '../../types';
 import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
@@ -41,6 +41,7 @@ interface NoteEditorProps {
   allTimelineEvents?: TimelineEvent[];
   onNavigateToNote?: (noteId: string) => void;
   onShareLink?: (note: Note) => void;
+  onSaveAsTemplate?: (note: Note) => void;
 }
 
 export function NoteEditor({
@@ -63,6 +64,7 @@ export function NoteEditor({
   allTimelineEvents = [],
   onNavigateToNote,
   onShareLink,
+  onSaveAsTemplate,
 }: NoteEditorProps) {
   const iocCount = note.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
   const [title, setTitle] = useState(note.title);
@@ -763,6 +765,17 @@ export function NoteEditor({
             aria-label="Generate shareable link"
           >
             <Share2 size={16} />
+          </button>
+        )}
+
+        {onSaveAsTemplate && !note.trashed && (
+          <button
+            onClick={() => onSaveAsTemplate(note)}
+            className="p-1.5 rounded text-gray-500 hover:text-gray-300"
+            title="Save as template"
+            aria-label="Save note as reusable template"
+          >
+            <FileText size={16} />
           </button>
         )}
 

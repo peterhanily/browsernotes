@@ -120,13 +120,13 @@ describe('isEncryptionEnabled', () => {
 });
 
 describe('getSessionDuration', () => {
-  it('returns "every-load" when no metadata', () => {
-    expect(getSessionDuration()).toBe('every-load');
+  it('returns "tab-close" when no metadata', () => {
+    expect(getSessionDuration()).toBe('tab-close');
   });
 
-  it('returns "every-load" when metadata has no sessionDuration', () => {
+  it('returns "tab-close" when metadata has no sessionDuration', () => {
     setEncryptionMeta(makeMeta());
-    expect(getSessionDuration()).toBe('every-load');
+    expect(getSessionDuration()).toBe('tab-close');
   });
 
   it('returns stored sessionDuration', () => {

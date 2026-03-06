@@ -55,7 +55,7 @@ export function isEncryptionEnabled(): boolean {
 }
 
 export function getSessionDuration(): SessionDuration {
-  return getEncryptionMeta()?.sessionDuration ?? 'every-load';
+  return getEncryptionMeta()?.sessionDuration ?? 'tab-close';
 }
 
 // ── Session key caching ─────────────────────────────────────────────

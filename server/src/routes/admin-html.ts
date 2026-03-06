@@ -152,6 +152,28 @@ export function getAdminHtml(nonce: string): string {
   .danger-zone p { color: #8b949e; font-size: 0.85rem; margin-bottom: 0.75rem; }
 
   input[type="checkbox"].row-check { width: 16px; height: 16px; accent-color: #58a6ff; cursor: pointer; }
+
+  /* ─── Bot-specific styles ──────────────────────────────── */
+  .bot-type-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+  .bot-type-enrichment { background: rgba(88,166,255,0.15); color: #58a6ff; }
+  .bot-type-feed { background: rgba(63,185,80,0.15); color: #3fb950; }
+  .bot-type-monitor { background: rgba(210,153,34,0.15); color: #e3b341; }
+  .bot-type-triage { background: rgba(188,140,255,0.15); color: #bc8cff; }
+  .bot-type-report { background: rgba(139,148,158,0.15); color: #8b949e; }
+  .bot-type-correlation { background: rgba(255,123,114,0.15); color: #ff7b72; }
+  .bot-type-ai-agent { background: rgba(210,153,34,0.15); color: #f0883e; }
+  .bot-type-custom { background: rgba(139,148,158,0.15); color: #8b949e; }
+  .cap-tag { display: inline-block; padding: 0.1rem 0.4rem; margin: 0.1rem; border-radius: 4px; font-size: 0.7rem; background: rgba(88,166,255,0.1); color: #58a6ff; }
+  .bot-stat { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: #8b949e; }
+  .bot-stat .num { color: #c9d1d9; font-weight: 600; }
+  .run-status-success { color: #3fb950; }
+  .run-status-error { color: #f85149; }
+  .run-status-running { color: #58a6ff; }
+  .run-status-timeout { color: #e3b341; }
+  .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.3rem; margin: 0.5rem 0; }
+  .checkbox-grid label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #c9d1d9; cursor: pointer; }
+  .checkbox-grid input[type="checkbox"] { accent-color: #58a6ff; }
+  .trigger-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #21262d; }
 </style>
 </head>
 <body>
@@ -184,6 +206,7 @@ export function getAdminHtml(nonce: string): string {
     <button class="tab-btn" data-tab="tab-investigations">Investigations</button>
     <button class="tab-btn" data-tab="tab-audit">Audit Log</button>
     <button class="tab-btn" data-tab="tab-sessions">Sessions</button>
+    <button class="tab-btn" data-tab="tab-bots">Bots</button>
   </div>
 
   <!-- ─── Dashboard Tab ──────────────────────────────────── -->
@@ -421,6 +444,50 @@ export function getAdminHtml(nonce: string): string {
       </table>
     </div>
   </div>
+
+  <!-- ─── Bots Tab ──────────────────────────────────────────── -->
+  <div id="tab-bots" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h2 style="font-size:1rem;color:#c9d1d9;">Bot Management</h2>
+      <button id="createBotBtn" class="btn btn-primary btn-sm">+ Create Bot</button>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="botSearch" placeholder="Search bots..." style="min-width:200px;">
+      <select id="botTypeFilter">
+        <option value="">All types</option>
+        <option value="enrichment">Enrichment</option>
+        <option value="feed">Feed</option>
+        <option value="monitor">Monitor</option>
+        <option value="triage">Triage</option>
+        <option value="report">Report</option>
+        <option value="correlation">Correlation</option>
+        <option value="ai-agent">AI Agent</option>
+        <option value="custom">Custom</option>
+      </select>
+      <select id="botStatusFilter">
+        <option value="">All status</option>
+        <option value="enabled">Enabled</option>
+        <option value="disabled">Disabled</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Scope</th>
+            <th>Runs</th>
+            <th>Errors</th>
+            <th>Last Run</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="botsBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ TOASTS ═══════════════════════════════════════════════════ -->
@@ -485,6 +552,97 @@ export function getAdminHtml(nonce: string): string {
     <div class="modal-actions">
       <button id="cancelPurge" class="btn btn-outline btn-sm">Cancel</button>
       <button id="confirmPurge" class="btn btn-danger btn-sm" disabled>Purge</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Bot Modal -->
+<div id="createBotModal" class="modal-overlay">
+  <div class="modal" style="max-width:600px;">
+    <h3>Create Bot</h3>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="newBotName" placeholder="e.g. IOC Enricher" maxlength="100">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" id="newBotDesc" placeholder="What does this bot do?">
+    </div>
+    <div class="form-group">
+      <label>Type *</label>
+      <select id="newBotType">
+        <option value="enrichment">Enrichment</option>
+        <option value="feed">Feed</option>
+        <option value="monitor">Monitor</option>
+        <option value="triage">Triage</option>
+        <option value="report">Report</option>
+        <option value="correlation">Correlation</option>
+        <option value="ai-agent">AI Agent</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Capabilities</label>
+      <div class="checkbox-grid">
+        <label><input type="checkbox" class="bot-cap-check" value="read_entities"> Read Entities</label>
+        <label><input type="checkbox" class="bot-cap-check" value="create_entities"> Create Entities</label>
+        <label><input type="checkbox" class="bot-cap-check" value="update_entities"> Update Entities</label>
+        <label><input type="checkbox" class="bot-cap-check" value="delete_entities"> Delete Entities</label>
+        <label><input type="checkbox" class="bot-cap-check" value="link_entities"> Link Entities</label>
+        <label><input type="checkbox" class="bot-cap-check" value="post_to_feed"> Post to Feed</label>
+        <label><input type="checkbox" class="bot-cap-check" value="notify_users"> Notify Users</label>
+        <label><input type="checkbox" class="bot-cap-check" value="call_external_apis"> Call External APIs</label>
+        <label><input type="checkbox" class="bot-cap-check" value="use_llm"> Use LLM</label>
+        <label><input type="checkbox" class="bot-cap-check" value="manage_investigations"> Manage Investigations</label>
+        <label><input type="checkbox" class="bot-cap-check" value="cross_investigation"> Cross Investigation</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Scope</label>
+      <select id="newBotScope">
+        <option value="investigation">Investigation-scoped</option>
+        <option value="global">Global</option>
+        <option value="tag-based">Tag-based</option>
+      </select>
+    </div>
+    <div class="trigger-section">
+      <label style="font-size:0.85rem;color:#8b949e;display:block;margin-bottom:0.5rem;">Triggers</label>
+      <div class="form-group">
+        <label>Event Triggers</label>
+        <div class="checkbox-grid">
+          <label><input type="checkbox" class="bot-event-check" value="entity.created"> Entity Created</label>
+          <label><input type="checkbox" class="bot-event-check" value="entity.updated"> Entity Updated</label>
+          <label><input type="checkbox" class="bot-event-check" value="entity.deleted"> Entity Deleted</label>
+          <label><input type="checkbox" class="bot-event-check" value="investigation.created"> Investigation Created</label>
+          <label><input type="checkbox" class="bot-event-check" value="investigation.closed"> Investigation Closed</label>
+          <label><input type="checkbox" class="bot-event-check" value="post.created"> Post Created</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Schedule (cron)</label>
+        <input type="text" id="newBotSchedule" placeholder="e.g. */30 * * * * (every 30 min)">
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;"><input type="checkbox" id="newBotWebhook"> Enable webhook trigger</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Allowed Domains (comma-separated)</label>
+      <input type="text" id="newBotDomains" placeholder="e.g. api.virustotal.com, otx.alienvault.com">
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+      <div class="form-group" style="flex:1;">
+        <label>Rate Limit / Hour</label>
+        <input type="number" id="newBotRateHour" value="100" min="1">
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label>Rate Limit / Day</label>
+        <input type="number" id="newBotRateDay" value="1000" min="1">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="cancelCreateBot" class="btn btn-outline">Cancel</button>
+      <button id="submitCreateBot" class="btn btn-primary">Create Bot</button>
     </div>
   </div>
 </div>
@@ -603,6 +761,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     if (tab === 'tab-investigations') renderInvestigations();
     if (tab === 'tab-audit') loadAuditLog();
     if (tab === 'tab-sessions') loadSessions();
+    if (tab === 'tab-bots') loadBotsData();
   });
 });
 
@@ -620,6 +779,7 @@ function loadAll() {
   loadAllowedEmails();
   loadUsersData();
   loadInvestigationsData();
+  loadBotsData();
 }
 
 function loadStats() {
@@ -1400,6 +1560,301 @@ function closeDetailPanel() {
 
 document.getElementById('closeDetailBtn').addEventListener('click', closeDetailPanel);
 document.getElementById('detailBackdrop').addEventListener('click', closeDetailPanel);
+
+/* ═══ BOTS TAB ═══════════════════════════════════════════════ */
+
+var allBots = [];
+
+function loadBotsData() {
+  return api('/bots').then(function(data) {
+    allBots = data.bots;
+    renderBots();
+  }).catch(function(err) { toast(err.message, 'error'); });
+}
+
+function botTypeBadge(type) {
+  return '<span class="bot-type-badge bot-type-' + esc(type) + '">' + esc(type) + '</span>';
+}
+
+function runStatusBadge(status) {
+  return '<span class="run-status-' + esc(status) + '">' + esc(status) + '</span>';
+}
+
+function getFilteredBots() {
+  var search = document.getElementById('botSearch').value.toLowerCase();
+  var typeFilter = document.getElementById('botTypeFilter').value;
+  var statusFilter = document.getElementById('botStatusFilter').value;
+
+  return allBots.filter(function(b) {
+    if (search && b.name.toLowerCase().indexOf(search) === -1 && (b.description || '').toLowerCase().indexOf(search) === -1) return false;
+    if (typeFilter && b.type !== typeFilter) return false;
+    if (statusFilter === 'enabled' && !b.enabled) return false;
+    if (statusFilter === 'disabled' && b.enabled) return false;
+    return true;
+  });
+}
+
+function renderBots() {
+  var filtered = getFilteredBots();
+  var tbody = document.getElementById('botsBody');
+  tbody.innerHTML = filtered.map(function(b) {
+    var lastRun = b.lastRunAt ? fmtDate(b.lastRunAt) : 'Never';
+    var statusBadge = b.enabled
+      ? '<span class="badge badge-green">enabled</span>'
+      : '<span class="badge badge-gray">disabled</span>';
+    var scopeLabel = b.scopeType === 'global' ? 'Global' : (b.scopeFolderIds && b.scopeFolderIds.length > 0 ? b.scopeFolderIds.length + ' inv.' : 'None');
+    return '<tr>' +
+      '<td><a data-action="bot-detail" data-id="' + esc(b.id) + '">' + esc(b.name) + '</a></td>' +
+      '<td>' + botTypeBadge(b.type) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td>' + esc(scopeLabel) + '</td>' +
+      '<td>' + (b.runCount || 0) + '</td>' +
+      '<td>' + (b.errorCount || 0) + '</td>' +
+      '<td style="white-space:nowrap;">' + lastRun + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        (b.enabled
+          ? '<button class="btn btn-outline btn-sm" data-action="disable-bot" data-id="' + esc(b.id) + '" data-name="' + esc(b.name) + '">Disable</button> '
+          : '<button class="btn btn-primary btn-sm" data-action="enable-bot" data-id="' + esc(b.id) + '" data-name="' + esc(b.name) + '">Enable</button> ') +
+        (b.enabled ? '<button class="btn btn-outline btn-sm" data-action="trigger-bot" data-id="' + esc(b.id) + '" data-name="' + esc(b.name) + '">Trigger</button> ' : '') +
+        '<button class="btn btn-danger btn-sm" data-action="delete-bot" data-id="' + esc(b.id) + '" data-name="' + esc(b.name) + '">Delete</button>' +
+      '</td>' +
+      '</tr>';
+  }).join('');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#8b949e;font-style:italic;">No bots found</td></tr>';
+  }
+}
+
+// Filter listeners
+document.getElementById('botSearch').addEventListener('input', function() { renderBots(); });
+document.getElementById('botTypeFilter').addEventListener('change', function() { renderBots(); });
+document.getElementById('botStatusFilter').addEventListener('change', function() { renderBots(); });
+
+// Table action delegation
+document.getElementById('botsBody').addEventListener('click', function(e) {
+  var enableBtn = e.target.closest('[data-action="enable-bot"]');
+  if (enableBtn) {
+    api('/bots/' + enableBtn.dataset.id + '/enable', { method: 'POST' })
+      .then(function() { toast('Bot enabled'); loadBotsData(); })
+      .catch(function(err) { toast(err.message, 'error'); });
+    return;
+  }
+
+  var disableBtn = e.target.closest('[data-action="disable-bot"]');
+  if (disableBtn) {
+    api('/bots/' + disableBtn.dataset.id + '/disable', { method: 'POST' })
+      .then(function() { toast('Bot disabled'); loadBotsData(); })
+      .catch(function(err) { toast(err.message, 'error'); });
+    return;
+  }
+
+  var triggerBtn = e.target.closest('[data-action="trigger-bot"]');
+  if (triggerBtn) {
+    api('/bots/' + triggerBtn.dataset.id + '/trigger', { method: 'POST' })
+      .then(function() { toast('Bot triggered'); })
+      .catch(function(err) { toast(err.message, 'error'); });
+    return;
+  }
+
+  var deleteBtn = e.target.closest('[data-action="delete-bot"]');
+  if (deleteBtn) {
+    if (!confirm('Delete bot "' + deleteBtn.dataset.name + '"? This cannot be undone.')) return;
+    api('/bots/' + deleteBtn.dataset.id, { method: 'DELETE' })
+      .then(function() { toast('Bot deleted'); loadBotsData(); closeDetailPanel(); })
+      .catch(function(err) { toast(err.message, 'error'); });
+    return;
+  }
+
+  var detailLink = e.target.closest('[data-action="bot-detail"]');
+  if (detailLink) {
+    openBotDetail(detailLink.dataset.id);
+    return;
+  }
+});
+
+// ─── Bot Detail Panel ────────────────────────────────────────
+
+function openBotDetail(botId) {
+  api('/bots/' + botId).then(function(data) {
+    var b = data.bot;
+    var runs = data.runs || [];
+    var html = '<h3>' + esc(b.name) + '</h3>';
+
+    // Info grid
+    html += '<div class="info-grid">';
+    html += '<span class="lbl">Type</span><span class="val">' + botTypeBadge(b.type) + '</span>';
+    html += '<span class="lbl">Status</span><span class="val">' + (b.enabled ? '<span class="badge badge-green">enabled</span>' : '<span class="badge badge-gray">disabled</span>') + '</span>';
+    html += '<span class="lbl">Scope</span><span class="val">' + esc(b.scopeType) + '</span>';
+    html += '<span class="lbl">Rate Limit</span><span class="val">' + b.rateLimitPerHour + '/hr, ' + b.rateLimitPerDay + '/day</span>';
+    html += '<span class="lbl">Runs</span><span class="val">' + (b.runCount || 0) + '</span>';
+    html += '<span class="lbl">Errors</span><span class="val">' + (b.errorCount || 0) + '</span>';
+    html += '<span class="lbl">Last Run</span><span class="val">' + fmtDate(b.lastRunAt) + '</span>';
+    html += '<span class="lbl">Created</span><span class="val">' + fmtDate(b.createdAt) + '</span>';
+    if (b.creatorName) html += '<span class="lbl">Created By</span><span class="val">' + esc(b.creatorName) + '</span>';
+    html += '</div>';
+
+    // Description
+    if (b.description) {
+      html += '<div class="section"><h4>Description</h4><p style="color:#c9d1d9;font-size:0.85rem;">' + esc(b.description) + '</p></div>';
+    }
+
+    // Last Error
+    if (b.lastError) {
+      html += '<div class="section"><h4>Last Error</h4><p style="color:#f85149;font-size:0.85rem;background:#1c2128;padding:0.5rem;border-radius:4px;font-family:monospace;word-break:break-all;">' + esc(b.lastError) + '</p></div>';
+    }
+
+    // Capabilities
+    html += '<div class="section"><h4>Capabilities</h4>';
+    var caps = b.capabilities || [];
+    if (caps.length > 0) {
+      html += caps.map(function(c) { return '<span class="cap-tag">' + esc(c) + '</span>'; }).join(' ');
+    } else {
+      html += '<p style="color:#8b949e;font-size:0.85rem;">No capabilities assigned</p>';
+    }
+    html += '</div>';
+
+    // Triggers
+    html += '<div class="section"><h4>Triggers</h4><div class="info-grid">';
+    var triggers = b.triggers || {};
+    if (triggers.events && triggers.events.length > 0) {
+      html += '<span class="lbl">Events</span><span class="val">' + triggers.events.map(function(ev) { return '<span class="cap-tag">' + esc(ev) + '</span>'; }).join(' ') + '</span>';
+    }
+    if (triggers.schedule) {
+      html += '<span class="lbl">Schedule</span><span class="val">' + esc(triggers.schedule) + '</span>';
+    }
+    html += '<span class="lbl">Webhook</span><span class="val">' + (triggers.webhook ? 'Yes' : 'No') + '</span>';
+    html += '</div></div>';
+
+    // Allowed Domains
+    if (b.allowedDomains && b.allowedDomains.length > 0) {
+      html += '<div class="section"><h4>Allowed Domains</h4>';
+      html += b.allowedDomains.map(function(d) { return '<span class="cap-tag">' + esc(d) + '</span>'; }).join(' ');
+      html += '</div>';
+    }
+
+    // Recent Runs
+    html += '<div class="section"><h4>Recent Runs (' + runs.length + ')</h4>';
+    if (runs.length > 0) {
+      html += '<table><thead><tr><th>Time</th><th>Trigger</th><th>Status</th><th>Duration</th><th>Created</th><th>Updated</th><th>API</th></tr></thead><tbody>';
+      runs.forEach(function(r) {
+        html += '<tr>' +
+          '<td style="white-space:nowrap;">' + fmtDate(r.createdAt) + '</td>' +
+          '<td>' + esc(r.trigger) + '</td>' +
+          '<td>' + runStatusBadge(r.status) + '</td>' +
+          '<td>' + (r.durationMs > 0 ? (r.durationMs / 1000).toFixed(1) + 's' : '-') + '</td>' +
+          '<td>' + (r.entitiesCreated || 0) + '</td>' +
+          '<td>' + (r.entitiesUpdated || 0) + '</td>' +
+          '<td>' + (r.apiCallsMade || 0) + '</td>' +
+          '</tr>';
+        if (r.error) {
+          html += '<tr><td colspan="7" style="color:#f85149;font-size:0.8rem;font-family:monospace;padding-left:1.5rem;">' + esc(r.error) + '</td></tr>';
+        }
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<p style="color:#8b949e;font-size:0.85rem;">No runs yet</p>';
+    }
+    html += '</div>';
+
+    // Actions
+    html += '<div style="display:flex;gap:0.5rem;margin-top:1rem;">';
+    if (b.enabled) {
+      html += '<button class="btn btn-outline btn-sm" onclick="toggleBotFromDetail(\\''+esc(b.id)+'\\', false)">Disable</button>';
+      html += '<button class="btn btn-primary btn-sm" onclick="triggerBotFromDetail(\\''+esc(b.id)+'\\')">Trigger Now</button>';
+    } else {
+      html += '<button class="btn btn-primary btn-sm" onclick="toggleBotFromDetail(\\''+esc(b.id)+'\\', true)">Enable</button>';
+    }
+    html += '<button class="btn btn-danger btn-sm" onclick="deleteBotFromDetail(\\''+esc(b.id)+'\\', \\''+esc(b.name)+'\\')">Delete</button>';
+    html += '</div>';
+
+    document.getElementById('detailContent').innerHTML = html;
+    openDetailPanel();
+  }).catch(function(err) { toast(err.message, 'error'); });
+}
+
+function toggleBotFromDetail(botId, enable) {
+  var endpoint = enable ? '/enable' : '/disable';
+  api('/bots/' + botId + endpoint, { method: 'POST' })
+    .then(function() { toast(enable ? 'Bot enabled' : 'Bot disabled'); loadBotsData(); openBotDetail(botId); })
+    .catch(function(err) { toast(err.message, 'error'); });
+}
+
+function triggerBotFromDetail(botId) {
+  api('/bots/' + botId + '/trigger', { method: 'POST' })
+    .then(function() { toast('Bot triggered'); setTimeout(function() { openBotDetail(botId); }, 1500); })
+    .catch(function(err) { toast(err.message, 'error'); });
+}
+
+function deleteBotFromDetail(botId, botName) {
+  if (!confirm('Delete bot "' + botName + '"? This cannot be undone.')) return;
+  api('/bots/' + botId, { method: 'DELETE' })
+    .then(function() { toast('Bot deleted'); loadBotsData(); closeDetailPanel(); })
+    .catch(function(err) { toast(err.message, 'error'); });
+}
+
+// ─── Create Bot Modal ──────────────────────────────────────
+
+document.getElementById('createBotBtn').addEventListener('click', function() {
+  document.getElementById('newBotName').value = '';
+  document.getElementById('newBotDesc').value = '';
+  document.getElementById('newBotType').value = 'enrichment';
+  document.querySelectorAll('.bot-cap-check').forEach(function(cb) { cb.checked = false; });
+  document.getElementById('newBotScope').value = 'investigation';
+  document.getElementById('newBotDomains').value = '';
+  document.getElementById('newBotRateHour').value = '100';
+  document.getElementById('newBotRateDay').value = '1000';
+  // Trigger config
+  document.getElementById('newBotSchedule').value = '';
+  document.getElementById('newBotWebhook').checked = false;
+  document.querySelectorAll('.bot-event-check').forEach(function(cb) { cb.checked = false; });
+  document.getElementById('createBotModal').classList.add('active');
+});
+
+document.getElementById('cancelCreateBot').addEventListener('click', function() {
+  document.getElementById('createBotModal').classList.remove('active');
+});
+
+document.getElementById('submitCreateBot').addEventListener('click', function() {
+  var name = document.getElementById('newBotName').value.trim();
+  var description = document.getElementById('newBotDesc').value.trim();
+  var type = document.getElementById('newBotType').value;
+  if (!name) { toast('Bot name is required', 'error'); return; }
+
+  var capabilities = [];
+  document.querySelectorAll('.bot-cap-check:checked').forEach(function(cb) { capabilities.push(cb.value); });
+
+  var events = [];
+  document.querySelectorAll('.bot-event-check:checked').forEach(function(cb) { events.push(cb.value); });
+
+  var triggers = {};
+  if (events.length > 0) triggers.events = events;
+  var schedule = document.getElementById('newBotSchedule').value.trim();
+  if (schedule) triggers.schedule = schedule;
+  if (document.getElementById('newBotWebhook').checked) triggers.webhook = true;
+
+  var domains = document.getElementById('newBotDomains').value.trim();
+  var allowedDomains = domains ? domains.split(',').map(function(d) { return d.trim(); }).filter(Boolean) : [];
+
+  var body = {
+    name: name,
+    description: description,
+    type: type,
+    capabilities: capabilities,
+    triggers: triggers,
+    allowedDomains: allowedDomains,
+    scopeType: document.getElementById('newBotScope').value,
+    rateLimitPerHour: parseInt(document.getElementById('newBotRateHour').value, 10) || 100,
+    rateLimitPerDay: parseInt(document.getElementById('newBotRateDay').value, 10) || 1000,
+  };
+
+  api('/bots', { method: 'POST', body: JSON.stringify(body) })
+    .then(function() {
+      toast('Bot created');
+      document.getElementById('createBotModal').classList.remove('active');
+      loadBotsData();
+    })
+    .catch(function(err) { toast(err.message, 'error'); });
+});
 
 /* ═══ INIT ════════════════════════════════════════════════════ */
 

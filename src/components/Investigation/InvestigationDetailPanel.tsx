@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Briefcase, FileBarChart, Share2 } from 'lucide-react';
+import { X, Briefcase, FileBarChart, Share2, Cloud, CloudOff } from 'lucide-react';
 import type { Folder, InvestigationStatus, ClosureResolution } from '../../types';
 import { NOTE_COLORS, CLOSURE_RESOLUTION_LABELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
@@ -19,6 +19,8 @@ interface InvestigationDetailPanelProps {
   onExport?: (folderId: string) => void;
   onGenerateReport?: (folderId: string) => void;
   onShareLink?: (folderId: string) => void;
+  serverConnected?: boolean;
+  onToggleSync?: (folderId: string, syncEnabled: boolean) => void;
 }
 
 const STATUS_OPTIONS: { value: InvestigationStatus; label: string }[] = [
@@ -40,6 +42,8 @@ export function InvestigationDetailPanel({
   onExport,
   onGenerateReport,
   onShareLink,
+  serverConnected,
+  onToggleSync,
 }: InvestigationDetailPanelProps) {
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description || '');
@@ -276,6 +280,47 @@ export function InvestigationDetailPanel({
               </button>
             )}
           </div>
+
+          {/* Cloud Sync */}
+          {serverConnected && onToggleSync && (
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-2">Cloud Sync</label>
+              <button
+                onClick={() => onToggleSync(folder.id, !!folder.localOnly)}
+                className={cn(
+                  'flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg border transition-colors text-left',
+                  folder.localOnly
+                    ? 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                    : 'bg-purple/5 border-purple/30 hover:border-purple/50'
+                )}
+              >
+                {folder.localOnly ? (
+                  <CloudOff size={16} className="shrink-0 text-gray-500" />
+                ) : (
+                  <Cloud size={16} className="shrink-0 text-purple" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-200">
+                    {folder.localOnly ? 'Local only' : 'Synced to server'}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    {folder.localOnly
+                      ? 'This investigation stays on your device only'
+                      : 'Backed up and available for team sharing'}
+                  </div>
+                </div>
+                <div className={cn(
+                  'w-8 h-[18px] rounded-full transition-colors relative shrink-0',
+                  folder.localOnly ? 'bg-gray-700' : 'bg-purple/60'
+                )}>
+                  <div className={cn(
+                    'absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all',
+                    folder.localOnly ? 'left-[2px]' : 'left-[14px]'
+                  )} />
+                </div>
+              </button>
+            </div>
+          )}
 
           {/* Export, Report & Share */}
           {(onExport || onGenerateReport || onShareLink) && (

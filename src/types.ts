@@ -113,6 +113,7 @@ export interface Folder {
   closedAt?: number;
   createdBy?: string;
   updatedBy?: string;
+  localOnly?: boolean;
 }
 
 export interface Tag {

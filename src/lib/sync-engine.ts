@@ -66,7 +66,7 @@ export class SyncEngine {
     try {
       const allFolders = await dynamicDb.table('folders').toArray();
       for (const folder of allFolders) {
-        if (folder.trashed) continue;
+        if (folder.trashed || folder.localOnly) continue;
         await this.syncFolder(folder.id);
       }
 

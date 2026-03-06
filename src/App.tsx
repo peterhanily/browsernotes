@@ -70,10 +70,11 @@ const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView
 import { ConflictDialog } from './components/Common/ConflictDialog';
 import type { InvestigationMember } from './types';
 import { fetchInvestigationMembers } from './lib/server-api';
-import { installSyncHooks } from './lib/sync-middleware';
+import { installSyncHooks, initLocalOnlyFlags } from './lib/sync-middleware';
 
 // Install Dexie hooks once at module load so every write is captured
 installSyncHooks();
+initLocalOnlyFlags();
 import { useLoggedActions } from './hooks/useLoggedActions';
 import { useServerSync } from './hooks/useServerSync';
 
@@ -1590,6 +1591,20 @@ function AppInner() {
             addToast('success', `Report generated for "${folder.name}"`);
           }}
           onShareLink={handleShareInvestigationLink}
+          serverConnected={auth.connected}
+          onToggleSync={(folderId, currentlyLocalOnly) => {
+            const newLocalOnly = !currentlyLocalOnly;
+            updateFolder(folderId, { localOnly: newLocalOnly });
+            import('./lib/sync-middleware').then(({ markFolderLocalOnly }) => {
+              markFolderLocalOnly(folderId, newLocalOnly);
+            });
+            if (!newLocalOnly) {
+              // Re-sync folder to server when enabling sync
+              import('./lib/sync-engine').then(({ syncEngine }) => {
+                syncEngine.syncFolder(folderId);
+              });
+            }
+          }}
         />
       )}
 

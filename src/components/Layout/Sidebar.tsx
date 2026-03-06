@@ -347,7 +347,7 @@ export function Sidebar({
                   <InvestigationListItem
                     folder={folder}
                     active={selectedFolderId === folder.id}
-                    synced={serverConnected}
+                    synced={serverConnected && !folder.localOnly}
                     onClick={() => nav(() => {
                       if (selectedFolderId === folder.id) {
                         onFolderSelect(undefined);
@@ -426,6 +426,7 @@ export function Sidebar({
               iocs: investigationScopedCounts?.iocs ?? 0,
             }}
             onEditFolder={onEditFolder}
+            synced={serverConnected && !selectedFolder.localOnly}
           />
         ) : (
           <div className="font-mono text-[11px] text-text-muted px-1">

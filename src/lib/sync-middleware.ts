@@ -8,6 +8,29 @@ const SYNCED_TABLES = [
   'standaloneIOCs', 'chatThreads',
 ];
 
+// Folder IDs marked as local-only (skip sync)
+const localOnlyFolders = new Set<string>();
+
+export function markFolderLocalOnly(folderId: string, localOnly: boolean) {
+  if (localOnly) {
+    localOnlyFolders.add(folderId);
+  } else {
+    localOnlyFolders.delete(folderId);
+  }
+}
+
+function shouldSkipSync(tableName: string, obj: Record<string, unknown>): boolean {
+  if (tableName === 'folders') {
+    return obj.localOnly === true || localOnlyFolders.has(obj.id as string);
+  }
+  // Skip folder-scoped entities belonging to local-only folders
+  const folderId = obj.folderId as string | undefined;
+  if (folderId && localOnlyFolders.has(folderId)) {
+    return true;
+  }
+  return false;
+}
+
 let syncEnabled = false;
 
 export function enableSync() {
@@ -16,6 +39,16 @@ export function enableSync() {
 
 export function disableSync() {
   syncEnabled = false;
+}
+
+/** Load localOnly flags from existing folders on startup */
+export async function initLocalOnlyFlags() {
+  try {
+    const allFolders = await db.folders.toArray();
+    for (const f of allFolders) {
+      if (f.localOnly) localOnlyFolders.add(f.id);
+    }
+  } catch { /* ignore — DB may not be ready */ }
 }
 
 /**
@@ -39,6 +72,7 @@ export function installSyncHooks() {
     // Creating — fires with (primKey, obj, transaction)
     table.hook('creating', function (_primKey: string, obj: Record<string, unknown>) {
       if (!syncEnabled) return;
+      if (shouldSkipSync(tableName, obj)) return;
       const entityId = (obj.id as string) || _primKey;
       const data = { ...obj };
       setTimeout(() => {
@@ -55,14 +89,16 @@ export function installSyncHooks() {
     ) {
       if (!syncEnabled) return;
       const merged = { ...obj, ...modifications };
+      if (shouldSkipSync(tableName, merged)) return;
       setTimeout(() => {
         syncEngine.enqueue(tableName, primKey, 'put', merged).catch((err) => console.warn('[sync] enqueue failed:', err));
       }, 0);
     });
 
     // Deleting — fires with (primKey, obj, transaction)
-    table.hook('deleting', function (primKey: string) {
+    table.hook('deleting', function (primKey: string, obj: Record<string, unknown>) {
       if (!syncEnabled) return;
+      if (shouldSkipSync(tableName, obj)) return;
       setTimeout(() => {
         syncEngine.enqueue(tableName, primKey, 'delete').catch((err) => console.warn('[sync] enqueue failed:', err));
       }, 0);

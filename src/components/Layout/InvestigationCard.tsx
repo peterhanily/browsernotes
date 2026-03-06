@@ -1,4 +1,4 @@
-import { FileText, ListChecks, Clock, PenTool, Shield } from 'lucide-react';
+import { FileText, ListChecks, Clock, PenTool, Shield, Cloud } from 'lucide-react';
 import type { Folder } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
 
@@ -6,9 +6,10 @@ interface InvestigationCardProps {
   folder: Folder;
   counts: { notes: number; tasks: number; events: number; whiteboards: number; iocs: number };
   onEditFolder: (id: string) => void;
+  synced?: boolean;
 }
 
-export function InvestigationCard({ folder, counts, onEditFolder }: InvestigationCardProps) {
+export function InvestigationCard({ folder, counts, onEditFolder, synced }: InvestigationCardProps) {
   const status = folder.status || 'active';
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
   const statusColor = status === 'active'
@@ -47,6 +48,11 @@ export function InvestigationCard({ folder, counts, onEditFolder }: Investigatio
         <span className="text-sm font-semibold text-text-primary truncate flex-1">
           {folder.name}
         </span>
+        {synced && (
+          <span title="Synced with team server" className="shrink-0">
+            <Cloud size={14} className="text-purple/60" />
+          </span>
+        )}
       </div>
 
       {/* Meta row */}

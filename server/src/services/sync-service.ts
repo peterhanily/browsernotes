@@ -22,6 +22,7 @@ const TABLE_MAP: Record<string, PgTable<any>> = {
 // Fields managed exclusively by the server — never accept from client
 const SERVER_MANAGED_FIELDS = new Set([
   'id', 'createdBy', 'updatedBy', 'version', 'createdAt', 'updatedAt', 'deletedAt',
+  'localOnly', // client-only field — never store on server
 ]);
 
 function stripServerFields(data: Record<string, unknown> | undefined): Record<string, unknown> {

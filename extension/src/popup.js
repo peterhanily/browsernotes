@@ -200,12 +200,40 @@ setupPermToggle('url-perm-toggle', 'url-perm-slider', ['*://*/*']);
 const mainSections = document.querySelectorAll('body > section, body > footer, body > header');
 const settingsPage = document.getElementById('settings-page');
 
+// Sync all permission toggles to reflect current browser state
+function refreshAllPermToggles() {
+  const aiOrigins = [
+    'https://api.anthropic.com/*',
+    'https://api.openai.com/*',
+    'https://generativelanguage.googleapis.com/*',
+    'https://api.mistral.ai/*',
+  ];
+  const urlOrigins = ['*://*/*'];
+
+  chrome.permissions.contains({ origins: aiOrigins }, (granted) => {
+    for (const [tid, sid] of [['ai-perm-toggle', 'ai-perm-slider'], ['settings-ai-toggle', 'settings-ai-slider']]) {
+      const t = document.getElementById(tid);
+      const s = document.getElementById(sid);
+      if (t && s) { t.checked = granted; s.style.backgroundColor = granted ? '#8b5cf6' : '#4b5563'; }
+    }
+  });
+  chrome.permissions.contains({ origins: urlOrigins }, (granted) => {
+    for (const [tid, sid] of [['url-perm-toggle', 'url-perm-slider'], ['settings-url-toggle', 'settings-url-slider']]) {
+      const t = document.getElementById(tid);
+      const s = document.getElementById(sid);
+      if (t && s) { t.checked = granted; s.style.backgroundColor = granted ? '#8b5cf6' : '#4b5563'; }
+    }
+  });
+}
+
 document.getElementById('settings-btn').addEventListener('click', () => {
+  refreshAllPermToggles();
   mainSections.forEach(el => el.style.display = 'none');
   settingsPage.style.display = 'block';
 });
 
 document.getElementById('settings-back').addEventListener('click', () => {
+  refreshAllPermToggles();
   settingsPage.style.display = 'none';
   mainSections.forEach(el => el.style.display = '');
 });
@@ -219,16 +247,18 @@ setupPermToggle('settings-ai-toggle', 'settings-ai-slider', [
 ]);
 setupPermToggle('settings-url-toggle', 'settings-url-slider', ['*://*/*']);
 
-// Target URL
+// Target URL — stored inside settings.targetUrl to match background.js / clips.js
 (async function loadTargetUrl() {
-  const { targetUrl = 'https://threatcaddy.com' } = await chrome.storage.local.get(['targetUrl']);
-  document.getElementById('settings-target-url').value = targetUrl;
+  const { settings = {} } = await chrome.storage.local.get(['settings']);
+  document.getElementById('settings-target-url').value = settings.targetUrl || 'https://threatcaddy.com';
 })();
 
 document.getElementById('settings-save-url').addEventListener('click', async () => {
   const url = document.getElementById('settings-target-url').value.trim();
   if (!url) return;
-  await chrome.storage.local.set({ targetUrl: url });
+  const { settings = {} } = await chrome.storage.local.get(['settings']);
+  settings.targetUrl = url;
+  await chrome.storage.local.set({ settings });
   const saved = document.getElementById('settings-url-saved');
   saved.classList.add('show');
   setTimeout(() => saved.classList.remove('show'), 2000);

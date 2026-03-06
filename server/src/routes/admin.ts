@@ -637,8 +637,13 @@ app.delete('/api/investigations/:id/content', requireAdminAuth, async (c) => {
   deleted.files = delFiles.length;
   const delNotif = await db.delete(notifications).where(eq(notifications.folderId, folderId)).returning({ id: notifications.id });
   deleted.notifications = delNotif.length;
+  const delMembers = await db.delete(investigationMembers).where(eq(investigationMembers.folderId, folderId)).returning({ id: investigationMembers.id });
+  deleted.members = delMembers.length;
 
-  await logAdminAction('investigation.purge', `Purged all content from "${folder.name}"`, { folderId });
+  // Delete the folder itself
+  await db.delete(folders).where(eq(folders.id, folderId));
+
+  await logAdminAction('investigation.purge', `Purged and deleted investigation "${folder.name}"`, { folderId });
 
   return c.json({ ok: true, deleted });
 });

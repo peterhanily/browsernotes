@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, ilike, or } from 'drizzle-orm';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { db } from '../db/index.js';
-import { users, posts, investigationMembers } from '../db/schema.js';
+import { users, posts, investigationMembers, sessions } from '../db/schema.js';
+import { disconnectUser } from '../ws/handler.js';
 import type { AuthUser } from '../types.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
@@ -16,6 +17,7 @@ app.get('/', async (c) => {
 
   if (search) {
     // Allow any authenticated user to search (for @mentions, invite by email)
+    const pattern = `%${search}%`;
     result = await db
       .select({
         id: users.id,
@@ -26,16 +28,14 @@ app.get('/', async (c) => {
         active: users.active,
       })
       .from(users)
-      .where(eq(users.active, true))
-      .limit(50);
-
-    // Filter in-memory for simplicity (PostgreSQL ILIKE would be better for large datasets)
-    const lower = search.toLowerCase();
-    result = result.filter(
-      (u) =>
-        u.displayName.toLowerCase().includes(lower) ||
-        u.email.toLowerCase().includes(lower)
-    );
+      .where(and(
+        eq(users.active, true),
+        or(
+          ilike(users.displayName, pattern),
+          ilike(users.email, pattern),
+        )
+      ))
+      .limit(20);
   } else {
     // Full list requires admin
     const user = c.get('user');
@@ -88,7 +88,14 @@ app.get('/:id/feed', async (c) => {
   const requestingUser = c.get('user');
   const targetUserId = c.req.param('id');
 
-  // Fetch the user's non-deleted posts (global + investigation-scoped)
+  // Get folders the requesting user has access to
+  const memberships = await db
+    .select({ folderId: investigationMembers.folderId })
+    .from(investigationMembers)
+    .where(eq(investigationMembers.userId, requestingUser.id));
+  const accessibleFolderIds = new Set(memberships.map((m) => m.folderId));
+
+  // Fetch the user's non-deleted posts (global + investigation-scoped), limited to 50
   const allPosts = await db
     .select()
     .from(posts)
@@ -99,30 +106,14 @@ app.get('/:id/feed', async (c) => {
       )
     )
     .orderBy(posts.createdAt)
-    .limit(200);
+    .limit(100);
 
-  // Batch-check folder access instead of N individual queries
-  const uniqueFolderIds = [...new Set(allPosts.map((p) => p.folderId).filter(Boolean))] as string[];
-  let accessibleFolderIds = new Set<string>();
-  if (uniqueFolderIds.length > 0) {
-    const memberships = await db
-      .select({ folderId: investigationMembers.folderId })
-      .from(investigationMembers)
-      .where(
-        and(
-          eq(investigationMembers.userId, requestingUser.id),
-          inArray(investigationMembers.folderId, uniqueFolderIds)
-        )
-      );
-    accessibleFolderIds = new Set(memberships.map((m) => m.folderId));
-  }
+  // Filter to only posts the requesting user can see
+  const result = allPosts
+    .filter((post) => !post.folderId || accessibleFolderIds.has(post.folderId))
+    .slice(-50);
 
-  const result = allPosts.filter(
-    (post) => !post.folderId || accessibleFolderIds.has(post.folderId)
-  );
-
-  // Return most recent 50
-  return c.json(result.slice(-50));
+  return c.json(result);
 });
 
 // PATCH /api/users/:id — admin update user
@@ -143,8 +134,18 @@ app.patch('/:id', requireRole('admin'), async (c) => {
 // DELETE /api/users/:id — admin deactivate user
 app.delete('/:id', requireRole('admin'), async (c) => {
   const userId = c.req.param('id');
+  const requestingUser = c.get('user');
+
+  // Prevent self-deactivation
+  if (userId === requestingUser.id) {
+    return c.json({ error: 'Cannot deactivate yourself' }, 400);
+  }
 
   await db.update(users).set({ active: false, updatedAt: new Date() }).where(eq(users.id, userId));
+  // Invalidate all sessions so refresh tokens stop working
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+  // Force-disconnect all WebSocket connections
+  disconnectUser(userId);
 
   return c.json({ ok: true });
 });

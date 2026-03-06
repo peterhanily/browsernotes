@@ -71,6 +71,13 @@
       "when": 1741700000000,
       "tag": "0009_add_activity_log_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1741800000000,
+      "tag": "0010_fk_cascade_and_nullable_fixes",
+      "breakpoints": true
     }
   ]
 }

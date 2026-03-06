@@ -143,7 +143,6 @@ export async function processPush(
             .update(table)
             .set({
               ...cleanData,
-              deletedAt: null, // Clear tombstone if entity is being re-created/updated
               updatedBy: userId,
               version: newVersion,
               updatedAt: now,

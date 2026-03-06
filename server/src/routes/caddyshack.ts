@@ -137,14 +137,23 @@ app.post('/posts', async (c) => {
     if (!validAttTypes.has(att.type)) {
       return c.json({ error: 'Attachment type must be image, video, audio, or document' }, 400);
     }
-    // Reject javascript: and data: URIs to prevent XSS
+    // Reject dangerous URI schemes to prevent XSS
     const urlLower = att.url.toLowerCase().trim();
-    if (urlLower.startsWith('javascript:') || urlLower.startsWith('data:text/html')) {
+    if (
+      urlLower.startsWith('javascript:') ||
+      urlLower.startsWith('vbscript:') ||
+      urlLower.startsWith('data:') ||
+      urlLower.startsWith('blob:')
+    ) {
       return c.json({ error: 'Invalid attachment URL' }, 400);
     }
+    // Only allow http(s) and relative URLs
+    if (att.url.includes(':') && !urlLower.startsWith('http://') && !urlLower.startsWith('https://') && !att.url.startsWith('/')) {
+      return c.json({ error: 'Attachment URL must use http(s) or be a relative path' }, 400);
+    }
   }
-  if (!Array.isArray(mentions) || mentions.length > 50 || !mentions.every((m: unknown) => typeof m === 'string')) {
-    return c.json({ error: 'Mentions must be an array of strings (max 50)' }, 400);
+  if (!Array.isArray(mentions) || mentions.length > 50 || !mentions.every((m: unknown) => typeof m === 'string' && m.length <= 128)) {
+    return c.json({ error: 'Mentions must be an array of strings (max 50, each max 128 chars)' }, 400);
   }
 
   if (folderId) {
@@ -452,8 +461,8 @@ app.post('/posts/:id/reactions', async (c) => {
   const body = await c.req.json();
   const { emoji } = body;
 
-  if (!emoji) {
-    return c.json({ error: 'Emoji is required' }, 400);
+  if (!emoji || typeof emoji !== 'string' || emoji.length > 32) {
+    return c.json({ error: 'Emoji is required (max 32 chars)' }, 400);
   }
 
   try {

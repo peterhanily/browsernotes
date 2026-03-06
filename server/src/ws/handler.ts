@@ -284,3 +284,27 @@ export function broadcastToUser(userId: string, msg: unknown) {
     }
   }
 }
+
+// Force-unsubscribe a user from a folder (called when member is removed)
+export function revokeUserFolderAccess(userId: string, folderId: string) {
+  const conns = userConnections.get(userId);
+  if (!conns) return;
+  for (const ws of conns) {
+    const client = clients.get(ws);
+    if (client && client.subscribedFolders.has(folderId)) {
+      client.subscribedFolders.delete(folderId);
+      removePresence(folderId, userId);
+      sendTo(ws, { type: 'access-revoked', folderId });
+    }
+  }
+  broadcastPresence(folderId);
+}
+
+// Force-disconnect all connections for a user (called when user is deactivated)
+export function disconnectUser(userId: string) {
+  const conns = userConnections.get(userId);
+  if (!conns) return;
+  for (const ws of conns) {
+    try { ws.close(4004, 'Account deactivated'); } catch { /* noop */ }
+  }
+}

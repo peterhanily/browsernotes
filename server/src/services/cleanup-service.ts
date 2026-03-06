@@ -1,7 +1,7 @@
-import { eq, lt, and, isNotNull } from 'drizzle-orm';
+import { eq, lt, and, isNotNull, notInArray } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
-import { serverSettings, notifications, activityLog } from '../db/schema.js';
+import { serverSettings, notifications, activityLog, investigationMembers, folders } from '../db/schema.js';
 import { logger } from '../lib/logger.js';
 
 const NOTIF_RETENTION_KEY = 'notification_retention_days';
@@ -82,8 +82,31 @@ export async function pruneOldData(): Promise<void> {
       }
     }
 
-    if (deletedNotifs.length > 0 || deletedAudit.length > 0 || totalTombstones > 0) {
-      logger.info(`Data pruning: deleted ${deletedNotifs.length} notification(s), ${deletedAudit.length} audit log entry(ies), ${totalTombstones} tombstone(s)`);
+    // Clean up orphaned investigationMembers (folders that no longer exist)
+    let orphanedMembers = 0;
+    try {
+      const allFolderIds = await db.select({ id: folders.id }).from(folders);
+      const validIds = allFolderIds.map(f => f.id);
+      if (validIds.length > 0) {
+        const deleted = await db.delete(investigationMembers)
+          .where(notInArray(investigationMembers.folderId, validIds))
+          .returning({ id: investigationMembers.id });
+        orphanedMembers = deleted.length;
+      } else {
+        // No folders exist — all memberships are orphaned
+        const deleted = await db.delete(investigationMembers)
+          .returning({ id: investigationMembers.id });
+        orphanedMembers = deleted.length;
+      }
+      if (orphanedMembers > 0) {
+        logger.info(`Orphan cleanup: removed ${orphanedMembers} orphaned investigation member(s)`);
+      }
+    } catch (err) {
+      logger.error('Orphaned membership cleanup failed', { error: String(err) });
+    }
+
+    if (deletedNotifs.length > 0 || deletedAudit.length > 0 || totalTombstones > 0 || orphanedMembers > 0) {
+      logger.info(`Data pruning: deleted ${deletedNotifs.length} notification(s), ${deletedAudit.length} audit log entry(ies), ${totalTombstones} tombstone(s), ${orphanedMembers} orphaned member(s)`);
     }
   } catch (err) {
     logger.error('Data pruning failed', { error: String(err) });

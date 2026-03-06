@@ -177,7 +177,7 @@ export async function backfillFolderOwners(): Promise<void> {
       .from(investigationMembers)
       .where(and(eq(investigationMembers.folderId, f.id), eq(investigationMembers.role, 'owner')))
       .limit(1);
-    if (ownerExists.length === 0) {
+    if (ownerExists.length === 0 && f.createdBy) {
       await db.insert(investigationMembers).values({
         id: nanoid(),
         folderId: f.id,

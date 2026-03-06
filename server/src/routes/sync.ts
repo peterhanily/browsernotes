@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
 import { processPush, pullChanges, getSnapshot, lookupEntityFolderId } from '../services/sync-service.js';
 import { logActivity } from '../services/audit-service.js';
+import { logger } from '../lib/logger.js';
 import { broadcastToFolder } from '../ws/handler.js';
 import { db } from '../db/index.js';
 import { folders, investigationMembers } from '../db/schema.js';
@@ -91,6 +92,7 @@ app.post('/push', async (c) => {
       results.push(processedResults[processedIdx++]);
     } else {
       results.push({ table: changes[i].table, entityId: changes[i].entityId, status: 'rejected' });
+      logger.warn(`Sync rejected: user ${user.id} attempted ${changes[i].op} on ${changes[i].table}/${changes[i].entityId}`);
     }
   }
 

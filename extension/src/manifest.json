@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ThreatCaddy — Quick Capture",
   "version": "1.0.0",
-  "description": "Clip text from any page into ThreatCaddy for AI-assisted threat analysis. Data stays on your device — AI queries go only to your chosen provider.",
+  "description": "Quick-capture web content and proxy AI requests for ThreatCaddy threat intelligence. All data stays local on your device.",
 
   "permissions": [
     "contextMenus",

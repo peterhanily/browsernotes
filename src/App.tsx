@@ -740,10 +740,11 @@ function AppInner() {
       timelines: timelines.filter((tl) => folder.timelineId === tl.id),
       whiteboards: whiteboards.filter((w) => w.folderId === folderId && !w.trashed),
       iocs: standaloneIOCsHook.iocs.filter((i) => i.folderId === folderId && !i.trashed),
+      chatThreads: chatsHook.threads.filter((c) => c.folderId === folderId && !c.trashed),
       tags,
     };
     setShareLinkPayload({ v: 1, s: 'investigation', t: Date.now(), d: bundle });
-  }, [folders, notes.notes, tasks.tasks, timeline.events, timelines, whiteboards, standaloneIOCsHook.iocs, tags]);
+  }, [folders, notes.notes, tasks.tasks, timeline.events, timelines, whiteboards, standaloneIOCsHook.iocs, chatsHook.threads, tags]);
 
   const handleShareChatThread = useCallback((thread: ChatThread) => {
     setShareLinkPayload({ v: 1, s: 'chat', t: Date.now(), d: thread });
@@ -752,13 +753,14 @@ function AppInner() {
   const handleSaveSharedPayload = useCallback(async (payload: SharePayload) => {
     if (payload.s === 'investigation') {
       const bundle = payload.d as InvestigationBundle;
-      await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.timelines, db.tags], async () => {
+      await db.transaction('rw', [db.folders, db.notes, db.tasks, db.timelineEvents, db.whiteboards, db.standaloneIOCs, db.chatThreads, db.timelines, db.tags], async () => {
         await db.folders.put(bundle.folder);
         await db.notes.bulkPut(bundle.notes);
         await db.tasks.bulkPut(bundle.tasks);
         await db.timelineEvents.bulkPut(bundle.events);
         await db.whiteboards.bulkPut(bundle.whiteboards);
         await db.standaloneIOCs.bulkPut(bundle.iocs);
+        if (bundle.chatThreads) await db.chatThreads.bulkPut(bundle.chatThreads);
         await db.timelines.bulkPut(bundle.timelines);
         await db.tags.bulkPut(bundle.tags);
       });
@@ -769,6 +771,7 @@ function AppInner() {
       reloadTimelines();
       reloadWhiteboards();
       standaloneIOCsHook.reload();
+      chatsHook.reload();
       reloadTags();
       addToast('success', `Saved investigation "${bundle.folder.name}" with all entities`);
     } else if (payload.s === 'note') {

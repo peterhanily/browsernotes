@@ -9,7 +9,9 @@ function stripCSPForSingleFile(): Plugin {
   return {
     name: 'strip-csp-meta',
     transformIndexHtml(html) {
-      return html.replace(/<meta\s+http-equiv="Content-Security-Policy"[^>]*\/?\s*>/i, '');
+      return html
+        .replace(/<meta\s+http-equiv="Content-Security-Policy"[^>]*\/?\s*>/i, '')
+        .replace(/<meta\s+name="google-site-verification"[^>]*\/?\s*>/i, '');
     },
   };
 }

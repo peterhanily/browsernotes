@@ -11,6 +11,7 @@ export interface InvestigationBundle {
   timelines: Timeline[];
   whiteboards: Whiteboard[];
   iocs: StandaloneIOC[];
+  chatThreads: ChatThread[];
   tags: Tag[];
 }
 

@@ -108,6 +108,7 @@ export function ExecDashboard({
       }),
       whiteboards: allWhiteboards.filter((w) => w.folderId === folderId && !w.trashed),
       iocs: allIOCs.filter((i) => i.folderId === folderId && !i.trashed),
+      chatThreads: [],
       tags: allTags,
     };
     setSharePayload({ v: 1, s: 'investigation', t: Date.now(), d: bundle });

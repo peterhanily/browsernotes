@@ -1,10 +1,10 @@
 import { db } from '../db';
-import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink } from '../types';
+import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, StandaloneIOC, ChatThread, ChatMessage, ExportData, TimelineExportData, TimelineEventType, ConfidenceLevel, IOCAnalysis, IOCEntry, IOCRelationship, TaskComment, NoteAnnotation, QuickLink, LLMProvider, IOCType } from '../types';
 import { TIMELINE_EVENT_TYPE_LABELS, CONFIDENCE_LEVELS, IOC_TYPE_LABELS } from '../types';
 import { nanoid } from 'nanoid';
 
 export async function exportJSON(): Promise<string> {
-  const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards] = await Promise.all([
+  const [notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, standaloneIOCs, chatThreads] = await Promise.all([
     db.notes.toArray(),
     db.tasks.toArray(),
     db.folders.toArray(),
@@ -12,6 +12,8 @@ export async function exportJSON(): Promise<string> {
     db.timelineEvents.toArray(),
     db.timelines.toArray(),
     db.whiteboards.toArray(),
+    db.standaloneIOCs.toArray(),
+    db.chatThreads.toArray(),
   ]);
 
   // Include quick links from settings if user has customized them
@@ -34,6 +36,8 @@ export async function exportJSON(): Promise<string> {
     timelineEvents,
     timelines,
     whiteboards,
+    standaloneIOCs,
+    chatThreads,
     quickLinks,
   };
 
@@ -298,6 +302,75 @@ function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
   };
 }
 
+const VALID_LLM_PROVIDERS = ['anthropic', 'openai', 'gemini', 'mistral', 'local'];
+
+function sanitizeStandaloneIOC(raw: unknown): StandaloneIOC | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const type = str(r.type);
+  if (!VALID_IOC_TYPES.includes(type)) return null;
+  return {
+    id: str(r.id),
+    type: type as IOCType,
+    value: str(r.value),
+    confidence: (VALID_CONFIDENCE.includes(str(r.confidence)) ? str(r.confidence) : 'low') as ConfidenceLevel,
+    analystNotes: r.analystNotes != null ? str(r.analystNotes) : undefined,
+    attribution: r.attribution != null ? str(r.attribution) : undefined,
+    iocSubtype: r.iocSubtype != null ? str(r.iocSubtype) : undefined,
+    iocStatus: r.iocStatus != null ? str(r.iocStatus) : undefined,
+    clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    folderId: r.folderId != null ? str(r.folderId) : undefined,
+    tags: strArr(r.tags),
+    relationships: Array.isArray(r.relationships)
+      ? (r.relationships as unknown[]).map(sanitizeIOCRelationship).filter((rel): rel is IOCRelationship => rel !== null)
+      : undefined,
+    linkedNoteIds: Array.isArray(r.linkedNoteIds) ? strArr(r.linkedNoteIds) : undefined,
+    linkedTaskIds: Array.isArray(r.linkedTaskIds) ? strArr(r.linkedTaskIds) : undefined,
+    linkedTimelineEventIds: Array.isArray(r.linkedTimelineEventIds) ? strArr(r.linkedTimelineEventIds) : undefined,
+    trashed: bool(r.trashed),
+    trashedAt: r.trashedAt != null ? num(r.trashedAt) : undefined,
+    archived: bool(r.archived),
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
+function sanitizeChatMessage(raw: unknown): ChatMessage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const role = str(r.role);
+  if (role !== 'user' && role !== 'assistant') return null;
+  return {
+    id: str(r.id),
+    role: role as 'user' | 'assistant',
+    content: str(r.content),
+    model: r.model != null ? str(r.model) : undefined,
+    createdAt: num(r.createdAt, Date.now()),
+  };
+}
+
+function sanitizeChatThread(raw: unknown): ChatThread | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const provider = str(r.provider, 'anthropic');
+  return {
+    id: str(r.id),
+    title: str(r.title),
+    messages: Array.isArray(r.messages)
+      ? (r.messages as unknown[]).map(sanitizeChatMessage).filter((m): m is ChatMessage => m !== null)
+      : [],
+    model: str(r.model, 'claude-sonnet-4-6'),
+    provider: (VALID_LLM_PROVIDERS.includes(provider) ? provider : 'anthropic') as LLMProvider,
+    folderId: r.folderId != null ? str(r.folderId) : undefined,
+    tags: strArr(r.tags),
+    trashed: bool(r.trashed),
+    trashedAt: r.trashedAt != null ? num(r.trashedAt) : undefined,
+    archived: bool(r.archived),
+    createdAt: num(r.createdAt, Date.now()),
+    updatedAt: num(r.updatedAt, Date.now()),
+  };
+}
+
 function sanitizeQuickLink(raw: unknown): QuickLink | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -312,7 +385,7 @@ function sanitizeQuickLink(raw: unknown): QuickLink | null {
   };
 }
 
-export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number }> {
+export async function importJSON(json: string): Promise<{ notes: number; tasks: number; folders: number; tags: number; timelineEvents: number; timelines: number; whiteboards: number; standaloneIOCs: number; chatThreads: number }> {
   if (json.length > MAX_IMPORT_SIZE) {
     throw new Error(`Backup file too large (max ${MAX_IMPORT_SIZE / 1024 / 1024} MB)`);
   }
@@ -343,6 +416,14 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     .map(sanitizeWhiteboard)
     .filter((w: Whiteboard | null): w is Whiteboard => w !== null && !!w.id);
 
+  const standaloneIOCs = (Array.isArray(data.standaloneIOCs) ? data.standaloneIOCs : [])
+    .map(sanitizeStandaloneIOC)
+    .filter((i: StandaloneIOC | null): i is StandaloneIOC => i !== null && !!i.id);
+
+  const chatThreads = (Array.isArray(data.chatThreads) ? data.chatThreads : [])
+    .map(sanitizeChatThread)
+    .filter((c: ChatThread | null): c is ChatThread => c !== null && !!c.id);
+
   // If we have timeline events but no timelines, create a Default and assign all events
   if (timelineEvents.length > 0 && timelines.length === 0) {
     const defaultId = nanoid();
@@ -358,7 +439,7 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     .map(sanitizeQuickLink)
     .filter((l: QuickLink | null): l is QuickLink => l !== null && !!l.id);
 
-  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards], async () => {
+  await db.transaction('rw', [db.notes, db.tasks, db.folders, db.tags, db.timelineEvents, db.timelines, db.whiteboards, db.standaloneIOCs, db.chatThreads], async () => {
     await db.notes.clear();
     await db.tasks.clear();
     await db.folders.clear();
@@ -366,6 +447,8 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.timelineEvents.clear();
     await db.timelines.clear();
     await db.whiteboards.clear();
+    await db.standaloneIOCs.clear();
+    await db.chatThreads.clear();
 
     await db.notes.bulkAdd(notes);
     await db.tasks.bulkAdd(tasks);
@@ -374,6 +457,8 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     await db.timelineEvents.bulkAdd(timelineEvents);
     await db.timelines.bulkAdd(timelines);
     await db.whiteboards.bulkAdd(whiteboards);
+    await db.standaloneIOCs.bulkAdd(standaloneIOCs);
+    await db.chatThreads.bulkAdd(chatThreads);
   });
 
   // Restore quick links to settings if present in backup
@@ -394,11 +479,13 @@ export async function importJSON(json: string): Promise<{ notes: number; tasks: 
     timelineEvents: timelineEvents.length,
     timelines: timelines.length,
     whiteboards: whiteboards.length,
+    standaloneIOCs: standaloneIOCs.length,
+    chatThreads: chatThreads.length,
   };
 }
 
 export async function exportInvestigationJSON(folderId: string): Promise<string> {
-  const [folder, allNotes, allTasks, allTags, allEvents, allTimelines, allWhiteboards] = await Promise.all([
+  const [folder, allNotes, allTasks, allTags, allEvents, allTimelines, allWhiteboards, allIOCs, allChats] = await Promise.all([
     db.folders.get(folderId),
     db.notes.where('folderId').equals(folderId).toArray(),
     db.tasks.where('folderId').equals(folderId).toArray(),
@@ -406,6 +493,8 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
     db.timelineEvents.where('folderId').equals(folderId).toArray(),
     db.timelines.toArray(),
     db.whiteboards.where('folderId').equals(folderId).toArray(),
+    db.standaloneIOCs.where('folderId').equals(folderId).toArray(),
+    db.chatThreads.where('folderId').equals(folderId).toArray(),
   ]);
 
   if (!folder) throw new Error('Investigation not found');
@@ -416,6 +505,8 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
   for (const t of allTasks) t.tags.forEach((tg) => usedTagNames.add(tg));
   for (const e of allEvents) e.tags.forEach((tg) => usedTagNames.add(tg));
   for (const w of allWhiteboards) w.tags.forEach((tg) => usedTagNames.add(tg));
+  for (const i of allIOCs) i.tags.forEach((tg) => usedTagNames.add(tg));
+  for (const c of allChats) c.tags.forEach((tg) => usedTagNames.add(tg));
   if (folder.tags) folder.tags.forEach((t) => usedTagNames.add(t));
 
   const tags = allTags.filter((t) => usedTagNames.has(t.name));
@@ -435,6 +526,8 @@ export async function exportInvestigationJSON(folderId: string): Promise<string>
     timelineEvents: allEvents,
     timelines,
     whiteboards: allWhiteboards,
+    standaloneIOCs: allIOCs,
+    chatThreads: allChats,
   };
 
   return JSON.stringify(data, null, 2);

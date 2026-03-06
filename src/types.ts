@@ -527,6 +527,8 @@ export interface ExportData {
   timelineEvents?: TimelineEvent[];
   timelines?: Timeline[];
   whiteboards?: Whiteboard[];
+  standaloneIOCs?: StandaloneIOC[];
+  chatThreads?: ChatThread[];
   quickLinks?: QuickLink[];
 }
 

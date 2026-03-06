@@ -50,6 +50,13 @@ export function ChatView({
 
   const activeThread = threads.find((t) => t.id === selectedThreadId);
 
+  // Auto-select first thread when none selected and threads exist
+  useEffect(() => {
+    if (!selectedThreadId && threads.length > 0) {
+      onSelectThread(threads[0].id);
+    }
+  }, [selectedThreadId, threads, onSelectThread]);
+
   // Scroll to bottom on new messages or streaming content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -520,10 +527,14 @@ export function ChatView({
           <div className="flex flex-col items-center justify-center h-full text-text-muted">
             <MessageSquare size={48} className="mb-3 opacity-20" />
             <p className="text-lg font-medium">CaddyChat</p>
-            <p className="text-sm mt-1">Select a thread or create a new one</p>
+            <p className="text-sm mt-1">
+              {threads.length > 0
+                ? 'Select a thread to view the conversation'
+                : 'AI-powered investigation assistant'}
+            </p>
             {!extensionAvailable && (
               <p className="text-xs mt-3 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                ThreatCaddy browser extension required for CaddyChat
+                Browser extension required to send new messages
               </p>
             )}
           </div>

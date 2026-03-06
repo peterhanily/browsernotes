@@ -551,47 +551,41 @@ export function ChatView({
 
       {/* First-use onboarding overlay */}
       {showOnboarding && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-bg-raised border border-border-subtle rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">Getting Started with CaddyAI</h2>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-xl">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl shadow-2xl p-6 max-w-md mx-4 w-full">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Getting Started with CaddyAI</h3>
             <div className="space-y-4">
               <div className="flex gap-3">
-                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-purple/15 flex items-center justify-center">
-                  <Key size={16} className="text-purple" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Key size={16} className="text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-text-primary">1. Configure an API key</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    Go to Settings &gt; CaddyAI / LLM and add an API key for at least one provider (Anthropic, OpenAI, Google Gemini, Mistral) or configure a local LLM endpoint.
-                  </p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">1. Configure an API key</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Go to Settings &gt; CaddyAI / LLM and add an API key for at least one provider (<a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Anthropic</a>, <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">OpenAI</a>, <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google Gemini</a>, <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Mistral</a>) or configure a local LLM endpoint.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-purple/15 flex items-center justify-center">
-                  <Puzzle size={16} className="text-purple" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Puzzle size={16} className="text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-text-primary">2. Install the browser extension</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    CaddyAI requires the ThreatCaddy browser extension to proxy API requests. Install it from the extension page.
-                  </p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">2. Install the browser extension</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">CaddyAI requires the ThreatCaddy <a href="https://github.com/peterhanily/threatcaddy/tree/main/extension" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">browser extension</a> to proxy API requests.</p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-purple/15 flex items-center justify-center">
-                  <Shield size={16} className="text-purple" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Shield size={16} className="text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-text-primary">3. Enable permissions</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    In the extension popup, enable &ldquo;Allow CaddyAI&rdquo; for AI provider access and &ldquo;Allow URL fetching&rdquo; for the /fetch tool.
-                  </p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">3. Enable permissions</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-0.5">In the extension popup, enable &ldquo;Allow CaddyAI&rdquo; for AI provider access and &ldquo;Allow URL fetching&rdquo; for the /fetch tool.</p>
                 </div>
               </div>
             </div>
             <button
               onClick={dismissOnboarding}
-              className="mt-6 w-full h-9 rounded-lg bg-purple text-white text-sm font-medium hover:brightness-110 transition-all"
+              className="w-full mt-5 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
             >
               Got it
             </button>

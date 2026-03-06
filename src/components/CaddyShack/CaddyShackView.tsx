@@ -118,7 +118,7 @@ export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-[var(--text-primary)]">1. Deploy a team server</p>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">CaddyShack requires a ThreatCaddy team server. Spin up the Docker container from the server README.</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">CaddyShack requires a ThreatCaddy <a href="https://github.com/peterhanily/threatcaddy/tree/main/server" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">team server</a>. Spin up the Docker container from the <a href="https://github.com/peterhanily/threatcaddy/tree/main/server#readme" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">server README</a>.</p>
                   </div>
                 </div>
                 <div className="flex gap-3">

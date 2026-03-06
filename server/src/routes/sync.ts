@@ -120,7 +120,10 @@ app.post('/push', async (c) => {
     const change = changes[i];
     const result = results[i];
     if (result.status === 'accepted') {
-      const folderId = (change.data?.folderId as string) || undefined;
+      // For deletes, client sends no data, so look up folderId from the DB record
+      const folderId = (change.data?.folderId as string)
+        || (result.serverRecord?.folderId as string | undefined)
+        || (change.op === 'delete' ? await lookupEntityFolderId(change.table, change.entityId) : undefined);
       if (folderId) {
         broadcastToFolder(folderId, {
           type: 'entity-change',

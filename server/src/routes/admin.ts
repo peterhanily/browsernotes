@@ -3,6 +3,9 @@ import { eq, count, sql, desc, and, gte, lte, ilike, or, not } from 'drizzle-orm
 import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
 import { unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const FILE_STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
 import { db } from '../db/index.js';
 import {
   users, folders, allowedEmails, sessions, activityLog,
@@ -618,9 +621,9 @@ app.delete('/api/investigations/:id/content', requireAdminAuth, async (c) => {
   const folderFiles = await db.select({ storagePath: files.storagePath, thumbnailPath: files.thumbnailPath })
     .from(files).where(eq(files.folderId, folderId));
   for (const f of folderFiles) {
-    try { await unlink(f.storagePath); } catch { /* ignore */ }
+    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch { /* ignore */ }
     if (f.thumbnailPath) {
-      try { await unlink(f.thumbnailPath); } catch { /* ignore */ }
+      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch { /* ignore */ }
     }
   }
 

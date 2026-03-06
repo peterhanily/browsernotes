@@ -10,6 +10,9 @@ import { logActivity } from '../services/audit-service.js';
 import { revokeUserFolderAccess, broadcastToUser } from '../ws/handler.js';
 import type { AuthUser } from '../types.js';
 import { unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+
+const FILE_STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
 
@@ -253,9 +256,9 @@ app.delete('/:id', async (c) => {
   const folderFiles = await db.select({ storagePath: files.storagePath, thumbnailPath: files.thumbnailPath })
     .from(files).where(eq(files.folderId, folderId));
   for (const f of folderFiles) {
-    try { await unlink(f.storagePath); } catch { /* ignore */ }
+    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch { /* ignore */ }
     if (f.thumbnailPath) {
-      try { await unlink(f.thumbnailPath); } catch { /* ignore */ }
+      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch { /* ignore */ }
     }
   }
 

@@ -39,7 +39,7 @@ FILE_STORAGE_PATH=./data/files
 # LLM API keys (optional)
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
-GOOGLE_API_KEY=
+GEMINI_API_KEY=
 MISTRAL_API_KEY=
 ```
 
@@ -81,7 +81,7 @@ npm run build && npm start  # production
 | `FILE_STORAGE_PATH` | No | `./data/files` | Directory for uploaded files |
 | `ANTHROPIC_API_KEY` | No | — | Anthropic API key for Claude models |
 | `OPENAI_API_KEY` | No | — | OpenAI API key |
-| `GOOGLE_API_KEY` | No | — | Google AI API key for Gemini models |
+| `GEMINI_API_KEY` | No | — | Google AI API key for Gemini models |
 | `MISTRAL_API_KEY` | No | — | Mistral API key |
 
 ## API Endpoints
@@ -117,7 +117,7 @@ npm run build && npm start  # production
 | DELETE | `/:id/members/:userId` | Remove member |
 | POST | `/:id/invite` | Invite user by email |
 
-### Feed (`/api/feed`)
+### Feed (`/api/caddyshack`)
 
 | Method | Path | Description |
 |--------|------|-------------|

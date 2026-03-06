@@ -178,6 +178,7 @@ describe('Header', () => {
     onOpenSearch: () => {},
     theme: 'dark' as const,
     onToggleTheme: () => {},
+    onQuickNote: () => {},
     onNewNote: () => {},
     onNewTask: () => {},
     onNewTimelineEvent: () => {},
@@ -199,20 +200,29 @@ describe('Header', () => {
     expect(btn.textContent).toContain('New');
   });
 
-  it('shows 4 items when Create dropdown is opened', () => {
+  it('shows 5 items when Create dropdown is opened', () => {
     render(<Header {...defaultProps} />);
     fireEvent.click(screen.getByTitle('Create new...'));
-    expect(screen.getByText('Note')).toBeTruthy();
+    expect(screen.getByText('Quick Note')).toBeTruthy();
+    expect(screen.getByText('Note Templates')).toBeTruthy();
     expect(screen.getByText('Task')).toBeTruthy();
     expect(screen.getByText('Timeline Event')).toBeTruthy();
     expect(screen.getByText('Whiteboard')).toBeTruthy();
   });
 
-  it('calls onNewNote when Note item is clicked', () => {
+  it('calls onQuickNote when Quick Note item is clicked', () => {
+    const onQuickNote = vi.fn();
+    render(<Header {...defaultProps} onQuickNote={onQuickNote} />);
+    fireEvent.click(screen.getByTitle('Create new...'));
+    fireEvent.click(screen.getByText('Quick Note'));
+    expect(onQuickNote).toHaveBeenCalledOnce();
+  });
+
+  it('calls onNewNote when Note Templates item is clicked', () => {
     const onNewNote = vi.fn();
     render(<Header {...defaultProps} onNewNote={onNewNote} />);
     fireEvent.click(screen.getByTitle('Create new...'));
-    fireEvent.click(screen.getByText('Note'));
+    fireEvent.click(screen.getByText('Note Templates'));
     expect(onNewNote).toHaveBeenCalledOnce();
   });
 

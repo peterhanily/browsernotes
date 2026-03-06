@@ -14,6 +14,7 @@ interface HeaderProps {
   onOpenSearch: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onQuickNote: () => void;
   onNewNote: () => void;
   onNewTask: () => void;
   onNewTimelineEvent: () => void;
@@ -37,6 +38,7 @@ export function Header({
   onOpenSearch,
   theme,
   onToggleTheme,
+  onQuickNote,
   onNewNote,
   onNewTask,
   onNewTimelineEvent,
@@ -184,6 +186,7 @@ export function Header({
 
       <div className="flex items-center gap-1 ml-auto">
         <CreateDropdown
+          onQuickNote={onQuickNote}
           onNewNote={onNewNote}
           onNewTask={onNewTask}
           onNewTimelineEvent={onNewTimelineEvent}

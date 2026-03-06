@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Globe, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchFeed, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
+import { fetchFeed, fetchServerInfo, addReaction, removeReaction, deletePost, editPost } from '../../lib/server-api';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
 import { ReplyThread } from './ReplyThread';
@@ -20,6 +20,7 @@ export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
   const [loading, setLoading] = useState(true);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [feedScope, setFeedScope] = useState<'global' | 'investigation'>(folderId ? 'investigation' : 'global');
+  const [serverName, setServerName] = useState<string>('Global');
 
   const loadFeed = useCallback(async () => {
     if (!connected) return;
@@ -38,6 +39,13 @@ export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
+
+  useEffect(() => {
+    if (!connected) return;
+    fetchServerInfo()
+      .then((info) => setServerName(info.serverName))
+      .catch(() => {});
+  }, [connected]);
 
   // Listen for notification-driven post selection
   useEffect(() => {
@@ -118,7 +126,7 @@ export function CaddyShackView({ folderId, folderName }: CaddyShackViewProps) {
                 onClick={() => setFeedScope('global')}
                 className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition-colors ${feedScope === 'global' ? 'bg-blue-600 text-white' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
               >
-                <Globe size={12} /> Global
+                <Globe size={12} /> {serverName} server
               </button>
               <button
                 onClick={() => setFeedScope('investigation')}

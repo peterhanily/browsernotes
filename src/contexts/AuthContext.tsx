@@ -211,7 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return data.accessToken as string | null;
       } catch {
-        setConnected(false);
+        // Network error during refresh — don't set connected=false.
+        // The WS client will handle reconnection and restore reachability.
         return null;
       } finally {
         refreshPromiseRef.current = null;

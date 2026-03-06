@@ -10,6 +10,7 @@ export class WSClient {
   private maxReconnectDelay = 30000;
   private intentionallyClosed = false;
   private statusCallback: ((ok: boolean) => void) | null = null;
+  private statusFalseTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(serverUrl: string, accessToken: string) {
     this.serverUrl = serverUrl;
@@ -18,6 +19,26 @@ export class WSClient {
 
   onStatusChange(cb: (ok: boolean) => void) {
     this.statusCallback = cb;
+  }
+
+  // Debounce the "false" status to avoid flickering during reconnects
+  private fireStatusChange(ok: boolean) {
+    if (!this.statusCallback) return;
+    if (ok) {
+      // Connected — cancel any pending "disconnected" callback and fire immediately
+      if (this.statusFalseTimer) {
+        clearTimeout(this.statusFalseTimer);
+        this.statusFalseTimer = null;
+      }
+      this.statusCallback(true);
+    } else {
+      // Disconnected — wait before notifying, in case we reconnect quickly
+      if (this.statusFalseTimer) return; // already scheduled
+      this.statusFalseTimer = setTimeout(() => {
+        this.statusFalseTimer = null;
+        if (this.statusCallback) this.statusCallback(false);
+      }, 5000);
+    }
   }
 
   connect() {
@@ -36,8 +57,8 @@ export class WSClient {
         const msg = JSON.parse(event.data);
         const type = msg.type as string;
         // Fire status callback on successful auth
-        if (type === 'auth-ok' && this.statusCallback) {
-          this.statusCallback(true);
+        if (type === 'auth-ok') {
+          this.fireStatusChange(true);
         }
         const typeHandlers = this.handlers.get(type);
         if (typeHandlers) {
@@ -57,7 +78,7 @@ export class WSClient {
 
     this.ws.onclose = () => {
       if (!this.intentionallyClosed) {
-        if (this.statusCallback) this.statusCallback(false);
+        this.fireStatusChange(false);
         this.scheduleReconnect();
       }
     };
@@ -112,6 +133,10 @@ export class WSClient {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    if (this.statusFalseTimer) {
+      clearTimeout(this.statusFalseTimer);
+      this.statusFalseTimer = null;
     }
     if (this.ws) {
       this.ws.close();

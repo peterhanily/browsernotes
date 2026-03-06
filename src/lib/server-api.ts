@@ -61,6 +61,14 @@ export async function changePassword(oldPassword: string, newPassword: string) {
   }
 }
 
+// ─── Server Info ────────────────────────────────────────────────
+
+export async function fetchServerInfo(): Promise<{ serverName: string }> {
+  const resp = await apiFetch('/api/server/info');
+  if (!resp.ok) throw new Error('Failed to fetch server info');
+  return resp.json();
+}
+
 // ─── Sync ───────────────────────────────────────────────────────
 
 export interface SyncChange {

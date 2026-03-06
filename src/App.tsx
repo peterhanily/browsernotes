@@ -1151,6 +1151,7 @@ function AppInner() {
             onOpenSearch={() => setSearchOverlayOpen(true)}
             theme={settings.theme}
             onToggleTheme={toggleTheme}
+            onQuickNote={handleNewNote}
             onNewNote={() => setShowQuickCapture(true)}
             onNewTask={handleNewTask}
             onNewTimelineEvent={handleNewTimelineEvent}

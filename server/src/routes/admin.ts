@@ -11,7 +11,7 @@ import {
 } from '../db/schema.js';
 import {
   verifyAdminSecret, changeAdminSecret, getRegistrationMode, setRegistrationMode,
-  getSessionSettings, setSessionSettings, ADMIN_SYSTEM_USER_ID,
+  getSessionSettings, setSessionSettings, getServerName, setServerName, ADMIN_SYSTEM_USER_ID,
 } from '../services/admin-secret.js';
 import { getRetentionSettings, setRetentionSettings } from '../services/cleanup-service.js';
 import { logActivity } from '../services/audit-service.js';
@@ -337,12 +337,23 @@ app.get('/api/settings', requireAdminAuth, async (c) => {
   const registrationMode = await getRegistrationMode();
   const sessionSettings = await getSessionSettings();
   const retentionSettings = await getRetentionSettings();
-  return c.json({ registrationMode, ...sessionSettings, ...retentionSettings });
+  const serverName = await getServerName();
+  return c.json({ serverName, registrationMode, ...sessionSettings, ...retentionSettings });
 });
 
 app.patch('/api/settings', requireAdminAuth, async (c) => {
   const body = await c.req.json();
   const changedSettings: string[] = [];
+
+  if (body.serverName !== undefined) {
+    const name = typeof body.serverName === 'string' ? body.serverName.trim() : '';
+    if (!name || name.length > 100) {
+      return c.json({ error: 'Server name must be 1-100 characters' }, 400);
+    }
+    await setServerName(name);
+    changedSettings.push(`serverName=${name}`);
+    logger.info('Admin action: server name changed', { serverName: name });
+  }
 
   if (body.registrationMode !== undefined) {
     const mode = body.registrationMode;
@@ -385,7 +396,8 @@ app.patch('/api/settings', requireAdminAuth, async (c) => {
   const registrationMode = await getRegistrationMode();
   const sessionSettings = await getSessionSettings();
   const retentionSettings = await getRetentionSettings();
-  return c.json({ ok: true, registrationMode, ...sessionSettings, ...retentionSettings });
+  const serverName = await getServerName();
+  return c.json({ ok: true, serverName, registrationMode, ...sessionSettings, ...retentionSettings });
 });
 
 // ─── Allowed Emails ──────────────────────────────────────────────

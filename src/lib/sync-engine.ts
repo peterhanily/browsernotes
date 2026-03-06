@@ -45,10 +45,48 @@ export class SyncEngine {
   start() {
     if (this.running) return;
     this.running = true;
-    // Initial sync
-    this.sync();
+    // Initial sync — push existing local data if this is the first sync
+    this.initialSync().then(() => {
+      this.sync();
+    }).catch(() => {
+      this.sync();
+    });
     // Periodic full sync as safety net
     this.intervalId = setInterval(() => this.sync(), SYNC_INTERVAL);
+  }
+
+  /**
+   * On first connection, push all local folders and their content to the server.
+   * This ensures locally-created data that predates the server connection gets synced.
+   */
+  private async initialSync() {
+    const meta = await dynamicDb.table('_syncMeta').get(META_KEY_LAST_SYNC);
+    if (meta?.value) return; // Not first sync — skip
+
+    try {
+      const allFolders = await dynamicDb.table('folders').toArray();
+      for (const folder of allFolders) {
+        if (folder.trashed) continue;
+        await this.syncFolder(folder.id);
+      }
+
+      // Also push global tables (tags, timelines)
+      for (const tableName of ['tags', 'timelines']) {
+        try {
+          const rows = await dynamicDb.table(tableName).toArray();
+          if (rows.length === 0) continue;
+          const changes: SyncChange[] = rows.map((row: Record<string, unknown>) => ({
+            table: tableName,
+            op: 'put' as const,
+            entityId: row.id as string,
+            data: row,
+          }));
+          await syncPush(changes);
+        } catch { /* table may not exist */ }
+      }
+    } catch (err) {
+      console.warn('SyncEngine: initial sync failed', err);
+    }
   }
 
   stop() {

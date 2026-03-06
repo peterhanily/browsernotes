@@ -20,7 +20,7 @@ import auditRoutes from './routes/audit.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
-import { initAdminSecret, initRegistrationMode, backfillFolderOwners, initAdminSystemUser } from './services/admin-secret.js';
+import { initAdminSecret, initRegistrationMode, initServerName, getServerName, backfillFolderOwners, initAdminSystemUser } from './services/admin-secret.js';
 import { pruneOldData } from './services/cleanup-service.js';
 import { initAdminKey } from './middleware/admin-auth.js';
 import { handleWSConnection, handleWSMessage, handleWSClose } from './ws/handler.js';
@@ -85,6 +85,12 @@ app.get('/health', async (c) => {
   } catch {
     return c.json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() }, 503);
   }
+});
+
+// Public server info (no auth required — needed by CaddyShack)
+app.get('/api/server/info', async (c) => {
+  const serverName = await getServerName();
+  return c.json({ serverName });
 });
 
 // API routes
@@ -162,6 +168,7 @@ async function main() {
   await initAdminSecret();
   await initAdminSystemUser();
   await initRegistrationMode();
+  await initServerName();
   await backfillFolderOwners();
 
   const server = serve({

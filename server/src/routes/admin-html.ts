@@ -191,6 +191,17 @@ export function getAdminHtml(nonce: string): string {
     <div class="stats" id="statsGrid"></div>
 
     <div class="settings-section">
+      <h2>Server Identity</h2>
+      <div class="setting-row">
+        <label>Server Name</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="serverNameInput" maxlength="100" style="flex:1">
+          <button id="saveServerNameBtn" class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h2>Registration Settings</h2>
       <div class="setting-row">
         <label>Registration Mode</label>
@@ -624,6 +635,7 @@ function loadStats() {
 
 function loadSettings() {
   return api('/settings').then(function(data) {
+    document.getElementById('serverNameInput').value = data.serverName || '';
     document.getElementById('regModeSelect').value = data.registrationMode;
     toggleEmailSection(data.registrationMode);
     document.getElementById('sessionTtl').value = data.ttlHours || 24;
@@ -632,6 +644,14 @@ function loadSettings() {
     document.getElementById('auditRetention').value = data.auditLogRetentionDays || 365;
   }).catch(function(err) { toast(err.message, 'error'); });
 }
+
+document.getElementById('saveServerNameBtn').addEventListener('click', function() {
+  var name = document.getElementById('serverNameInput').value.trim();
+  if (!name) { toast('Server name cannot be empty', 'error'); return; }
+  api('/settings', { method: 'PATCH', body: JSON.stringify({ serverName: name }) })
+    .then(function() { toast('Server name updated'); })
+    .catch(function(err) { toast(err.message, 'error'); loadSettings(); });
+});
 
 function toggleEmailSection(mode) {
   document.getElementById('allowedEmailsSection').style.display = mode === 'invite' ? '' : 'none';

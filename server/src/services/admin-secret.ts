@@ -57,6 +57,67 @@ export async function initAdminSecret(): Promise<void> {
   }
 }
 
+// ─── Server Name ────────────────────────────────────────────────
+
+const SERVER_NAME_KEY = 'server_name';
+
+// Adjective + noun random name generator
+function generateRandomName(): string {
+  const adjectives = [
+    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Falcon', 'Ghost',
+    'Hawk', 'Iron', 'Jade', 'Kilo', 'Luna', 'Mystic', 'Nova', 'Onyx',
+    'Phoenix', 'Quantum', 'Raven', 'Shadow', 'Titan', 'Ultra', 'Viper',
+    'Wolf', 'Zenith', 'Apex', 'Blaze', 'Cipher', 'Dagger', 'Ember',
+  ];
+  const nouns = [
+    'Base', 'Hub', 'Ops', 'Node', 'Lab', 'Vault', 'Forge', 'Core',
+    'Station', 'Nexus', 'Tower', 'Grid', 'Deck', 'Watch', 'Post',
+    'Gate', 'Shield', 'Camp', 'Den', 'Hive', 'Bunker', 'Outpost',
+  ];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  return `${adj} ${noun}`;
+}
+
+export async function initServerName(): Promise<void> {
+  const envName = process.env.SERVER_NAME?.trim();
+
+  if (envName) {
+    const existing = await db.select().from(serverSettings).where(eq(serverSettings.key, SERVER_NAME_KEY)).limit(1);
+    if (existing.length > 0) {
+      await db.update(serverSettings).set({ value: envName, updatedAt: new Date() }).where(eq(serverSettings.key, SERVER_NAME_KEY));
+    } else {
+      await db.insert(serverSettings).values({ key: SERVER_NAME_KEY, value: envName });
+    }
+    logger.info(`Server name set from SERVER_NAME env var: ${envName}`);
+    return;
+  }
+
+  // No env var — check DB
+  const existing = await db.select().from(serverSettings).where(eq(serverSettings.key, SERVER_NAME_KEY)).limit(1);
+  if (existing.length > 0) return;
+
+  // Generate random name
+  const name = generateRandomName();
+  await db.insert(serverSettings).values({ key: SERVER_NAME_KEY, value: name }).onConflictDoNothing();
+  logger.info(`Generated random server name: ${name}`);
+}
+
+export async function getServerName(): Promise<string> {
+  const row = await db.select().from(serverSettings).where(eq(serverSettings.key, SERVER_NAME_KEY)).limit(1);
+  if (row.length === 0) return 'ThreatCaddy';
+  return row[0].value;
+}
+
+export async function setServerName(name: string): Promise<void> {
+  const existing = await db.select().from(serverSettings).where(eq(serverSettings.key, SERVER_NAME_KEY)).limit(1);
+  if (existing.length > 0) {
+    await db.update(serverSettings).set({ value: name, updatedAt: new Date() }).where(eq(serverSettings.key, SERVER_NAME_KEY));
+  } else {
+    await db.insert(serverSettings).values({ key: SERVER_NAME_KEY, value: name });
+  }
+}
+
 // ─── Registration Mode ──────────────────────────────────────────
 
 const REG_MODE_KEY = 'registration_mode';

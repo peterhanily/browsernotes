@@ -33,7 +33,6 @@ const { selectQueue, makeThenableChain, mockLogAdminAction, mockGetAdminId } = v
 // ─── Mock the shared module ────────────────────────────────────
 
 vi.mock('../routes/admin/shared.js', async () => {
-  const { createMiddleware } = await import('hono/factory');
   const { initAdminKey: _initAdminKey, requireAdminAuth: _requireAdminAuth } = await import('../middleware/admin-auth.js');
 
   // Initialize key once inside the mock factory

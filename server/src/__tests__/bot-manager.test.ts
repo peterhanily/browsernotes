@@ -14,17 +14,27 @@ function makeUpdateChain() {
   return chain;
 }
 
+function makeWhereResult() {
+  // Returns an object that is both thenable (for `await db.select().from().where()`)
+  // and has chain methods (for `.where().orderBy().limit()`, `.where().limit()`, etc.)
+  const result = {
+    orderBy: vi.fn().mockReturnValue({
+      limit: mockSelectResolve,
+    }),
+    returning: vi.fn().mockResolvedValue([]),
+    limit: mockSelectResolve,
+    then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
+      return mockSelectResolve().then(resolve, reject);
+    },
+  };
+  return result;
+}
+
 vi.mock('../db/index.js', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: mockSelectResolve,
-          }),
-          returning: vi.fn().mockResolvedValue([]),
-          limit: mockSelectResolve,
-        }),
+        where: vi.fn().mockImplementation(() => makeWhereResult()),
       }),
     }),
     insert: vi.fn().mockReturnValue({
@@ -463,6 +473,166 @@ describe('BotManager', () => {
         table: 'notes',
         entityId: 'n1',
         folderId: 'f2',
+        userId: 'human-user',
+        timestamp: new Date(),
+      });
+
+      await new Promise(r => setTimeout(r, 50));
+      expect((db.insert as ReturnType<typeof vi.fn>).mock.calls.length).toBe(insertBefore);
+    });
+  });
+
+  describe('getWebhookSecret', () => {
+    it('returns null for unknown bot', async () => {
+      const manager = new BotManager();
+      expect(manager.getWebhookSecret('nonexistent')).toBeNull();
+    });
+
+    it('returns null for disabled bot', async () => {
+      const manager = new BotManager();
+      const config = makeBotConfig({ id: 'b1', enabled: false, triggers: { webhook: true } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (manager as any).configs.set('b1', config);
+      expect(manager.getWebhookSecret('b1')).toBeNull();
+    });
+
+    it('returns null when webhook trigger is not enabled', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1', triggers: { events: ['entity.created'] } }));
+      expect(manager.getWebhookSecret('b1')).toBeNull();
+    });
+
+    it('returns null when no webhookSecret is in decrypted config', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1', triggers: { webhook: true }, config: {} }));
+      expect(manager.getWebhookSecret('b1')).toBeNull();
+    });
+
+    it('returns the secret when webhook is enabled and secret is configured', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        triggers: { webhook: true },
+        config: { webhookSecret: 'my-secret-123' },
+      }));
+      expect(manager.getWebhookSecret('b1')).toBe('my-secret-123');
+    });
+  });
+
+  describe('reloadBot', () => {
+    it('unloads and reloads bot from DB', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1', name: 'Original' }));
+      expect(manager.getLoadedBots()).toHaveLength(1);
+
+      // Mock DB to return updated config
+      mockSelectResolve.mockResolvedValueOnce([makeBotConfig({ id: 'b1', name: 'Updated', enabled: true })]);
+      await manager.reloadBot('b1');
+
+      const loaded = manager.getLoadedBots();
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].name).toBe('Updated');
+    });
+
+    it('unloads and does not reload if bot is disabled in DB', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1' }));
+
+      mockSelectResolve.mockResolvedValueOnce([makeBotConfig({ id: 'b1', enabled: false })]);
+      await manager.reloadBot('b1');
+
+      expect(manager.getLoadedBots()).toHaveLength(0);
+    });
+
+    it('unloads and does not reload if bot not found in DB', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1' }));
+
+      mockSelectResolve.mockResolvedValueOnce([]);
+      await manager.reloadBot('b1');
+
+      expect(manager.getLoadedBots()).toHaveLength(0);
+    });
+  });
+
+  describe('routeEvent table filter', () => {
+    it('filters events by table when eventFilters.tables is set', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        userId: 'bot-user-1',
+        triggers: {
+          events: ['entity.created'],
+          eventFilters: { tables: ['standaloneIOCs'] },
+        },
+      }));
+
+      const { db } = await import('../db/index.js');
+      const insertBefore = (db.insert as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // Event with notes table should be filtered out
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (manager as any).routeEvent({
+        type: 'entity.created',
+        table: 'notes',
+        entityId: 'n1',
+        folderId: 'f1',
+        userId: 'human-user',
+        timestamp: new Date(),
+      });
+
+      await new Promise(r => setTimeout(r, 50));
+      expect((db.insert as ReturnType<typeof vi.fn>).mock.calls.length).toBe(insertBefore);
+    });
+
+    it('allows events matching table filter', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        userId: 'bot-user-1',
+        triggers: {
+          events: ['entity.created'],
+          eventFilters: { tables: ['standaloneIOCs'] },
+        },
+      }));
+
+      const { db } = await import('../db/index.js');
+      const insertBefore = (db.insert as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (manager as any).routeEvent({
+        type: 'entity.created',
+        table: 'standaloneIOCs',
+        entityId: 'ioc-1',
+        folderId: 'f1',
+        userId: 'human-user',
+        timestamp: new Date(),
+      });
+
+      await new Promise(r => setTimeout(r, 50));
+      expect((db.insert as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(insertBefore);
+    });
+
+    it('rejects tableless events when tables filter is set', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        userId: 'bot-user-1',
+        triggers: {
+          events: ['entity.created'],
+          eventFilters: { tables: ['notes'] },
+        },
+      }));
+
+      const { db } = await import('../db/index.js');
+      const insertBefore = (db.insert as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      // Event without table property
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (manager as any).routeEvent({
+        type: 'entity.created',
+        entityId: 'x1',
+        folderId: 'f1',
         userId: 'human-user',
         timestamp: new Date(),
       });

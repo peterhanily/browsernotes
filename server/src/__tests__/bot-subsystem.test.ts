@@ -289,6 +289,84 @@ describe('secret-store', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 2b. Bot Implementations — factory and class tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeImplConfig(overrides: Record<string, unknown> = {}): any {
+  return {
+    id: 'bot-1', userId: 'bot-user-1', type: 'custom', name: 'Test Bot',
+    description: '', enabled: true, triggers: {}, config: {},
+    capabilities: ['read_entities'], allowedDomains: [], scopeType: 'global',
+    scopeFolderIds: [], rateLimitPerHour: 100, rateLimitPerDay: 1000,
+    lastRunAt: null, lastError: null, runCount: 0, errorCount: 0,
+    createdBy: 'admin-1', createdAt: new Date(), updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+describe('createBotImplementation', () => {
+  let createBotImplementation: typeof import('../bots/implementations/index.js').createBotImplementation;
+  let GenericBot: typeof import('../bots/implementations/index.js').GenericBot;
+  let EnrichmentBot: typeof import('../bots/implementations/index.js').EnrichmentBot;
+  let MonitorBot: typeof import('../bots/implementations/index.js').MonitorBot;
+
+  beforeEach(async () => {
+    const mod = await import('../bots/implementations/index.js');
+    createBotImplementation = mod.createBotImplementation;
+    GenericBot = mod.GenericBot;
+    EnrichmentBot = mod.EnrichmentBot;
+    MonitorBot = mod.MonitorBot;
+  });
+
+  it('returns EnrichmentBot for type "enrichment"', () => {
+    const bot = createBotImplementation(makeImplConfig({ type: 'enrichment' }));
+    expect(bot).toBeInstanceOf(EnrichmentBot);
+  });
+
+  it('returns MonitorBot for type "monitor"', () => {
+    const bot = createBotImplementation(makeImplConfig({ type: 'monitor' }));
+    expect(bot).toBeInstanceOf(MonitorBot);
+  });
+
+  it('returns GenericBot for "custom" and other types', () => {
+    for (const type of ['custom', 'feed', 'triage', 'report', 'correlation', 'ai-agent']) {
+      const bot = createBotImplementation(makeImplConfig({ type }));
+      expect(bot).toBeInstanceOf(GenericBot);
+    }
+  });
+
+  it('GenericBot.onInit updates config', async () => {
+    const bot = new GenericBot(makeImplConfig({ name: 'Original' }));
+    await bot.onInit(makeImplConfig({ name: 'Updated' }));
+    expect(bot.name).toBe('Original'); // name is set in constructor, not onInit
+  });
+
+  it('GenericBot.onDestroy is a no-op', async () => {
+    const bot = new GenericBot(makeImplConfig());
+    await expect(bot.onDestroy()).resolves.toBeUndefined();
+  });
+
+  it('GenericBot handlers are no-ops by default', async () => {
+    const bot = new GenericBot(makeImplConfig({ capabilities: ['read_entities'] }));
+    const ctx = {
+      botConfig: makeImplConfig({ capabilities: ['read_entities'] }),
+      botUserId: 'bot-user-1', runId: 'run-1', trigger: 'manual' as const,
+      entitiesCreated: 0, entitiesUpdated: 0, apiCallsMade: 0,
+      signal: new AbortController().signal,
+    };
+
+    await expect(bot.onEvent(ctx, {
+      type: 'entity.created', table: 'notes', entityId: 'n1', timestamp: new Date(),
+    })).resolves.toBeUndefined();
+
+    await expect(bot.onSchedule(ctx)).resolves.toBeUndefined();
+
+    await expect(bot.onWebhook(ctx, { test: true })).resolves.toBeUndefined();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 3. Event Bus — emitBotEvent and emitEntityEvent
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -402,6 +480,47 @@ describe('event-bus', () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0][0].type).toBe('investigation.created');
+  });
+
+  it('emitEntityEvent maps folder status=closed to investigation.closed', () => {
+    const handler = vi.fn();
+    botEventBus.onBotEvent('*', handler);
+
+    emitEntityEvent('put', 'folders', 'folder-1', undefined, 'user-1', false, { status: 'closed' });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][0].type).toBe('investigation.closed');
+  });
+
+  it('emitEntityEvent maps folder status=archived to investigation.archived', () => {
+    const handler = vi.fn();
+    botEventBus.onBotEvent('*', handler);
+
+    emitEntityEvent('put', 'folders', 'folder-1', undefined, 'user-1', false, { status: 'archived' });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][0].type).toBe('investigation.archived');
+  });
+
+  it('emitEntityEvent sets folderId to entityId for folder events', () => {
+    const handler = vi.fn();
+    botEventBus.onBotEvent('*', handler);
+
+    emitEntityEvent('put', 'folders', 'folder-new', undefined, 'user-1', true);
+
+    expect(handler.mock.calls[0][0].folderId).toBe('folder-new');
+  });
+
+  it('emitEntityEvent includes originBotIds from AsyncLocalStorage', async () => {
+    const handler = vi.fn();
+    botEventBus.onBotEvent('*', handler);
+    const { botEventOrigins } = await import('../bots/event-bus.js');
+
+    botEventOrigins.run(['bot-a', 'bot-b'], () => {
+      emitEntityEvent('put', 'notes', 'n5', 'folder-1', 'user-1', true);
+    });
+
+    expect(handler.mock.calls[0][0].originBotIds).toEqual(['bot-a', 'bot-b']);
   });
 
   it('emitEntityEvent includes depth from AsyncLocalStorage', () => {

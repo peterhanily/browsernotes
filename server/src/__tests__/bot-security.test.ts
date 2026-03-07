@@ -824,6 +824,97 @@ describe('validateBotUpdate', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 2b. validateBotCreate — new field validations
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('validateBotCreate — scopeType and rate limit validation', () => {
+  let validateBotCreate: typeof import('../services/bot-service.js').validateBotCreate;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import('../services/bot-service.js');
+    validateBotCreate = mod.validateBotCreate;
+  });
+
+  it('returns error for invalid scopeType', () => {
+    const result = validateBotCreate({ name: 'Bot', type: 'custom', scopeType: 'universe' });
+    expect(result).toContain('Invalid scopeType');
+  });
+
+  it('accepts scopeType "global"', () => {
+    const result = validateBotCreate({ name: 'Bot', type: 'custom', scopeType: 'global' });
+    expect(result).toBeNull();
+  });
+
+  it('accepts scopeType "investigation"', () => {
+    const result = validateBotCreate({ name: 'Bot', type: 'custom', scopeType: 'investigation' });
+    expect(result).toBeNull();
+  });
+
+  it('returns error for non-positive rateLimitPerHour', () => {
+    const result = validateBotCreate({ name: 'Bot', type: 'custom', rateLimitPerHour: 0 });
+    expect(result).toContain('rateLimitPerHour');
+  });
+
+  it('returns error for non-positive rateLimitPerDay', () => {
+    const result = validateBotCreate({ name: 'Bot', type: 'custom', rateLimitPerDay: -1 });
+    expect(result).toContain('rateLimitPerDay');
+  });
+
+  it('returns error for non-string scopeFolderIds elements', () => {
+    const result = validateBotCreate({
+      name: 'Bot', type: 'custom',
+      scopeFolderIds: [123 as unknown as string],
+    });
+    expect(result).toContain('scopeFolderIds');
+  });
+
+  it('returns error for empty string in scopeFolderIds', () => {
+    const result = validateBotCreate({
+      name: 'Bot', type: 'custom',
+      scopeFolderIds: ['folder-1', ''],
+    });
+    expect(result).toContain('scopeFolderIds');
+  });
+});
+
+describe('validateBotUpdate — webhook cross-validation and schedule type check', () => {
+  let validateBotUpdate: typeof import('../services/bot-service.js').validateBotUpdate;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import('../services/bot-service.js');
+    validateBotUpdate = mod.validateBotUpdate;
+  });
+
+  it('returns error when enabling webhook without webhookSecret', () => {
+    const result = validateBotUpdate({ triggers: { webhook: true } });
+    expect('error' in result).toBe(true);
+    if ('error' in result) expect(result.error).toContain('webhookSecret is required');
+  });
+
+  it('accepts webhook trigger when webhookSecret is provided in config', () => {
+    const result = validateBotUpdate({
+      triggers: { webhook: true },
+      config: { webhookSecret: 'my-secret' },
+    });
+    expect('updates' in result).toBe(true);
+  });
+
+  it('returns error when schedule is not a string', () => {
+    const result = validateBotUpdate({ triggers: { schedule: 12345 } });
+    expect('error' in result).toBe(true);
+    if ('error' in result) expect(result.error).toContain('Schedule must be a string');
+  });
+
+  it('returns error for non-string scopeFolderIds elements', () => {
+    const result = validateBotUpdate({ scopeFolderIds: [42 as unknown] });
+    expect('error' in result).toBe(true);
+    if ('error' in result) expect(result.error).toContain('scopeFolderIds');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 3. Webhook auth flow — timing-safe secret comparison
 // ══════════════════════════════════════════════════════════════════════════════
 

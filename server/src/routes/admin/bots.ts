@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { requireAdminAuth, logAdminAction, ADMIN_SYSTEM_USER_ID } from './shared.js';
+import { requireAdminAuth, logAdminAction, ADMIN_SYSTEM_USER_ID, getAdminId } from './shared.js';
 import {
   validateBotCreate, validateBotUpdate,
   createBot, updateBot, enableBot, disableBot, triggerBot, deleteBot,
@@ -23,7 +23,7 @@ app.post('/api/bots', requireAdminAuth, async (c) => {
 
   const bot = await createBot(body, ADMIN_SYSTEM_USER_ID);
 
-  await logAdminAction('bot.create', `Created bot "${bot.name}" (${bot.type})`, { itemId: bot.id });
+  await logAdminAction(getAdminId(c), 'bot.create', `Created bot "${bot.name}" (${bot.type})`, { itemId: bot.id });
   return c.json({ ok: true, bot }, 201);
 });
 
@@ -45,7 +45,7 @@ app.patch('/api/bots/:id', requireAdminAuth, async (c) => {
   const bot = await updateBot(c.req.param('id'), result.updates);
   if (!bot) return c.json({ error: 'Bot not found' }, 404);
 
-  await logAdminAction('bot.update', `Updated bot "${bot.name}"`, { itemId: c.req.param('id') });
+  await logAdminAction(getAdminId(c), 'bot.update', `Updated bot "${bot.name}"`, { itemId: c.req.param('id') });
   return c.json({ ok: true });
 });
 
@@ -54,7 +54,7 @@ app.post('/api/bots/:id/enable', requireAdminAuth, async (c) => {
   const bot = await enableBot(c.req.param('id'));
   if (!bot) return c.json({ error: 'Bot not found' }, 404);
 
-  await logAdminAction('bot.enable', `Enabled bot "${bot.name}"`, { itemId: c.req.param('id') });
+  await logAdminAction(getAdminId(c), 'bot.enable', `Enabled bot "${bot.name}"`, { itemId: c.req.param('id') });
   return c.json({ ok: true, enabled: true });
 });
 
@@ -63,7 +63,7 @@ app.post('/api/bots/:id/disable', requireAdminAuth, async (c) => {
   const bot = await disableBot(c.req.param('id'));
   if (!bot) return c.json({ error: 'Bot not found' }, 404);
 
-  await logAdminAction('bot.disable', `Disabled bot "${bot.name}"`, { itemId: c.req.param('id') });
+  await logAdminAction(getAdminId(c), 'bot.disable', `Disabled bot "${bot.name}"`, { itemId: c.req.param('id') });
   return c.json({ ok: true, enabled: false });
 });
 
@@ -73,7 +73,7 @@ app.post('/api/bots/:id/trigger', requireAdminAuth, async (c) => {
   if (!result) return c.json({ error: 'Bot not found' }, 404);
   if ('error' in result) return c.json({ error: result.error }, 400);
 
-  await logAdminAction('bot.trigger', `Manually triggered bot "${result.name}"`, { itemId: c.req.param('id') });
+  await logAdminAction(getAdminId(c), 'bot.trigger', `Manually triggered bot "${result.name}"`, { itemId: c.req.param('id') });
   return c.json({ ok: true });
 });
 
@@ -82,7 +82,7 @@ app.delete('/api/bots/:id', requireAdminAuth, async (c) => {
   const bot = await deleteBot(c.req.param('id'));
   if (!bot) return c.json({ error: 'Bot not found' }, 404);
 
-  await logAdminAction('bot.delete', `Deleted bot "${bot.name}"`, { itemId: c.req.param('id') });
+  await logAdminAction(getAdminId(c), 'bot.delete', `Deleted bot "${bot.name}"`, { itemId: c.req.param('id') });
   return c.json({ ok: true });
 });
 

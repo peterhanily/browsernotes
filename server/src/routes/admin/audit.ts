@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, count, desc, and, gte, lte, ilike, or } from 'drizzle-orm';
 import {
   db, users, folders, activityLog,
-  requireAdminAuth, logAdminAction,
+  requireAdminAuth, logAdminAction, getAdminId,
 } from './shared.js';
 
 const app = new Hono();
@@ -123,7 +123,7 @@ app.get('/api/audit-log/export', requireAdminAuth, async (c) => {
       .map(v => csvEscape(String(v))).join(',')
   );
 
-  await logAdminAction('audit-log.export', `Exported ${entries.length} audit log entries as CSV`);
+  await logAdminAction(getAdminId(c), 'audit-log.export', `Exported ${entries.length} audit log entries as CSV`);
 
   c.header('Content-Type', 'text/csv');
   c.header('Content-Disposition', 'attachment; filename="audit-log.csv"');

@@ -5,6 +5,7 @@ import { investigationsTabJs } from './investigations-tab.js';
 import { botsTabJs } from './bots-tab.js';
 import { auditTabJs } from './audit-tab.js';
 import { settingsTabJs } from './settings-tab.js';
+import { adminAccountsTabJs } from './admin-accounts-tab.js';
 
 export function getAdminHtml(nonce: string): string {
   return `<!DOCTYPE html>
@@ -23,10 +24,37 @@ ${adminStyles()}
 <div id="login" class="login-container">
   <div class="login-box">
     <h1>Admin Panel</h1>
-    <form id="loginForm">
+    <!-- Setup form (shown when no admin accounts exist yet) -->
+    <form id="setupForm" style="display:none;">
+      <p style="color:#8b949e;font-size:0.85rem;margin-bottom:1rem;">No admin accounts exist yet. Use your bootstrap secret to create the first admin account.</p>
       <div class="form-group">
-        <label for="secret">Admin Secret</label>
-        <input type="password" id="secret" placeholder="Enter admin secret" autocomplete="off" required>
+        <label for="setupSecret">Bootstrap Secret</label>
+        <input type="password" id="setupSecret" placeholder="Enter bootstrap secret" autocomplete="off" required>
+      </div>
+      <div class="form-group">
+        <label for="setupUsername">Username</label>
+        <input type="text" id="setupUsername" placeholder="admin" maxlength="50" required>
+      </div>
+      <div class="form-group">
+        <label for="setupDisplayName">Display Name</label>
+        <input type="text" id="setupDisplayName" placeholder="Admin User" maxlength="100" required>
+      </div>
+      <div class="form-group">
+        <label for="setupPassword">Password (min 12 chars)</label>
+        <input type="password" id="setupPassword" placeholder="Enter password" autocomplete="new-password" required>
+      </div>
+      <div id="setupError" class="error-msg"></div>
+      <button type="submit" class="btn btn-primary full-width">Create Account &amp; Sign In</button>
+    </form>
+    <!-- Normal login form -->
+    <form id="loginForm" style="display:none;">
+      <div class="form-group">
+        <label for="loginUsername">Username</label>
+        <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
       </div>
       <div id="loginError" class="error-msg"></div>
       <button type="submit" class="btn btn-primary full-width">Sign In</button>
@@ -48,6 +76,7 @@ ${adminStyles()}
     <button class="tab-btn" data-tab="tab-audit">Audit Log</button>
     <button class="tab-btn" data-tab="tab-sessions">Sessions</button>
     <button class="tab-btn" data-tab="tab-bots">Bots</button>
+    <button class="tab-btn" data-tab="tab-admins">Admin Accounts</button>
   </div>
 
   <!-- ─── Dashboard Tab ──────────────────────────────────── -->
@@ -111,7 +140,8 @@ ${adminStyles()}
     </div>
 
     <div class="settings-section">
-      <h2>Change Admin Secret</h2>
+      <h2>Change Bootstrap Secret</h2>
+      <p style="color:#8b949e;font-size:0.85rem;margin-bottom:0.5rem;">The bootstrap secret is used to create the first admin account on new deployments.</p>
       <div class="setting-row">
         <label>Current secret</label>
         <input type="password" id="currentSecret" placeholder="Current secret" autocomplete="off">
@@ -125,6 +155,29 @@ ${adminStyles()}
         <input type="password" id="confirmSecret" placeholder="Confirm new secret" autocomplete="off">
         <button id="changeSecretBtn" class="btn btn-warning btn-sm">Change Secret</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ─── Admin Accounts Tab ──────────────────────────────── -->
+  <div id="tab-admins" class="tab-content">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h2 style="font-size:1rem;color:#c9d1d9;">Admin Accounts</h2>
+      <button id="createAdminBtn" class="btn btn-primary btn-sm">+ Create Admin Account</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Display Name</th>
+            <th>Active</th>
+            <th>Last Login</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="adminsBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -531,6 +584,30 @@ ${adminStyles()}
   </div>
 </div>
 
+<!-- Create Admin Account Modal -->
+<div id="createAdminModal" class="modal-overlay">
+  <div class="modal">
+    <h3>Create Admin Account</h3>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="newAdminUsername" placeholder="username" maxlength="50">
+      <span style="font-size:0.75rem;color:#8b949e;">Letters, numbers, dots, hyphens, underscores only</span>
+    </div>
+    <div class="form-group">
+      <label>Display Name</label>
+      <input type="text" id="newAdminDisplayName" placeholder="Display name" maxlength="100">
+    </div>
+    <div class="form-group">
+      <label>Password (min 12 chars)</label>
+      <input type="password" id="newAdminPassword" placeholder="Password" autocomplete="new-password">
+    </div>
+    <div class="modal-actions">
+      <button id="cancelCreateAdmin" class="btn btn-outline btn-sm">Cancel</button>
+      <button id="submitCreateAdmin" class="btn btn-primary btn-sm">Create</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ DETAIL PANELS ════════════════════════════════════════════ -->
 <div id="detailBackdrop" class="detail-backdrop"></div>
 <div id="detailPanel" class="detail-panel">
@@ -545,10 +622,11 @@ ${usersTabJs()}
 ${investigationsTabJs()}
 ${auditTabJs()}
 ${botsTabJs()}
+${adminAccountsTabJs()}
 
 /* ═══ INIT ════════════════════════════════════════════════════ */
 
-if (token) showDashboard();
+checkSetupStatus();
 </script>
 </body>
 </html>`;

@@ -5,6 +5,8 @@ export function sharedJs(): string {
 
 var BASE = location.origin;
 var token = sessionStorage.getItem('adminToken');
+var currentAdmin = null;
+try { currentAdmin = JSON.parse(sessionStorage.getItem('adminInfo') || 'null'); } catch(e) {}
 
 // Cached data for client-side filtering
 var allUsers = [];
@@ -62,32 +64,95 @@ function statusBadge(status) {
   return '<span class="badge badge-' + c + '">' + esc(status || 'active') + '</span>';
 }
 
+/* ═══ SETUP STATUS CHECK ═════════════════════════════════════ */
+
+function checkSetupStatus() {
+  if (token) {
+    showDashboard();
+    return;
+  }
+  // Check if admin accounts exist
+  fetch(BASE + '/admin/api/setup-status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.hasAdminAccounts) {
+        document.getElementById('loginForm').style.display = '';
+        document.getElementById('setupForm').style.display = 'none';
+      } else {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('setupForm').style.display = '';
+      }
+    })
+    .catch(function() {
+      // Default to login form on error
+      document.getElementById('loginForm').style.display = '';
+    });
+}
+
+/* ═══ SETUP FORM ═════════════════════════════════════════════ */
+
+document.getElementById('setupForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var errEl = document.getElementById('setupError');
+  errEl.style.display = 'none';
+  var password = document.getElementById('setupPassword').value;
+  if (password.length < 12) { errEl.textContent = 'Password must be at least 12 characters'; errEl.style.display = 'block'; return; }
+  api('/bootstrap', {
+    method: 'POST',
+    body: JSON.stringify({
+      bootstrapSecret: document.getElementById('setupSecret').value,
+      username: document.getElementById('setupUsername').value,
+      displayName: document.getElementById('setupDisplayName').value,
+      password: password
+    })
+  }).then(function(res) {
+    token = res.token;
+    currentAdmin = res.admin;
+    sessionStorage.setItem('adminToken', token);
+    sessionStorage.setItem('adminInfo', JSON.stringify(currentAdmin));
+    showDashboard();
+  }).catch(function(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  });
+});
+
 /* ═══ LOGIN / LOGOUT ══════════════════════════════════════════ */
 
 document.getElementById('loginForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var errEl = document.getElementById('loginError');
   errEl.style.display = 'none';
-  api('/login', { method: 'POST', body: JSON.stringify({ secret: document.getElementById('secret').value }) })
-    .then(function(res) {
-      token = res.token;
-      sessionStorage.setItem('adminToken', token);
-      showDashboard();
+  api('/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      username: document.getElementById('loginUsername').value,
+      password: document.getElementById('loginPassword').value
     })
-    .catch(function(err) {
-      errEl.textContent = err.message;
-      errEl.style.display = 'block';
-    });
+  }).then(function(res) {
+    token = res.token;
+    currentAdmin = res.admin;
+    sessionStorage.setItem('adminToken', token);
+    sessionStorage.setItem('adminInfo', JSON.stringify(currentAdmin));
+    showDashboard();
+  }).catch(function(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  });
 });
 
 document.getElementById('logoutBtn').addEventListener('click', function() { logout(); });
 
 function logout() {
   token = null;
+  currentAdmin = null;
   sessionStorage.removeItem('adminToken');
+  sessionStorage.removeItem('adminInfo');
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('login').style.display = 'flex';
-  document.getElementById('secret').value = '';
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+  checkSetupStatus();
 }
 
 /* ═══ TAB NAVIGATION ══════════════════════════════════════════ */
@@ -106,6 +171,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     if (tab === 'tab-audit') loadAuditLog();
     if (tab === 'tab-sessions') loadSessions();
     if (tab === 'tab-bots') loadBotsData();
+    if (tab === 'tab-admins') loadAdminAccounts();
   });
 });
 

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, count, and, gte, not, ilike } from 'drizzle-orm';
 import {
   db, users, folders, sessions, activityLog, allowedEmails,
-  requireAdminAuth, logger, logAdminAction,
+  requireAdminAuth, logger, logAdminAction, getAdminId,
 } from './shared.js';
 import {
   getRegistrationMode, setRegistrationMode,
@@ -91,7 +91,7 @@ app.patch('/api/settings', requireAdminAuth, async (c) => {
   }
 
   if (changedSettings.length > 0) {
-    await logAdminAction('settings.update', `Updated ${changedSettings.join(', ')}`);
+    await logAdminAction(getAdminId(c), 'settings.update', `Updated ${changedSettings.join(', ')}`);
   }
 
   const registrationMode = await getRegistrationMode();
@@ -116,7 +116,7 @@ app.post('/api/allowed-emails', requireAdminAuth, async (c) => {
   }
   await db.insert(allowedEmails).values({ email }).onConflictDoNothing();
   logger.info('Admin action: email added to allowlist', { email });
-  await logAdminAction('allowlist.add', `Added ${email}`);
+  await logAdminAction(getAdminId(c), 'allowlist.add', `Added ${email}`);
   return c.json({ ok: true, email });
 });
 
@@ -127,7 +127,7 @@ app.delete('/api/allowed-emails/:email', requireAdminAuth, async (c) => {
     return c.json({ error: 'Email not found' }, 404);
   }
   logger.info('Admin action: email removed from allowlist', { email });
-  await logAdminAction('allowlist.remove', `Removed ${email}`);
+  await logAdminAction(getAdminId(c), 'allowlist.remove', `Removed ${email}`);
   return c.json({ ok: true });
 });
 

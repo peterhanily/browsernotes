@@ -6,7 +6,7 @@ export {
   users, folders, allowedEmails, sessions, activityLog,
   investigationMembers, notes, tasks, timelineEvents, whiteboards,
   standaloneIOCs, chatThreads, posts, files, notifications,
-  botConfigs, botRuns,
+  botConfigs, botRuns, adminUsers,
 } from '../../db/schema.js';
 export { requireAdminAuth } from '../../middleware/admin-auth.js';
 export { _logActivity as logActivity };
@@ -15,9 +15,19 @@ export { logger } from '../../lib/logger.js';
 
 export const FILE_STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
 
-export function logAdminAction(action: string, detail: string, opts?: { itemId?: string; itemTitle?: string; folderId?: string }) {
+/** Get admin identity from Hono context (set by requireAdminAuth middleware) */
+export function getAdminId(c: { get: (key: string) => unknown }): string {
+  return (c.get('adminUserId') as string) || _ADMIN_SYSTEM_USER_ID;
+}
+
+export function logAdminAction(
+  adminUserId: string,
+  action: string,
+  detail: string,
+  opts?: { itemId?: string; itemTitle?: string; folderId?: string },
+) {
   return _logActivity({
-    userId: _ADMIN_SYSTEM_USER_ID,
+    userId: adminUserId,
     category: 'admin',
     action,
     detail,

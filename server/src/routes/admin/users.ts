@@ -4,7 +4,7 @@ import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
 import {
   db, users, sessions, activityLog, investigationMembers, folders,
-  requireAdminAuth, logger, logAdminAction,
+  requireAdminAuth, logger, logAdminAction, getAdminId,
 } from './shared.js';
 import { changeAdminSecret } from '../../services/admin-secret.js';
 
@@ -44,7 +44,7 @@ app.patch('/api/users/:id', requireAdminAuth, async (c) => {
     }
     updates.role = body.role;
     logger.info('Admin action: user role changed', { targetUserId: id, newRole: body.role });
-    await logAdminAction('user.role-change', `Changed ${target.email} role to ${body.role}`, { itemId: id });
+    await logAdminAction(getAdminId(c), 'user.role-change', `Changed ${target.email} role to ${body.role}`, { itemId: id });
   }
 
   if (body.active !== undefined) {
@@ -53,7 +53,7 @@ app.patch('/api/users/:id', requireAdminAuth, async (c) => {
     }
     updates.active = body.active;
     logger.info('Admin action: user active status changed', { targetUserId: id, active: body.active });
-    await logAdminAction('user.toggle-active', `${body.active ? 'Activated' : 'Deactivated'} ${target.email}`, { itemId: id });
+    await logAdminAction(getAdminId(c), 'user.toggle-active', `${body.active ? 'Activated' : 'Deactivated'} ${target.email}`, { itemId: id });
   }
 
   await db.update(users).set(updates).where(eq(users.id, id));
@@ -74,7 +74,7 @@ app.post('/api/users/:id/reset-password', requireAdminAuth, async (c) => {
   await db.update(users).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(users.id, id));
 
   logger.info('Admin action: password reset', { targetUserId: id, targetEmail: user[0].email });
-  await logAdminAction('user.reset-password', `Reset password for ${user[0].email}`, { itemId: id });
+  await logAdminAction(getAdminId(c), 'user.reset-password', `Reset password for ${user[0].email}`, { itemId: id });
 
   return c.json({ temporaryPassword });
 });
@@ -117,7 +117,7 @@ app.post('/api/users', requireAdminAuth, async (c) => {
     updatedAt: now,
   });
 
-  await logAdminAction('user.create', `Created user ${trimmedEmail} with role ${userRole}`, { itemId: userId });
+  await logAdminAction(getAdminId(c), 'user.create', `Created user ${trimmedEmail} with role ${userRole}`, { itemId: userId });
 
   return c.json({ ok: true, user: { id: userId, email: trimmedEmail, displayName: displayName.trim(), role: userRole } }, 201);
 });
@@ -152,7 +152,7 @@ app.post('/api/users/bulk', requireAdminAuth, async (c) => {
     if (result.length > 0) affected++;
   }
 
-  await logAdminAction('user.bulk', `Bulk ${action} on ${affected} user(s)${action === 'changeRole' ? ` to ${role}` : ''}`);
+  await logAdminAction(getAdminId(c), 'user.bulk', `Bulk ${action} on ${affected} user(s)${action === 'changeRole' ? ` to ${role}` : ''}`);
 
   return c.json({ ok: true, affected });
 });
@@ -186,7 +186,7 @@ app.get('/api/users/export', requireAdminAuth, async (c) => {
       .map(v => csvEscape(String(v))).join(',')
   );
 
-  await logAdminAction('user.export', `Exported ${allUsers.length} users as CSV`);
+  await logAdminAction(getAdminId(c), 'user.export', `Exported ${allUsers.length} users as CSV`);
 
   c.header('Content-Type', 'text/csv');
   c.header('Content-Disposition', 'attachment; filename="users.csv"');
@@ -255,7 +255,7 @@ app.post('/api/change-secret', requireAdminAuth, async (c) => {
     return c.json({ error: 'Current secret is incorrect' }, 401);
   }
   logger.info('Admin action: admin secret changed');
-  await logAdminAction('secret.change', 'Admin secret changed');
+  await logAdminAction(getAdminId(c), 'secret.change', 'Admin bootstrap secret changed');
   return c.json({ ok: true });
 });
 
@@ -280,13 +280,13 @@ app.get('/api/sessions', requireAdminAuth, async (c) => {
 app.delete('/api/sessions/user/:userId', requireAdminAuth, async (c) => {
   const userId = c.req.param('userId');
   const result = await db.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
-  await logAdminAction('session.force-logout', `Force-logged out user ${userId} (${result.length} sessions)`);
+  await logAdminAction(getAdminId(c), 'session.force-logout', `Force-logged out user ${userId} (${result.length} sessions)`);
   return c.json({ ok: true, deletedCount: result.length });
 });
 
 app.delete('/api/sessions/all', requireAdminAuth, async (c) => {
   const result = await db.delete(sessions).returning({ id: sessions.id });
-  await logAdminAction('session.force-logout-all', `Force-logged out all users (${result.length} sessions)`);
+  await logAdminAction(getAdminId(c), 'session.force-logout-all', `Force-logged out all users (${result.length} sessions)`);
   return c.json({ ok: true, deletedCount: result.length });
 });
 

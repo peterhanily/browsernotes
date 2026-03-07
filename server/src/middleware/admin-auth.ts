@@ -12,12 +12,12 @@ export function initAdminKey(): void {
   adminKey = randomBytes(32);
 }
 
-export async function signAdminToken(): Promise<string> {
+export async function signAdminToken(adminUserId: string, adminUsername: string): Promise<string> {
   if (!adminKey) throw new Error('Admin key not initialized');
-  return new jose.SignJWT({})
+  return new jose.SignJWT({ username: adminUsername })
     .setProtectedHeader({ alg: 'HS256' })
     .setAudience(ADMIN_AUDIENCE)
-    .setSubject('admin')
+    .setSubject(adminUserId)
     .setIssuedAt()
     .setExpirationTime('1h')
     .sign(adminKey);
@@ -31,7 +31,9 @@ export const requireAdminAuth = createMiddleware(async (c, next) => {
   }
   const token = header.slice(7);
   try {
-    await jose.jwtVerify(token, adminKey, { audience: ADMIN_AUDIENCE });
+    const { payload } = await jose.jwtVerify(token, adminKey, { audience: ADMIN_AUDIENCE });
+    c.set('adminUserId', payload.sub || '__system_admin__');
+    c.set('adminUsername', (payload as Record<string, unknown>).username || 'unknown');
   } catch {
     return c.json({ error: 'Invalid or expired admin token' }, 401);
   }

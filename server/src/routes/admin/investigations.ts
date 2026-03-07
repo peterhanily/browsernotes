@@ -7,7 +7,7 @@ import {
   db, users, folders, investigationMembers, notes, tasks,
   timelineEvents, whiteboards, standaloneIOCs, chatThreads, posts,
   files, notifications,
-  requireAdminAuth, logger, logAdminAction, FILE_STORAGE_PATH,
+  requireAdminAuth, logger, logAdminAction, getAdminId, FILE_STORAGE_PATH,
 } from './shared.js';
 
 const app = new Hono();
@@ -107,7 +107,7 @@ app.patch('/api/investigations/:id', requireAdminAuth, async (c) => {
   }
 
   await db.update(folders).set(updates).where(eq(folders.id, id));
-  await logAdminAction('investigation.status-change', `Changed "${folder.name}" status to ${status}`, { folderId: id });
+  await logAdminAction(getAdminId(c), 'investigation.status-change', `Changed "${folder.name}" status to ${status}`, { folderId: id });
 
   return c.json({ ok: true });
 });
@@ -135,7 +135,7 @@ app.post('/api/investigations/:id/members', requireAdminAuth, async (c) => {
     role: memberRole,
   }).onConflictDoNothing();
 
-  await logAdminAction('investigation.add-member', `Added ${user.email} as ${memberRole} to investigation`, { folderId });
+  await logAdminAction(getAdminId(c), 'investigation.add-member', `Added ${user.email} as ${memberRole} to investigation`, { folderId });
 
   return c.json({ ok: true });
 });
@@ -157,7 +157,7 @@ app.patch('/api/investigations/:id/members/:userId', requireAdminAuth, async (c)
 
   if (result.length === 0) return c.json({ error: 'Member not found' }, 404);
 
-  await logAdminAction('investigation.update-member', `Changed member role to ${role}`, { folderId });
+  await logAdminAction(getAdminId(c), 'investigation.update-member', `Changed member role to ${role}`, { folderId });
   return c.json({ ok: true });
 });
 
@@ -172,7 +172,7 @@ app.delete('/api/investigations/:id/members/:userId', requireAdminAuth, async (c
 
   if (result.length === 0) return c.json({ error: 'Member not found' }, 404);
 
-  await logAdminAction('investigation.remove-member', `Removed member from investigation`, { folderId });
+  await logAdminAction(getAdminId(c), 'investigation.remove-member', `Removed member from investigation`, { folderId });
   return c.json({ ok: true });
 });
 
@@ -225,7 +225,7 @@ app.delete('/api/investigations/:id/content', requireAdminAuth, async (c) => {
   // Delete the folder itself
   await db.delete(folders).where(eq(folders.id, folderId));
 
-  await logAdminAction('investigation.purge', `Purged and deleted investigation "${folder.name}"`, { folderId });
+  await logAdminAction(getAdminId(c), 'investigation.purge', `Purged and deleted investigation "${folder.name}"`, { folderId });
 
   return c.json({ ok: true, deleted });
 });

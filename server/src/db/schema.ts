@@ -348,6 +348,18 @@ export const botRuns = pgTable('bot_runs', {
   idxBotRunsConfigCreated: index('idx_bot_runs_config_created').on(t.botConfigId, t.createdAt),
 }));
 
+// ─── Admin Users (separate from investigation users) ────────────
+
+export const adminUsers = pgTable('admin_users', {
+  id: text('id').primaryKey(),
+  username: text('username').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+});
+
 // ─── Activity Log ───────────────────────────────────────────────
 
 export const activityLog = pgTable('activity_log', {

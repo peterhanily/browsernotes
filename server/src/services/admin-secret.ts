@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { db } from '../db/index.js';
-import { serverSettings, folders, investigationMembers, users } from '../db/schema.js';
+import { serverSettings, folders, investigationMembers, users, adminUsers } from '../db/schema.js';
 import { logger } from '../lib/logger.js';
 
 export const ADMIN_SYSTEM_USER_ID = '__system_admin__';
@@ -23,14 +23,14 @@ export async function initAdminSecret(): Promise<void> {
     } else {
       await db.insert(serverSettings).values({ key: SETTINGS_KEY, value: hash });
     }
-    logger.info('Admin secret set from ADMIN_SECRET env var');
+    logger.info('Admin bootstrap secret set from ADMIN_SECRET env var');
     return;
   }
 
   // No env var — check DB
   const existing = await db.select().from(serverSettings).where(eq(serverSettings.key, SETTINGS_KEY)).limit(1);
   if (existing.length > 0) {
-    logger.info('Using existing admin secret from database');
+    logger.info('Using existing admin bootstrap secret from database');
     return;
   }
 
@@ -46,14 +46,14 @@ export async function initAdminSecret(): Promise<void> {
     const secretFilePath = join(process.env.FILE_STORAGE_PATH || '/data/files', '.admin-secret');
     try {
       await writeFile(secretFilePath, secret, { mode: 0o600 });
-      logger.info(`Generated new admin secret — written to ${secretFilePath} (read and delete it)`);
+      logger.info(`Generated new admin bootstrap secret — written to ${secretFilePath} (read and delete it)`);
     } catch {
       // Fall back to logger if file write fails (e.g. read-only FS)
-      logger.warn('Generated new admin secret — could not write to file, check structured logs');
-      logger.info('Admin secret value', { adminSecret: secret, _onetime: true });
+      logger.warn('Generated new admin bootstrap secret — could not write to file, check structured logs');
+      logger.info('Admin bootstrap secret value', { adminSecret: secret, _onetime: true });
     }
   } else {
-    logger.info('Another instance set the admin secret first, using that');
+    logger.info('Another instance set the admin bootstrap secret first, using that');
   }
 }
 
@@ -209,7 +209,9 @@ export async function initAdminSystemUser(): Promise<void> {
   logger.info('System admin sentinel user created');
 }
 
-export async function verifyAdminSecret(plaintext: string): Promise<boolean> {
+// ─── Bootstrap Secret ───────────────────────────────────────────
+
+export async function verifyBootstrapSecret(plaintext: string): Promise<boolean> {
   const row = await db.select().from(serverSettings).where(eq(serverSettings.key, SETTINGS_KEY)).limit(1);
   if (row.length === 0) return false;
   try {
@@ -220,9 +222,79 @@ export async function verifyAdminSecret(plaintext: string): Promise<boolean> {
 }
 
 export async function changeAdminSecret(currentPlaintext: string, newPlaintext: string): Promise<boolean> {
-  const valid = await verifyAdminSecret(currentPlaintext);
+  const valid = await verifyBootstrapSecret(currentPlaintext);
   if (!valid) return false;
   const hash = await argon2.hash(newPlaintext, { type: argon2.argon2id });
   await db.update(serverSettings).set({ value: hash, updatedAt: new Date() }).where(eq(serverSettings.key, SETTINGS_KEY));
   return true;
+}
+
+// ─── Admin User CRUD ────────────────────────────────────────────
+
+export async function getAdminUserCount(): Promise<number> {
+  const rows = await db.select({ id: adminUsers.id }).from(adminUsers);
+  return rows.length;
+}
+
+export async function listAdminUsers(): Promise<Array<{
+  id: string;
+  username: string;
+  displayName: string;
+  active: boolean;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+}>> {
+  return db.select({
+    id: adminUsers.id,
+    username: adminUsers.username,
+    displayName: adminUsers.displayName,
+    active: adminUsers.active,
+    createdAt: adminUsers.createdAt,
+    lastLoginAt: adminUsers.lastLoginAt,
+  }).from(adminUsers).orderBy(adminUsers.createdAt);
+}
+
+export async function createAdminUser(username: string, displayName: string, password: string): Promise<{ id: string; username: string; displayName: string }> {
+  const hash = await argon2.hash(password, { type: argon2.argon2id });
+  const id = nanoid();
+  await db.insert(adminUsers).values({
+    id,
+    username: username.toLowerCase().trim(),
+    displayName: displayName.trim(),
+    passwordHash: hash,
+  });
+  return { id, username: username.toLowerCase().trim(), displayName: displayName.trim() };
+}
+
+export async function verifyAdminUser(username: string, password: string): Promise<{ id: string; username: string; displayName: string } | null> {
+  const rows = await db.select().from(adminUsers)
+    .where(and(eq(adminUsers.username, username.toLowerCase().trim()), eq(adminUsers.active, true)))
+    .limit(1);
+  if (rows.length === 0) return null;
+  const user = rows[0];
+  try {
+    const valid = await argon2.verify(user.passwordHash, password);
+    if (!valid) return null;
+  } catch {
+    return null;
+  }
+  // Update last login
+  await db.update(adminUsers).set({ lastLoginAt: new Date() }).where(eq(adminUsers.id, user.id));
+  return { id: user.id, username: user.username, displayName: user.displayName };
+}
+
+export async function updateAdminUser(id: string, updates: { displayName?: string; active?: boolean }): Promise<boolean> {
+  const result = await db.update(adminUsers).set(updates).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  return result.length > 0;
+}
+
+export async function changeAdminUserPassword(id: string, newPassword: string): Promise<boolean> {
+  const hash = await argon2.hash(newPassword, { type: argon2.argon2id });
+  const result = await db.update(adminUsers).set({ passwordHash: hash }).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  return result.length > 0;
+}
+
+export async function deleteAdminUser(id: string): Promise<boolean> {
+  const result = await db.delete(adminUsers).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  return result.length > 0;
 }

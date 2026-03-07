@@ -112,7 +112,7 @@ export async function processPush(
       if (existing.length === 0) {
         // New entity — insert
         const now = new Date();
-        await db.insert(table).values({
+        const inserted = await db.insert(table).values({
           ...cleanData,
           id: entityId,
           createdBy: userId,
@@ -120,8 +120,7 @@ export async function processPush(
           version: 1,
           createdAt: now,
           updatedAt: now,
-        });
-        const inserted = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
+        }).returning();
         results.push({ table: change.table, entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
         emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, true, cleanData);
       } else {
@@ -152,7 +151,7 @@ export async function processPush(
               updatedAt: now,
             })
             .where(and(eq(table.id, entityId), eq(table.version, serverVersion)))
-            .returning({ id: table.id });
+            .returning();
 
           if (updated.length === 0) {
             // Concurrent modification — fetch current state
@@ -171,8 +170,7 @@ export async function processPush(
               results.push({ table: change.table, entityId, status: 'conflict' });
             }
           } else {
-            const freshRow = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
-            results.push({ table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: freshRow[0] as Record<string, unknown> });
+            results.push({ table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: updated[0] as Record<string, unknown> });
             emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, false, cleanData);
           }
         }
@@ -243,23 +241,30 @@ export async function pullChanges(
 export async function getSnapshot(folderId: string): Promise<Record<string, unknown[]>> {
   const snapshot: Record<string, unknown[]> = {};
 
+  // Build all queries up front, then execute in parallel
+  const queries: { tableName: string; promise: Promise<unknown[]> }[] = [];
+
   for (const [tableName, table] of Object.entries(TABLE_MAP)) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const t = table as any;
     if (t.folderId) {
-      // Only include non-deleted entities in snapshots
-      snapshot[tableName] = await db
-        .select()
-        .from(table)
-        .where(and(eq(t.folderId, folderId), isNull(t.deletedAt)));
+      queries.push({
+        tableName,
+        promise: db.select().from(table).where(and(eq(t.folderId, folderId), isNull(t.deletedAt))),
+      });
     }
   }
 
-  // Also include the folder itself (if not deleted)
-  snapshot.folders = await db
-    .select()
-    .from(schema.folders)
-    .where(and(eq(schema.folders.id, folderId), isNull(schema.folders.deletedAt)));
+  // Include the folder itself
+  queries.push({
+    tableName: 'folders',
+    promise: db.select().from(schema.folders).where(and(eq(schema.folders.id, folderId), isNull(schema.folders.deletedAt))),
+  });
+
+  const results = await Promise.all(queries.map(q => q.promise));
+  for (let i = 0; i < queries.length; i++) {
+    snapshot[queries[i].tableName] = results[i] as unknown[];
+  }
 
   return snapshot;
 }

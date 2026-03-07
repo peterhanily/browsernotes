@@ -17,9 +17,10 @@ function createSelectChain(rows: Record<string, unknown>[] = []) {
   return chain;
 }
 
-function createInsertChain() {
+function createInsertChain(returningRows: Record<string, unknown>[] = [{ id: 'test' }]) {
   const chain = {
     values: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue(returningRows),
     onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
   };
   return chain;
@@ -95,15 +96,10 @@ describe('sync-service', () => {
       const selectChain = createSelectChain([]);
       mockSelect.mockReturnValue(selectChain);
 
-      // Insert
-      const insertChain = createInsertChain();
-      mockInsert.mockReturnValue(insertChain);
-
-      // Second select after insert: return the inserted row
+      // Insert — returning() returns the inserted row
       const insertedRow = { id: 'note-1', title: 'Test Note', version: 1 };
-      selectChain.limit
-        .mockResolvedValueOnce([])          // first: entity doesn't exist
-        .mockResolvedValueOnce([insertedRow]); // second: after insert
+      const insertChain = createInsertChain([insertedRow]);
+      mockInsert.mockReturnValue(insertChain);
 
       const changes: SyncChange[] = [{
         table: 'notes',
@@ -131,15 +127,10 @@ describe('sync-service', () => {
       const selectChain = createSelectChain([existingRow]);
       mockSelect.mockReturnValue(selectChain);
 
-      // Update returns a row (success)
-      const updateChain = createUpdateChain([{ id: 'note-1' }]);
-      mockUpdate.mockReturnValue(updateChain);
-
-      // Select after update: return updated row
+      // Update returns the full updated row via .returning()
       const updatedRow = { id: 'note-1', title: 'New Title', version: 4 };
-      selectChain.limit
-        .mockResolvedValueOnce([existingRow])  // first: check existence
-        .mockResolvedValueOnce([updatedRow]);   // second: after update
+      const updateChain = createUpdateChain([updatedRow]);
+      mockUpdate.mockReturnValue(updateChain);
 
       const changes: SyncChange[] = [{
         table: 'notes',
@@ -240,13 +231,9 @@ describe('sync-service', () => {
       const selectChain = createSelectChain([]);
       mockSelect.mockReturnValue(selectChain);
 
-      const insertChain = createInsertChain();
-      mockInsert.mockReturnValue(insertChain);
-
       const insertedRow = { id: 'note-2', version: 1 };
-      selectChain.limit
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([insertedRow]);
+      const insertChain = createInsertChain([insertedRow]);
+      mockInsert.mockReturnValue(insertChain);
 
       const changes: SyncChange[] = [{
         table: 'notes',
@@ -274,30 +261,26 @@ describe('sync-service', () => {
     it('should handle multiple changes in a batch', async () => {
       // First change: new entity
       const selectChain1 = createSelectChain([]);
-      const insertChain1 = createInsertChain();
+      const insertedRow = { id: 'note-new', version: 1 };
+      const insertChain1 = createInsertChain([insertedRow]);
       // Second change: existing entity
       const existingRow = { id: 'task-1', version: 1 };
       const selectChain2 = createSelectChain([existingRow]);
-      const updateChain = createUpdateChain([{ id: 'task-1' }]);
       const updatedRow = { id: 'task-1', version: 2 };
+      const updateChain = createUpdateChain([updatedRow]);
 
       // Set up sequential mock returns
       let selectCallCount = 0;
       mockSelect.mockImplementation(() => {
         selectCallCount++;
-        if (selectCallCount <= 2) return selectChain1; // calls 1-2 for first change
-        return selectChain2;                            // calls 3+ for second change
+        if (selectCallCount <= 1) return selectChain1; // call 1 for first change (insert uses .returning() now)
+        return selectChain2;                            // calls 2+ for second change
       });
       mockInsert.mockReturnValue(insertChain1);
       mockUpdate.mockReturnValue(updateChain);
 
-      const insertedRow = { id: 'note-new', version: 1 };
-      selectChain1.limit
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([insertedRow]);
       selectChain2.limit
-        .mockResolvedValueOnce([existingRow])
-        .mockResolvedValueOnce([updatedRow]);
+        .mockResolvedValueOnce([existingRow]);
 
       const changes: SyncChange[] = [
         { table: 'notes', op: 'put', entityId: 'note-new', data: { title: 'New' } },

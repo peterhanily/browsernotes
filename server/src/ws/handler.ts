@@ -254,7 +254,7 @@ export function handleWSClose(ws: WSContext) {
 
 function sendTo(ws: WSContext, msg: unknown) {
   try {
-    ws.send(JSON.stringify(msg));
+    ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg));
   } catch { /* client disconnected */ }
 }
 
@@ -262,10 +262,11 @@ function broadcastPresence(folderId: string) {
   const subs = folderSubscribers.get(folderId);
   if (!subs) return;
   const presence = getPresence(folderId);
-  const msg = { type: 'presence', folderId, users: presence };
+  // Pre-stringify once for all recipients
+  const json = JSON.stringify({ type: 'presence', folderId, users: presence });
 
   for (const ws of subs) {
-    sendTo(ws, msg);
+    sendTo(ws, json);
   }
 }
 
@@ -273,19 +274,22 @@ function broadcastPresence(folderId: string) {
 export function broadcastToFolder(folderId: string, msg: unknown, excludeUserId?: string) {
   const subs = folderSubscribers.get(folderId);
   if (!subs) return;
+  // Pre-stringify once for all recipients
+  const json = typeof msg === 'string' ? msg : JSON.stringify(msg);
   for (const ws of subs) {
     const client = clients.get(ws);
     if (client && client.user.id !== excludeUserId) {
-      sendTo(ws, msg);
+      sendTo(ws, json);
     }
   }
 }
 
 // Broadcast to all connected clients
 export function broadcastGlobal(msg: unknown, excludeUserId?: string) {
+  const json = typeof msg === 'string' ? msg : JSON.stringify(msg);
   for (const [, client] of clients) {
     if (client.user.id !== excludeUserId) {
-      sendTo(client.ws, msg);
+      sendTo(client.ws, json);
     }
   }
 }
@@ -294,8 +298,9 @@ export function broadcastGlobal(msg: unknown, excludeUserId?: string) {
 export function broadcastToUser(userId: string, msg: unknown) {
   const conns = userConnections.get(userId);
   if (conns) {
+    const json = typeof msg === 'string' ? msg : JSON.stringify(msg);
     for (const ws of conns) {
-      sendTo(ws, msg);
+      sendTo(ws, json);
     }
   }
 }

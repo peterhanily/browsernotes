@@ -355,9 +355,19 @@ export class BotManager {
 
       const durationMs = Date.now() - startTime;
 
-      // Update run record
-      try {
-        await db.update(schema.botRuns).set({
+      // Update run record + bot config stats in parallel
+      const statsUpdate: Record<string, unknown> = {
+        lastRunAt: new Date(),
+        lastError: error,
+        runCount: sql`${schema.botConfigs.runCount} + 1`,
+        updatedAt: new Date(),
+      };
+      if (status === 'error' || status === 'timeout') {
+        statsUpdate.errorCount = sql`${schema.botConfigs.errorCount} + 1`;
+      }
+
+      await Promise.all([
+        db.update(schema.botRuns).set({
           status,
           durationMs,
           error,
@@ -365,26 +375,13 @@ export class BotManager {
           entitiesCreated: ctx.entitiesCreated,
           entitiesUpdated: ctx.entitiesUpdated,
           apiCallsMade: ctx.apiCallsMade,
-        }).where(eq(schema.botRuns.id, runId));
-      } catch (err) {
-        logger.error(`Failed to update bot run record ${runId}`, { error: String(err) });
-      }
-
-      // Update bot config stats using SQL increment to avoid race conditions
-      try {
-        const statsUpdate: Record<string, unknown> = {
-          lastRunAt: new Date(),
-          lastError: error,
-          runCount: sql`${schema.botConfigs.runCount} + 1`,
-          updatedAt: new Date(),
-        };
-        if (status === 'error' || status === 'timeout') {
-          statsUpdate.errorCount = sql`${schema.botConfigs.errorCount} + 1`;
-        }
-        await db.update(schema.botConfigs).set(statsUpdate).where(eq(schema.botConfigs.id, botId));
-      } catch (err) {
-        logger.error(`Failed to update bot config stats for ${botId}`, { error: String(err) });
-      }
+        }).where(eq(schema.botRuns.id, runId)).catch(err => {
+          logger.error(`Failed to update bot run record ${runId}`, { error: String(err) });
+        }),
+        db.update(schema.botConfigs).set(statsUpdate).where(eq(schema.botConfigs.id, botId)).catch(err => {
+          logger.error(`Failed to update bot config stats for ${botId}`, { error: String(err) });
+        }),
+      ]);
 
       // Update in-memory config (best-effort cache)
       const updatedConfig = this.configs.get(botId);

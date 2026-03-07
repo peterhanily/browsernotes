@@ -131,7 +131,7 @@ export function validateBotUpdate(body: Record<string, unknown>): { updates: Rec
   }
 
   if (body.scopeType !== undefined) {
-    if (!['global', 'investigation', 'tag-based'].includes(body.scopeType as string)) {
+    if (!['global', 'investigation'].includes(body.scopeType as string)) {
       return { error: 'Invalid scopeType' };
     }
     updates.scopeType = body.scopeType;

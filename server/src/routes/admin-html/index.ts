@@ -435,12 +435,22 @@ ${adminStyles()}
       </div>
     </div>
     <div class="form-group">
+      <label>Bot Config (JSON)</label>
+      <textarea id="newBotConfig" rows="4" placeholder='{"apiKey": "...", "baseUrl": "..."}'
+        style="font-family:monospace;font-size:0.8rem;resize:vertical;"></textarea>
+      <span style="font-size:0.75rem;color:#8b949e;">Bot-specific settings (API keys, URLs, etc). Secret fields are auto-encrypted.</span>
+      <span id="botConfigSecretNote" style="font-size:0.75rem;color:#d29922;display:none;">Note: Secret values show as "***configured***". Leave unchanged to keep existing secrets.</span>
+    </div>
+    <div class="form-group">
       <label>Scope</label>
       <select id="newBotScope">
         <option value="investigation">Investigation-scoped</option>
         <option value="global">Global</option>
-        <option value="tag-based">Tag-based</option>
       </select>
+    </div>
+    <div class="form-group" id="scopeFolderIdsGroup" style="display:none;">
+      <label>Investigations</label>
+      <div id="scopeFolderIdsList" class="checkbox-grid" style="max-height:150px;overflow-y:auto;"></div>
     </div>
     <div class="trigger-section">
       <label style="font-size:0.85rem;color:#8b949e;display:block;margin-bottom:0.5rem;">Triggers</label>
@@ -458,6 +468,11 @@ ${adminStyles()}
           <label><input type="checkbox" class="bot-event-check" value="member.removed"> Member Removed</label>
           <label><input type="checkbox" class="bot-event-check" value="webhook.received"> Webhook Received</label>
         </div>
+      </div>
+      <div class="form-group" id="eventFilterGroup" style="display:none;">
+        <label>Event Table Filter</label>
+        <input type="text" id="newBotEventTables" placeholder="e.g. standaloneIOCs,notes,tasks">
+        <span style="font-size:0.75rem;color:#8b949e;">Comma-separated table names to filter events (leave blank for all)</span>
       </div>
       <div class="form-group">
         <label>Schedule (cron)</label>

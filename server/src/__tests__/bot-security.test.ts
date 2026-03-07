@@ -739,7 +739,7 @@ describe('validateBotUpdate', () => {
   });
 
   it('accepts valid scopeType values', () => {
-    for (const scopeType of ['global', 'investigation', 'tag-based']) {
+    for (const scopeType of ['global', 'investigation']) {
       const result = validateBotUpdate({ scopeType });
       expect('updates' in result).toBe(true);
       if ('updates' in result) {

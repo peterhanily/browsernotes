@@ -235,6 +235,46 @@ function deleteBotFromDetail(botId, botName) {
 
 var editingBotId = null;
 
+// Scope type toggle — show/hide investigation picker
+function updateScopeUI() {
+  var scopeType = document.getElementById('newBotScope').value;
+  var group = document.getElementById('scopeFolderIdsGroup');
+  if (scopeType === 'investigation') {
+    group.style.display = '';
+    populateInvestigationPicker();
+  } else {
+    group.style.display = 'none';
+  }
+}
+
+function populateInvestigationPicker(selectedIds) {
+  selectedIds = selectedIds || [];
+  var container = document.getElementById('scopeFolderIdsList');
+  if (allInvestigations.length === 0) {
+    container.innerHTML = '<span style="color:#8b949e;font-size:0.8rem;">No investigations available</span>';
+    return;
+  }
+  container.innerHTML = allInvestigations.map(function(inv) {
+    var checked = selectedIds.indexOf(inv.id) !== -1 ? ' checked' : '';
+    return '<label><input type="checkbox" class="bot-scope-inv-check" value="' + esc(inv.id) + '"' + checked + '> ' + esc(inv.name) + '</label>';
+  }).join('');
+}
+
+document.getElementById('newBotScope').addEventListener('change', function() { updateScopeUI(); });
+
+// Event filter toggle — show/hide when events are checked
+function updateEventFilterUI() {
+  var hasEvents = false;
+  document.querySelectorAll('.bot-event-check').forEach(function(cb) {
+    if (cb.checked) hasEvents = true;
+  });
+  document.getElementById('eventFilterGroup').style.display = hasEvents ? '' : 'none';
+}
+
+document.querySelectorAll('.bot-event-check').forEach(function(cb) {
+  cb.addEventListener('change', function() { updateEventFilterUI(); });
+});
+
 function editBotFromDetail(botId) {
   var b = allBots.find(function(bot) { return bot.id === botId; });
   if (!b) { toast('Bot not found', 'error'); return; }
@@ -251,8 +291,19 @@ function editBotFromDetail(botId) {
     cb.checked = (b.capabilities || []).indexOf(cb.value) !== -1;
   });
 
+  // Config JSON
+  var configVal = b.config && typeof b.config === 'object' && Object.keys(b.config).length > 0
+    ? JSON.stringify(b.config, null, 2) : '';
+  document.getElementById('newBotConfig').value = configVal;
+  document.getElementById('botConfigSecretNote').style.display = configVal ? '' : 'none';
+
   // Scope
   document.getElementById('newBotScope').value = b.scopeType || 'investigation';
+  updateScopeUI();
+  // Pre-select scope folder IDs after picker is populated
+  if (b.scopeType === 'investigation') {
+    populateInvestigationPicker(b.scopeFolderIds || []);
+  }
 
   // Domains
   document.getElementById('newBotDomains').value = (b.allowedDomains || []).join(', ');
@@ -269,6 +320,11 @@ function editBotFromDetail(botId) {
   document.getElementById('newBotSchedule').value = triggers.schedule || '';
   document.getElementById('newBotWebhook').checked = !!triggers.webhook;
 
+  // Event table filter
+  var eventFilters = triggers.eventFilters || {};
+  document.getElementById('newBotEventTables').value = (eventFilters.tables || []).join(', ');
+  updateEventFilterUI();
+
   // Change modal title and button
   document.querySelector('#createBotModal .modal h3').textContent = 'Edit Bot';
   document.getElementById('submitCreateBot').textContent = 'Save Changes';
@@ -284,7 +340,10 @@ document.getElementById('createBotBtn').addEventListener('click', function() {
   document.getElementById('newBotDesc').value = '';
   document.getElementById('newBotType').value = 'enrichment';
   document.querySelectorAll('.bot-cap-check').forEach(function(cb) { cb.checked = false; });
+  document.getElementById('newBotConfig').value = '';
+  document.getElementById('botConfigSecretNote').style.display = 'none';
   document.getElementById('newBotScope').value = 'investigation';
+  updateScopeUI();
   document.getElementById('newBotDomains').value = '';
   document.getElementById('newBotRateHour').value = '100';
   document.getElementById('newBotRateDay').value = '1000';
@@ -292,6 +351,8 @@ document.getElementById('createBotBtn').addEventListener('click', function() {
   document.getElementById('newBotSchedule').value = '';
   document.getElementById('newBotWebhook').checked = false;
   document.querySelectorAll('.bot-event-check').forEach(function(cb) { cb.checked = false; });
+  document.getElementById('newBotEventTables').value = '';
+  updateEventFilterUI();
   document.getElementById('createBotModal').classList.add('active');
 });
 
@@ -311,6 +372,18 @@ document.getElementById('submitCreateBot').addEventListener('click', function() 
   var capabilities = [];
   document.querySelectorAll('.bot-cap-check:checked').forEach(function(cb) { capabilities.push(cb.value); });
 
+  // Parse config JSON
+  var configStr = document.getElementById('newBotConfig').value.trim();
+  var config = undefined;
+  if (configStr) {
+    try {
+      config = JSON.parse(configStr);
+    } catch (e) {
+      toast('Invalid JSON in Bot Config: ' + e.message, 'error');
+      return;
+    }
+  }
+
   var events = [];
   document.querySelectorAll('.bot-event-check:checked').forEach(function(cb) { events.push(cb.value); });
 
@@ -320,8 +393,27 @@ document.getElementById('submitCreateBot').addEventListener('click', function() 
   if (schedule) triggers.schedule = schedule;
   if (document.getElementById('newBotWebhook').checked) triggers.webhook = true;
 
+  // Event table filter
+  if (events.length > 0) {
+    var tablesStr = document.getElementById('newBotEventTables').value.trim();
+    if (tablesStr) {
+      var tables = tablesStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+      if (tables.length > 0) {
+        triggers.eventFilters = triggers.eventFilters || {};
+        triggers.eventFilters.tables = tables;
+      }
+    }
+  }
+
   var domains = document.getElementById('newBotDomains').value.trim();
   var allowedDomains = domains ? domains.split(',').map(function(d) { return d.trim(); }).filter(Boolean) : [];
+
+  // Scope folder IDs
+  var scopeType = document.getElementById('newBotScope').value;
+  var scopeFolderIds = [];
+  if (scopeType === 'investigation') {
+    document.querySelectorAll('.bot-scope-inv-check:checked').forEach(function(cb) { scopeFolderIds.push(cb.value); });
+  }
 
   var body = {
     name: name,
@@ -330,10 +422,15 @@ document.getElementById('submitCreateBot').addEventListener('click', function() 
     capabilities: capabilities,
     triggers: triggers,
     allowedDomains: allowedDomains,
-    scopeType: document.getElementById('newBotScope').value,
+    scopeType: scopeType,
+    scopeFolderIds: scopeFolderIds,
     rateLimitPerHour: parseInt(document.getElementById('newBotRateHour').value, 10) || 100,
     rateLimitPerDay: parseInt(document.getElementById('newBotRateDay').value, 10) || 1000,
   };
+
+  if (config !== undefined) {
+    body.config = config;
+  }
 
   if (editingBotId) {
     api('/bots/' + editingBotId, { method: 'PATCH', body: JSON.stringify(body) })

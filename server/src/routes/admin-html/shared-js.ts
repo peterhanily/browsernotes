@@ -178,6 +178,7 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     if (tab === 'tab-sessions') loadSessions();
     if (tab === 'tab-bots') loadBotsData();
     if (tab === 'tab-admins') loadAdminAccounts();
+    if (tab === 'tab-ai') loadAiProviders();
   });
 });
 

@@ -288,6 +288,29 @@ export function getAnthropicTools() {
   }));
 }
 
+// Build OpenAI-format tools (also works for Mistral)
+export function getOpenAITools() {
+  return allAdminTools.map(t => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description + (t.requiresConfirm ? ' [REQUIRES CONFIRMATION -- describe what you want to do and ask the user to confirm before calling this tool]' : ''),
+      parameters: t.input_schema,
+    },
+  }));
+}
+
+// Build Gemini-format tools
+export function getGeminiTools() {
+  return [{
+    functionDeclarations: allAdminTools.map(t => ({
+      name: t.name,
+      description: t.description + (t.requiresConfirm ? ' [REQUIRES CONFIRMATION]' : ''),
+      parameters: t.input_schema,
+    })),
+  }];
+}
+
 export function getToolByName(name: string): AdminTool | undefined {
   return toolMap.get(name);
 }

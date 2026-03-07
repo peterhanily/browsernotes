@@ -242,10 +242,7 @@ describe('Token signing and verification', () => {
   });
 
   it('token contains correct sub claim', async () => {
-    const token = await signAdminToken('user-42', 'bob');
-    const { payload } = await jose.decodeJwt(token) as unknown as { payload: jose.JWTPayload };
-    // decodeJwt returns the payload directly
-    const decoded = jose.decodeJwt(token);
+    const decoded = jose.decodeJwt(await signAdminToken('user-42', 'bob'));
     expect(decoded.sub).toBe('user-42');
   });
 

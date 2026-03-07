@@ -3,6 +3,58 @@ export function aiTabJs(): string {
 
 var aiMessages = [];
 var aiStreaming = false;
+var aiProvidersLoaded = false;
+
+function loadAiProviders() {
+  if (aiProvidersLoaded) return;
+  aiProvidersLoaded = true;
+  fetch(BASE + '/admin/api/ai/providers', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var sel = document.getElementById('aiProviderSelect');
+    var modelSel = document.getElementById('aiModelSelect');
+    sel.innerHTML = '';
+    if (!data.providers || data.providers.length === 0) {
+      sel.innerHTML = '<option value="">No providers configured</option>';
+      modelSel.innerHTML = '<option value="">—</option>';
+      document.getElementById('aiProviderHint').textContent = 'Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or MISTRAL_API_KEY on the server.';
+      document.getElementById('aiProviderHint').style.display = 'block';
+      return;
+    }
+    document.getElementById('aiProviderHint').style.display = 'none';
+    window._aiProviders = data.providers;
+    for (var i = 0; i < data.providers.length; i++) {
+      var p = data.providers[i];
+      var opt = document.createElement('option');
+      opt.value = p.provider;
+      opt.textContent = p.provider.charAt(0).toUpperCase() + p.provider.slice(1);
+      sel.appendChild(opt);
+    }
+    updateAiModels();
+  }).catch(function() {
+    document.getElementById('aiProviderHint').textContent = 'Failed to load providers.';
+    document.getElementById('aiProviderHint').style.display = 'block';
+  });
+}
+
+function updateAiModels() {
+  var provider = document.getElementById('aiProviderSelect').value;
+  var modelSel = document.getElementById('aiModelSelect');
+  modelSel.innerHTML = '';
+  if (!window._aiProviders) return;
+  for (var i = 0; i < window._aiProviders.length; i++) {
+    if (window._aiProviders[i].provider === provider) {
+      var models = window._aiProviders[i].models;
+      for (var j = 0; j < models.length; j++) {
+        var opt = document.createElement('option');
+        opt.value = models[j];
+        opt.textContent = models[j];
+        modelSel.appendChild(opt);
+      }
+      break;
+    }
+  }
+}
 
 function sendAiMessage() {
   if (aiStreaming) return;
@@ -19,17 +71,16 @@ function sendAiMessage() {
 function clearAiChat() {
   aiMessages = [];
   document.getElementById('aiChatArea').innerHTML =
-    '<div style="text-align:center;color:#8b949e;padding:2rem;">Ask me anything about your server -- users, bots, investigations, audit logs, and more.</div>';
+    '<div style="text-align:center;color:#8b949e;padding:2rem;">Ask me anything about your server — users, bots, investigations, audit logs, and more.</div>';
 }
 
 function appendAiMessage(role, content) {
   var area = document.getElementById('aiChatArea');
-  // Clear placeholder
   var placeholder = area.querySelector('[style*="text-align:center"]');
   if (placeholder) area.innerHTML = '';
 
   var div = document.createElement('div');
-  div.style.cssText = 'margin-bottom:1rem;padding:0.75rem;background:' + (role === 'user' ? '#1c2128' : '#161b22') + ';border:1px solid ' + (role === 'user' ? '#30363d' : '#21262d') + ';border-radius:8px;';
+  div.className = 'ai-msg ai-msg-' + role;
   div.innerHTML = role === 'user'
     ? '<div style="font-size:0.75rem;color:#58a6ff;font-weight:600;margin-bottom:0.25rem;">You</div><div style="font-size:0.85rem;color:#c9d1d9;white-space:pre-wrap;word-break:break-word;">' + esc(content) + '</div>'
     : '<div style="font-size:0.75rem;color:#3fb950;font-weight:600;margin-bottom:0.25rem;">Assistant</div><span class="ai-text" style="font-size:0.85rem;color:#c9d1d9;white-space:pre-wrap;word-break:break-word;"></span>';
@@ -48,10 +99,13 @@ function runAiChat() {
   var textSpan = msgDiv.querySelector('.ai-text');
   var fullText = '';
 
+  var provider = document.getElementById('aiProviderSelect').value;
+  var model = document.getElementById('aiModelSelect').value;
+
   fetch(BASE + '/admin/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ messages: aiMessages }),
+    body: JSON.stringify({ messages: aiMessages, provider: provider, model: model }),
   }).then(function(resp) {
     if (!resp.ok) {
       return resp.json().then(function(d) { throw new Error(d.error || 'Request failed'); });
@@ -83,12 +137,12 @@ function runAiChat() {
               document.getElementById('aiChatArea').scrollTop = document.getElementById('aiChatArea').scrollHeight;
             } else if (evt.type === 'tool_call') {
               var toolDiv = document.createElement('div');
-              toolDiv.style.cssText = 'font-size:0.75rem;color:#d29922;margin-top:0.5rem;padding:0.3rem 0.5rem;background:#0d1117;border-radius:4px;';
+              toolDiv.className = 'ai-tool-call';
               toolDiv.innerHTML = (evt.requiresConfirm ? '! ' : '> ') + 'Calling <strong>' + esc(evt.name) + '</strong>';
               msgDiv.appendChild(toolDiv);
             } else if (evt.type === 'tool_result') {
               var resDiv = document.createElement('div');
-              resDiv.style.cssText = 'font-size:0.75rem;color:#58a6ff;margin-top:0.25rem;padding:0.3rem 0.5rem;background:#0d1117;border-radius:4px;max-height:150px;overflow:auto;';
+              resDiv.className = 'ai-tool-result';
               resDiv.innerHTML = 'Result: ' + esc(evt.name);
               msgDiv.appendChild(resDiv);
             } else if (evt.type === 'error') {
@@ -130,5 +184,6 @@ document.getElementById('aiInput').addEventListener('keydown', function(e) {
     sendAiMessage();
   }
 });
-document.getElementById('aiClearBtn').addEventListener('click', function() { clearAiChat(); });`;
+document.getElementById('aiClearBtn').addEventListener('click', function() { clearAiChat(); });
+document.getElementById('aiProviderSelect').addEventListener('change', function() { updateAiModels(); });`;
 }

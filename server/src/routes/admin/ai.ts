@@ -1,141 +1,347 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { requireAdminAuth, logAdminAction, getAdminId } from './shared.js';
-import { getAnthropicTools, getToolByName, ADMIN_AI_SYSTEM_PROMPT } from '../../services/admin-ai-service.js';
+import {
+  getAnthropicTools, getOpenAITools, getGeminiTools,
+  getToolByName, ADMIN_AI_SYSTEM_PROMPT,
+} from '../../services/admin-ai-service.js';
+import { getAvailableProviders } from '../../services/llm-service.js';
 import { logger } from '../../lib/logger.js';
 
 const app = new Hono();
 const MAX_TOOL_CALLS = 20;
 
-// POST /admin/api/ai/chat -- streaming AI chat
-app.post('/api/ai/chat', requireAdminAuth, async (c) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return c.json({ error: 'ANTHROPIC_API_KEY not configured on server' }, 503);
+// GET /admin/api/ai/providers — list available providers with API keys configured
+app.get('/api/ai/providers', requireAdminAuth, async (c) => {
+  return c.json({ providers: getAvailableProviders() });
+});
+
+// ─── Provider-specific LLM call abstractions ─────────────────────
+
+interface ToolCall { id: string; name: string; input: Record<string, unknown> }
+interface LLMResult {
+  textParts: string[];
+  toolCalls: ToolCall[];
+  stopReason: string;
+  rawAssistantContent: unknown; // for appending to message history
+}
+
+function getApiKey(provider: string): string {
+  switch (provider) {
+    case 'anthropic': return process.env.ANTHROPIC_API_KEY || '';
+    case 'openai': return process.env.OPENAI_API_KEY || '';
+    case 'gemini': return process.env.GEMINI_API_KEY || '';
+    case 'mistral': return process.env.MISTRAL_API_KEY || '';
+    default: return '';
+  }
+}
+
+async function callAnthropic(model: string, messages: unknown[], apiKey: string): Promise<LLMResult> {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: ADMIN_AI_SYSTEM_PROMPT,
+      messages,
+      tools: getAnthropicTools(),
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`API error ${resp.status}: ${errText}`);
   }
 
+  const result = await resp.json() as {
+    content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
+    stop_reason: string;
+  };
+
+  return {
+    textParts: result.content.filter(b => b.type === 'text').map(b => b.text!),
+    toolCalls: result.content.filter(b => b.type === 'tool_use').map(b => ({
+      id: b.id!, name: b.name!, input: b.input || {},
+    })),
+    stopReason: result.stop_reason,
+    rawAssistantContent: result.content,
+  };
+}
+
+function buildAnthropicToolResults(
+  results: Array<{ id: string; content: string }>,
+): { role: string; content: unknown } {
+  return {
+    role: 'user',
+    content: results.map(r => ({ type: 'tool_result', tool_use_id: r.id, content: r.content })),
+  };
+}
+
+async function callOpenAI(model: string, messages: unknown[], apiKey: string, provider: 'openai' | 'mistral'): Promise<LLMResult> {
+  const url = provider === 'mistral'
+    ? 'https://api.mistral.ai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+
+  // Prepend system message
+  const allMessages = [{ role: 'system', content: ADMIN_AI_SYSTEM_PROMPT }, ...(messages as Array<Record<string, unknown>>)];
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: allMessages,
+      tools: getOpenAITools(),
+      max_tokens: 4096,
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`API error ${resp.status}: ${errText}`);
+  }
+
+  const result = await resp.json() as {
+    choices: Array<{
+      message: {
+        role: string;
+        content: string | null;
+        tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+      };
+      finish_reason: string;
+    }>;
+  };
+
+  const msg = result.choices[0]?.message;
+  const textParts = msg?.content ? [msg.content] : [];
+  const toolCalls = (msg?.tool_calls || []).map(tc => ({
+    id: tc.id,
+    name: tc.function.name,
+    input: JSON.parse(tc.function.arguments || '{}') as Record<string, unknown>,
+  }));
+
+  return {
+    textParts,
+    toolCalls,
+    stopReason: result.choices[0]?.finish_reason || 'stop',
+    rawAssistantContent: msg,
+  };
+}
+
+function buildOpenAIToolResults(
+  results: Array<{ id: string; name: string; content: string }>,
+): Array<{ role: string; tool_call_id: string; name: string; content: string }> {
+  return results.map(r => ({
+    role: 'tool',
+    tool_call_id: r.id,
+    name: r.name,
+    content: r.content,
+  }));
+}
+
+async function callGemini(model: string, messages: unknown[], apiKey: string): Promise<LLMResult> {
+  // Convert messages to Gemini format
+  const contents = (messages as Array<{ role: string; content: unknown }>).map(m => {
+    if (m.role === 'assistant') {
+      return { role: 'model', parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] };
+    }
+    // tool results come as separate messages
+    if (m.role === 'function' || m.role === 'tool') {
+      const mr = m as { name?: string; content: string };
+      return { role: 'function', parts: [{ functionResponse: { name: mr.name || 'unknown', response: JSON.parse(mr.content || '{}') } }] };
+    }
+    return { role: 'user', parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] };
+  });
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents,
+      tools: getGeminiTools(),
+      systemInstruction: { parts: [{ text: ADMIN_AI_SYSTEM_PROMPT }] },
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`API error ${resp.status}: ${errText}`);
+  }
+
+  const result = await resp.json() as {
+    candidates: Array<{
+      content: { parts: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> };
+      finishReason: string;
+    }>;
+  };
+
+  const parts = result.candidates?.[0]?.content?.parts || [];
+  const textParts = parts.filter(p => p.text).map(p => p.text!);
+  const toolCalls = parts.filter(p => p.functionCall).map((p, i) => ({
+    id: `gemini-tc-${i}`,
+    name: p.functionCall!.name,
+    input: p.functionCall!.args || {},
+  }));
+
+  return {
+    textParts,
+    toolCalls,
+    stopReason: result.candidates?.[0]?.finishReason || 'STOP',
+    rawAssistantContent: result.candidates?.[0]?.content,
+  };
+}
+
+// ─── Unified agent loop ──────────────────────────────────────────
+
+app.post('/api/ai/chat', requireAdminAuth, async (c) => {
   let body;
   try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON body' }, 400); }
 
-  const { messages } = body;
+  const { messages, provider: reqProvider, model: reqModel } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return c.json({ error: 'Messages array required' }, 400);
   }
-
-  // Cap message count to prevent context abuse
   if (messages.length > 50) {
     return c.json({ error: 'Too many messages (max 50)' }, 400);
   }
 
-  const adminId = getAdminId(c);
-  const tools = getAnthropicTools();
+  // Determine provider: use requested or first available
+  const available = getAvailableProviders();
+  if (available.length === 0) {
+    return c.json({ error: 'No AI provider API keys configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or MISTRAL_API_KEY.' }, 503);
+  }
 
-  // Log the chat request
-  await logAdminAction(adminId, 'ai-assistant.chat', `AI Assistant chat (${messages.length} messages)`);
+  const provider = reqProvider && available.some(p => p.provider === reqProvider)
+    ? reqProvider as string
+    : available[0].provider;
+
+  const providerInfo = available.find(p => p.provider === provider)!;
+  const model = reqModel && providerInfo.models.includes(reqModel)
+    ? reqModel as string
+    : providerInfo.models[0];
+
+  const apiKey = getApiKey(provider);
+  if (!apiKey) {
+    return c.json({ error: `${provider.toUpperCase()} API key not configured` }, 503);
+  }
+
+  const adminId = getAdminId(c);
+  await logAdminAction(adminId, 'ai-assistant.chat', `AI Assistant chat via ${provider}/${model} (${messages.length} messages)`);
 
   return streamSSE(c, async (stream) => {
     let toolCallCount = 0;
     const currentMessages = [...messages];
 
-    // Agent loop -- keep calling Claude until no more tool_use
+    // Send provider info to client
+    await stream.writeSSE({ data: JSON.stringify({ type: 'provider', provider, model }) });
+
     while (toolCallCount < MAX_TOOL_CALLS) {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4096,
-          system: ADMIN_AI_SYSTEM_PROMPT,
-          messages: currentMessages,
-          tools,
-        }),
-      });
-
-      if (!resp.ok) {
-        const errText = await resp.text();
-        logger.error('Admin AI API error', { status: resp.status, error: errText });
-        await stream.writeSSE({ data: JSON.stringify({ type: 'error', error: `API error: ${resp.status}` }) });
+      let result: LLMResult;
+      try {
+        switch (provider) {
+          case 'anthropic':
+            result = await callAnthropic(model, currentMessages, apiKey);
+            break;
+          case 'openai':
+            result = await callOpenAI(model, currentMessages, apiKey, 'openai');
+            break;
+          case 'mistral':
+            result = await callOpenAI(model, currentMessages, apiKey, 'mistral');
+            break;
+          case 'gemini':
+            result = await callGemini(model, currentMessages, apiKey);
+            break;
+          default:
+            await stream.writeSSE({ data: JSON.stringify({ type: 'error', error: `Unsupported provider: ${provider}` }) });
+            return;
+        }
+      } catch (err) {
+        logger.error('Admin AI API error', { provider, model, error: String(err) });
+        await stream.writeSSE({ data: JSON.stringify({ type: 'error', error: String(err) }) });
         return;
       }
 
-      const result = await resp.json() as {
-        content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
-        stop_reason: string;
-      };
-
-      // Send text blocks to the client
-      const textBlocks = result.content.filter(b => b.type === 'text');
-      for (const block of textBlocks) {
-        await stream.writeSSE({ data: JSON.stringify({ type: 'text', text: block.text }) });
+      // Send text to client
+      for (const text of result.textParts) {
+        await stream.writeSSE({ data: JSON.stringify({ type: 'text', text }) });
       }
 
-      // Check for tool_use blocks
-      const toolUseBlocks = result.content.filter(b => b.type === 'tool_use');
-      if (toolUseBlocks.length === 0) {
-        // No tool calls -- we're done
-        await stream.writeSSE({ data: JSON.stringify({ type: 'done', stopReason: result.stop_reason }) });
+      if (result.toolCalls.length === 0) {
+        await stream.writeSSE({ data: JSON.stringify({ type: 'done', stopReason: result.stopReason }) });
         return;
+      }
+
+      // Append assistant message to history
+      if (provider === 'anthropic') {
+        currentMessages.push({ role: 'assistant', content: result.rawAssistantContent });
+      } else if (provider === 'openai' || provider === 'mistral') {
+        currentMessages.push(result.rawAssistantContent);
+      } else if (provider === 'gemini') {
+        // For Gemini, we'll include the model response as a model turn
+        currentMessages.push({ role: 'assistant', content: result.textParts.join('\n') + '\n[tool calls made]' });
       }
 
       // Execute tools
-      currentMessages.push({ role: 'assistant', content: result.content });
-
-      const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
-      for (const block of toolUseBlocks) {
+      const toolResultEntries: Array<{ id: string; name: string; content: string }> = [];
+      for (const tc of result.toolCalls) {
         toolCallCount++;
-        const tool = getToolByName(block.name!);
+        const tool = getToolByName(tc.name);
 
-        // Send tool call info to client
         await stream.writeSSE({ data: JSON.stringify({
-          type: 'tool_call',
-          name: block.name,
-          input: block.input,
+          type: 'tool_call', name: tc.name, input: tc.input,
           requiresConfirm: tool?.requiresConfirm || false,
         }) });
 
         if (!tool) {
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id!,
-            content: JSON.stringify({ error: `Unknown tool: ${block.name}` }),
-          });
+          toolResultEntries.push({ id: tc.id, name: tc.name, content: JSON.stringify({ error: `Unknown tool: ${tc.name}` }) });
           continue;
         }
 
         try {
-          const toolResult = await tool.execute(block.input || {}, adminId);
+          const toolResult = await tool.execute(tc.input, adminId);
           const resultStr = JSON.stringify(toolResult);
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id!,
+          toolResultEntries.push({
+            id: tc.id,
+            name: tc.name,
             content: resultStr.length > 20000 ? resultStr.slice(0, 20000) + '...[truncated]' : resultStr,
           });
-
-          // Send tool result to client
           await stream.writeSSE({ data: JSON.stringify({
-            type: 'tool_result',
-            name: block.name,
+            type: 'tool_result', name: tc.name,
             result: resultStr.length > 5000 ? resultStr.slice(0, 5000) + '...' : toolResult,
           }) });
         } catch (err) {
           const errorMsg = String(err);
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: block.id!,
-            content: JSON.stringify({ error: errorMsg }),
-          });
-          await stream.writeSSE({ data: JSON.stringify({ type: 'tool_error', name: block.name, error: errorMsg }) });
+          toolResultEntries.push({ id: tc.id, name: tc.name, content: JSON.stringify({ error: errorMsg }) });
+          await stream.writeSSE({ data: JSON.stringify({ type: 'tool_error', name: tc.name, error: errorMsg }) });
         }
       }
 
-      currentMessages.push({ role: 'user', content: toolResults });
+      // Append tool results in provider-specific format
+      if (provider === 'anthropic') {
+        currentMessages.push(buildAnthropicToolResults(toolResultEntries));
+      } else if (provider === 'openai' || provider === 'mistral') {
+        currentMessages.push(...buildOpenAIToolResults(toolResultEntries));
+      } else if (provider === 'gemini') {
+        // Gemini: add function responses as user messages
+        for (const tr of toolResultEntries) {
+          currentMessages.push({
+            role: 'user',
+            content: `Tool "${tr.name}" returned: ${tr.content}`,
+          });
+        }
+      }
     }
 
-    // Hit tool call limit
     await stream.writeSSE({ data: JSON.stringify({ type: 'error', error: 'Tool call limit reached' }) });
   });
 });

@@ -392,6 +392,15 @@ ${adminStyles()}
   <!-- ─── AI Assistant Tab ─────────────────────────────────── -->
   <div id="tab-ai" class="tab-content">
     <div style="display:flex;flex-direction:column;height:calc(100vh - 180px);">
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+        <select id="aiProviderSelect" style="padding:0.3rem 0.5rem;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.8rem;">
+          <option value="">Loading...</option>
+        </select>
+        <select id="aiModelSelect" style="padding:0.3rem 0.5rem;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.8rem;">
+          <option value="">—</option>
+        </select>
+        <span id="aiProviderHint" style="font-size:0.75rem;color:#d29922;display:none;"></span>
+      </div>
       <div id="aiChatArea" style="flex:1;overflow-y:auto;padding:1rem;background:#0d1117;border:1px solid #21262d;border-radius:6px;margin-bottom:0.5rem;">
         <div style="text-align:center;color:#8b949e;padding:2rem;">Ask me anything about your server — users, bots, investigations, audit logs, and more.</div>
       </div>

@@ -94,6 +94,13 @@ export function validateBotUpdate(body: Record<string, unknown>): { updates: Rec
     updates.description = typeof body.description === 'string' ? body.description.trim() : '';
   }
 
+  if (body.type !== undefined) {
+    if (!VALID_BOT_TYPES.includes(body.type as BotType)) {
+      return { error: `Invalid bot type: ${body.type}` };
+    }
+    updates.type = body.type;
+  }
+
   if (body.triggers !== undefined) {
     const triggers = body.triggers as Record<string, unknown> | null;
     if (triggers?.schedule) {
@@ -234,9 +241,16 @@ export async function createBot(input: BotCreateInput, createdBy: string): Promi
 
 /** Update a bot config. Returns the existing bot name for audit logging. */
 export async function updateBot(id: string, updates: Record<string, unknown>): Promise<{ name: string } | null> {
-  const rows = await db.select({ id: schema.botConfigs.id, name: schema.botConfigs.name })
+  const rows = await db.select({ id: schema.botConfigs.id, name: schema.botConfigs.name, config: schema.botConfigs.config })
     .from(schema.botConfigs).where(eq(schema.botConfigs.id, id)).limit(1);
   if (rows.length === 0) return null;
+
+  // If config is being updated, merge sentinel values (***configured***, ***not set***)
+  // back to the existing encrypted values so we don't destroy real secrets on edit
+  if (updates.config && typeof updates.config === 'object') {
+    const existingConfig = (rows[0].config || {}) as Record<string, unknown>;
+    updates.config = mergeSentinelSecrets(updates.config as Record<string, unknown>, existingConfig);
+  }
 
   await db.update(schema.botConfigs).set(updates).where(eq(schema.botConfigs.id, id));
   await botManager.reloadBot(id);
@@ -244,27 +258,46 @@ export async function updateBot(id: string, updates: Record<string, unknown>): P
   return { name: rows[0].name };
 }
 
+/** Replace sentinel redacted values with existing encrypted values from DB */
+function mergeSentinelSecrets(newConfig: Record<string, unknown>, existingConfig: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(newConfig)) {
+    if (value === '***configured***' || value === '***not set***') {
+      // Restore the existing encrypted value
+      result[key] = existingConfig[key] ?? '';
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recurse into nested objects
+      const existingNested = (existingConfig[key] && typeof existingConfig[key] === 'object' && !Array.isArray(existingConfig[key]))
+        ? existingConfig[key] as Record<string, unknown> : {};
+      result[key] = mergeSentinelSecrets(value as Record<string, unknown>, existingNested);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 /** Enable a bot. Returns bot name or null if not found. */
 export async function enableBot(id: string): Promise<{ name: string } | null> {
-  const rows = await db.select({ id: schema.botConfigs.id, name: schema.botConfigs.name })
-    .from(schema.botConfigs).where(eq(schema.botConfigs.id, id)).limit(1);
+  const rows = await db.update(schema.botConfigs)
+    .set({ enabled: true, updatedAt: new Date() })
+    .where(eq(schema.botConfigs.id, id))
+    .returning({ name: schema.botConfigs.name });
   if (rows.length === 0) return null;
 
-  await db.update(schema.botConfigs).set({ enabled: true, updatedAt: new Date() }).where(eq(schema.botConfigs.id, id));
   await botManager.reloadBot(id);
-
   return { name: rows[0].name };
 }
 
 /** Disable a bot. Returns bot name or null if not found. */
 export async function disableBot(id: string): Promise<{ name: string } | null> {
-  const rows = await db.select({ id: schema.botConfigs.id, name: schema.botConfigs.name })
-    .from(schema.botConfigs).where(eq(schema.botConfigs.id, id)).limit(1);
+  const rows = await db.update(schema.botConfigs)
+    .set({ enabled: false, updatedAt: new Date() })
+    .where(eq(schema.botConfigs.id, id))
+    .returning({ name: schema.botConfigs.name });
   if (rows.length === 0) return null;
 
-  await db.update(schema.botConfigs).set({ enabled: false, updatedAt: new Date() }).where(eq(schema.botConfigs.id, id));
   await botManager.unloadBot(id);
-
   return { name: rows[0].name };
 }
 
@@ -286,9 +319,12 @@ export async function deleteBot(id: string): Promise<{ name: string } | null> {
   if (rows.length === 0) return null;
 
   await botManager.unloadBot(id);
-  await db.delete(schema.botConfigs).where(eq(schema.botConfigs.id, id));
-  await db.update(schema.users).set({ active: false, updatedAt: new Date() })
-    .where(eq(schema.users.id, rows[0].userId));
+
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.botConfigs).where(eq(schema.botConfigs.id, id));
+    await tx.update(schema.users).set({ active: false, updatedAt: new Date() })
+      .where(eq(schema.users.id, rows[0].userId));
+  });
 
   return { name: rows[0].name };
 }

@@ -74,7 +74,14 @@ export function encryptConfigSecrets(config: Record<string, unknown>): Record<st
       // Recurse into nested objects
       result[key] = encryptConfigSecrets(value as Record<string, unknown>);
     } else if (isSecretField(key) && typeof value === 'string' && value && !value.startsWith('enc:')) {
-      result[key] = encryptSecret(value);
+      // Don't re-encrypt redacted sentinel values — these come from the admin UI
+      // when editing a bot without changing the secret fields
+      if (value === '***configured***' || value === '***not set***') {
+        // Preserve the existing encrypted value — caller must merge with existing config
+        result[key] = value;
+      } else {
+        result[key] = encryptSecret(value);
+      }
     } else {
       result[key] = value;
     }

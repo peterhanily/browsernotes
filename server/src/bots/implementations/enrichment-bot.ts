@@ -22,16 +22,15 @@ export class EnrichmentBot extends GenericBot {
       return;
     }
 
-    // Read the newly created IOC
-    const iocs = await execCtx.listIOCs(folderId, undefined, 1);
-    if (iocs.length === 0) {
-      logger.warn(`EnrichmentBot "${this.name}": could not find IOC in folder`, { botId: this.id, folderId });
+    // Use the IOC data directly from the event instead of querying the DB
+    // (event.data contains the full entity record from sync-service)
+    if (!event.data || !event.entityId) {
+      logger.warn(`EnrichmentBot "${this.name}": event missing data or entityId`, { botId: this.id, folderId });
       return;
     }
 
-    const ioc = iocs[0];
-    const iocValue = (ioc.value as string) || 'unknown';
-    const iocType = (ioc.type as string) || 'unknown';
+    const iocValue = (event.data.value as string) || 'unknown';
+    const iocType = (event.data.type as string) || 'unknown';
 
     const enrichmentUrl = this.config.config.enrichmentUrl as string | undefined;
     const enrichmentApiKey = this.config.config.enrichmentApiKey as string | undefined;

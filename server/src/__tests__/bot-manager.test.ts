@@ -193,6 +193,69 @@ describe('BotManager', () => {
       expect(manager.getLoadedBots()).toHaveLength(0);
     });
   });
+
+  describe('event routing', () => {
+    it('routes event to bots subscribed to that event type', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        userId: 'bot-user-1',
+        triggers: { events: ['entity.created'] },
+      }));
+
+      await manager.executeBot('b1', 'event', {
+        type: 'entity.created',
+        table: 'notes',
+        entityId: 'n1',
+        folderId: 'f1',
+        userId: 'human-user',
+        timestamp: new Date(),
+      });
+
+      const { db } = await import('../db/index.js');
+      expect(db.insert).toHaveBeenCalled();
+    });
+
+    it('executes bot even without folderId when called directly', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({
+        id: 'b1',
+        userId: 'bot-user-1',
+        triggers: {
+          events: ['entity.created'],
+          eventFilters: { folderIds: ['f1', 'f2'] },
+        },
+      }));
+
+      const { db } = await import('../db/index.js');
+      const insertCalls = (db.insert as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      await manager.executeBot('b1', 'event', {
+        type: 'entity.created',
+        table: 'notes',
+        entityId: 'n1',
+        userId: 'human-user',
+        timestamp: new Date(),
+      });
+
+      // Should still execute (executeBot is called directly, not via routeEvent)
+      expect((db.insert as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(insertCalls);
+    });
+  });
+
+  describe('stats', () => {
+    it('getStats returns current state', async () => {
+      const manager = new BotManager();
+      await manager.loadBot(makeBotConfig({ id: 'b1' }));
+
+      const stats = manager.getStats();
+      expect(stats.loadedBots).toBe(1);
+      expect(stats.activeRuns).toBe(0);
+      expect(stats.queueSize).toBe(0);
+      expect(stats.dropped).toBe(0);
+      expect(stats.rateLimited).toBe(0);
+    });
+  });
 });
 
 describe('validateCronExpression', () => {

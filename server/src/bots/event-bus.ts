@@ -30,11 +30,8 @@ class BotEventBus extends EventEmitter {
     }
   }
 
-  /** Emit a typed bot event */
+  /** Emit a bot event via wildcard for BotManager routing */
   emitBotEvent(event: BotEvent): void {
-    // Emit the specific event type (e.g., 'entity.created')
-    this.emit(event.type, event);
-    // Also emit a wildcard so BotManager can route all events
     this.emit('*', event);
   }
 

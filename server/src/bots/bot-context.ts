@@ -11,12 +11,18 @@ import type { BotContext, BotCapability } from './types.js';
 
 const BOT_WRITABLE_TABLES = new Set(['notes', 'tasks', 'standaloneIOCs', 'timelineEvents']);
 
-function isPrivateIP(ip: string): boolean {
+export function isPrivateIP(ip: string): boolean {
   // IPv6 checks
   if (ip === '::1') return true;
   const lowerIp = ip.toLowerCase();
   if (lowerIp.startsWith('fc') || lowerIp.startsWith('fd')) return true; // fc00::/7
   if (lowerIp.startsWith('fe8') || lowerIp.startsWith('fe9') || lowerIp.startsWith('fea') || lowerIp.startsWith('feb')) return true; // fe80::/10
+
+  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — strip prefix and check as IPv4
+  if (lowerIp.startsWith('::ffff:')) {
+    const mapped = ip.slice(7); // strip '::ffff:'
+    return isPrivateIP(mapped);
+  }
 
   // IPv4 checks
   const parts = ip.split('.').map(Number);
@@ -236,7 +242,7 @@ export class BotExecutionContext {
       return [];
     }
 
-    return db.select().from(schema.standaloneIOCs).where(and(...conditions));
+    return db.select().from(schema.standaloneIOCs).where(and(...conditions)).limit(500);
   }
 
   // ─── Write Operations (via sync-service) ──────────────────────
@@ -444,10 +450,18 @@ export class BotExecutionContext {
     this.requireDomain(url);
     this.checkAborted();
 
-    const { address } = await lookup(new URL(url).hostname);
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+    const { address } = await lookup(hostname);
     if (isPrivateIP(address)) {
-      throw new Error(`Bot "${this.ctx.botConfig.name}" blocked from accessing private IP ${address} (resolved from ${new URL(url).hostname})`);
+      throw new Error(`Bot "${this.ctx.botConfig.name}" blocked from accessing private IP ${address} (resolved from ${hostname})`);
     }
+
+    // Prevent DNS rebinding TOCTOU: replace hostname with resolved IP and set Host header
+    // so fetch connects to the verified IP, not a potentially re-resolved one
+    const resolvedUrl = new URL(url);
+    resolvedUrl.hostname = address;
+    const resolvedUrlStr = resolvedUrl.toString();
 
     this.ctx.apiCallsMade++;
 
@@ -459,11 +473,12 @@ export class BotExecutionContext {
     this.ctx.signal.addEventListener('abort', onAbort, { once: true });
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(resolvedUrlStr, {
         ...opts,
         signal: controller.signal,
         redirect: 'error',
         headers: {
+          'Host': hostname,
           'User-Agent': 'ThreatCaddy-Bot/1.0',
           ...opts?.headers,
         },

@@ -209,6 +209,25 @@ describe('secret-store', () => {
       expect(nested.channel).toBe('#alerts');
       expect(result.name).toBe('Bot');
     });
+
+    it('preserves sentinel values (***configured*** / ***not set***) without encrypting', () => {
+      const config = {
+        apiKey: '***configured***',
+        token: '***not set***',
+        password: 'new-real-password',
+        name: 'Bot',
+      };
+
+      const result = encryptConfigSecrets(config);
+
+      // Sentinel values should pass through unchanged
+      expect(result.apiKey).toBe('***configured***');
+      expect(result.token).toBe('***not set***');
+      // New password should be encrypted
+      expect((result.password as string).startsWith('enc:')).toBe(true);
+      // Non-secret field untouched
+      expect(result.name).toBe('Bot');
+    });
   });
 
   describe('decryptConfigSecrets', () => {
@@ -288,11 +307,9 @@ describe('event-bus', () => {
     botEventBus.removeAllListeners();
   });
 
-  it('emitBotEvent emits to both specific type and wildcard *', () => {
-    const specificHandler = vi.fn();
+  it('emitBotEvent emits to wildcard * listener', () => {
     const wildcardHandler = vi.fn();
 
-    botEventBus.onBotEvent('entity.created', specificHandler);
     botEventBus.onBotEvent('*', wildcardHandler);
 
     const event = {
@@ -304,14 +321,13 @@ describe('event-bus', () => {
 
     botEventBus.emitBotEvent(event);
 
-    expect(specificHandler).toHaveBeenCalledWith(event);
     expect(wildcardHandler).toHaveBeenCalledWith(event);
   });
 
   it('onBotEvent / offBotEvent subscribe/unsubscribe correctly', () => {
     const handler = vi.fn();
 
-    botEventBus.onBotEvent('entity.updated', handler);
+    botEventBus.onBotEvent('*', handler);
 
     const event = {
       type: 'entity.updated' as const,
@@ -323,7 +339,7 @@ describe('event-bus', () => {
     botEventBus.emitBotEvent(event);
     expect(handler).toHaveBeenCalledTimes(1);
 
-    botEventBus.offBotEvent('entity.updated', handler);
+    botEventBus.offBotEvent('*', handler);
 
     botEventBus.emitBotEvent(event);
     expect(handler).toHaveBeenCalledTimes(1); // not called again
@@ -334,7 +350,7 @@ describe('event-bus', () => {
       throw new Error('handler exploded');
     });
 
-    botEventBus.onBotEvent('entity.created', badHandler);
+    botEventBus.onBotEvent('*', badHandler);
 
     const event = {
       type: 'entity.created' as const,
@@ -350,7 +366,7 @@ describe('event-bus', () => {
 
   it('emitEntityEvent maps op=delete to entity.deleted', () => {
     const handler = vi.fn();
-    botEventBus.onBotEvent('entity.deleted', handler);
+    botEventBus.onBotEvent('*', handler);
 
     emitEntityEvent('delete', 'notes', 'n1', 'folder-1', 'user-1', false);
 
@@ -360,7 +376,7 @@ describe('event-bus', () => {
 
   it('emitEntityEvent maps new put to entity.created', () => {
     const handler = vi.fn();
-    botEventBus.onBotEvent('entity.created', handler);
+    botEventBus.onBotEvent('*', handler);
 
     emitEntityEvent('put', 'notes', 'n2', 'folder-1', 'user-1', true);
 
@@ -370,7 +386,7 @@ describe('event-bus', () => {
 
   it('emitEntityEvent maps existing put to entity.updated', () => {
     const handler = vi.fn();
-    botEventBus.onBotEvent('entity.updated', handler);
+    botEventBus.onBotEvent('*', handler);
 
     emitEntityEvent('put', 'notes', 'n3', 'folder-1', 'user-1', false);
 
@@ -380,7 +396,7 @@ describe('event-bus', () => {
 
   it('emitEntityEvent maps folder creation to investigation.created', () => {
     const handler = vi.fn();
-    botEventBus.onBotEvent('investigation.created', handler);
+    botEventBus.onBotEvent('*', handler);
 
     emitEntityEvent('put', 'folders', 'folder-new', undefined, 'user-1', true);
 
@@ -390,7 +406,7 @@ describe('event-bus', () => {
 
   it('emitEntityEvent includes depth from AsyncLocalStorage', () => {
     const handler = vi.fn();
-    botEventBus.onBotEvent('entity.created', handler);
+    botEventBus.onBotEvent('*', handler);
 
     botEventDepth.run(3, () => {
       emitEntityEvent('put', 'notes', 'n4', 'folder-1', 'user-1', true);
@@ -398,5 +414,61 @@ describe('event-bus', () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0][0].depth).toBe(3);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 4. isPrivateIP — SSRF boundary tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('isPrivateIP', () => {
+  let isPrivateIP: typeof import('../bots/bot-context.js').isPrivateIP;
+
+  beforeEach(async () => {
+    const mod = await import('../bots/bot-context.js');
+    isPrivateIP = mod.isPrivateIP;
+  });
+
+  it('detects IPv4 loopback', () => {
+    expect(isPrivateIP('127.0.0.1')).toBe(true);
+    expect(isPrivateIP('127.255.255.255')).toBe(true);
+  });
+
+  it('detects IPv4 private ranges', () => {
+    expect(isPrivateIP('10.0.0.1')).toBe(true);
+    expect(isPrivateIP('172.16.0.1')).toBe(true);
+    expect(isPrivateIP('172.31.255.255')).toBe(true);
+    expect(isPrivateIP('192.168.1.1')).toBe(true);
+    expect(isPrivateIP('169.254.1.1')).toBe(true);
+    expect(isPrivateIP('0.0.0.0')).toBe(true);
+  });
+
+  it('allows public IPv4', () => {
+    expect(isPrivateIP('8.8.8.8')).toBe(false);
+    expect(isPrivateIP('1.1.1.1')).toBe(false);
+    expect(isPrivateIP('172.32.0.1')).toBe(false);
+    expect(isPrivateIP('192.169.1.1')).toBe(false);
+  });
+
+  it('detects IPv6 loopback', () => {
+    expect(isPrivateIP('::1')).toBe(true);
+  });
+
+  it('detects IPv6 private ranges', () => {
+    expect(isPrivateIP('fc00::1')).toBe(true);
+    expect(isPrivateIP('fd12::1')).toBe(true);
+    expect(isPrivateIP('fe80::1')).toBe(true);
+  });
+
+  it('detects IPv4-mapped IPv6 addresses', () => {
+    expect(isPrivateIP('::ffff:127.0.0.1')).toBe(true);
+    expect(isPrivateIP('::ffff:10.0.0.1')).toBe(true);
+    expect(isPrivateIP('::ffff:192.168.1.1')).toBe(true);
+    expect(isPrivateIP('::FFFF:172.16.0.1')).toBe(true);
+  });
+
+  it('allows IPv4-mapped IPv6 public addresses', () => {
+    expect(isPrivateIP('::ffff:8.8.8.8')).toBe(false);
+    expect(isPrivateIP('::ffff:1.1.1.1')).toBe(false);
   });
 });

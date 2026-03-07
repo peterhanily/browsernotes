@@ -22,9 +22,11 @@ const MAX_QUEUE_SIZE = 50;
 export class BotManager {
   private bots = new Map<string, Bot>();
   private configs = new Map<string, BotConfig>();
+  private decryptedConfigs = new Map<string, Record<string, unknown>>();
   private cronIntervals = new Map<string, ReturnType<typeof setInterval>>();
   private activeRuns = 0;
   private initialized = false;
+  private initializing = false;
 
   /** Reverse index: event type → set of bot IDs that subscribe to that event */
   private eventTypeIndex = new Map<BotEventType, Set<string>>();
@@ -43,7 +45,8 @@ export class BotManager {
 
   /** Load all enabled bot configs from DB and start them */
   async init(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized || this.initializing) return;
+    this.initializing = true;
 
     const rows = await db.select().from(schema.botConfigs).where(eq(schema.botConfigs.enabled, true));
     for (const row of rows) {
@@ -69,7 +72,9 @@ export class BotManager {
 
     // Listen for all events and route to bots
     this.wildcardListener = (event: BotEvent) => {
-      void this.routeEvent(event);
+      this.routeEvent(event).catch(err => {
+        logger.error('Error routing bot event', { type: event.type, error: String(err) });
+      });
     };
     botEventBus.onBotEvent('*', this.wildcardListener);
 
@@ -107,6 +112,7 @@ export class BotManager {
 
     this.bots.clear();
     this.configs.clear();
+    this.decryptedConfigs.clear();
     this.cronIntervals.clear();
     this.eventTypeIndex.clear();
     this.executionQueue.length = 0;
@@ -138,6 +144,7 @@ export class BotManager {
     const bot = createBotImplementation(config);
     await bot.onInit(config);
     this.bots.set(config.id, bot);
+    this.decryptedConfigs.set(config.id, decryptConfigSecrets(config.config));
 
     // Set up cron schedule if configured
     if (config.triggers.schedule) {
@@ -186,6 +193,7 @@ export class BotManager {
 
     botRateLimiter.removeBuckets(botId);
     this.configs.delete(botId);
+    this.decryptedConfigs.delete(botId);
   }
 
   /** Reload a bot (disable then re-enable with updated config) */
@@ -221,7 +229,8 @@ export class BotManager {
       const filters = config.triggers.eventFilters;
       if (filters) {
         if (filters.tables && event.table && !filters.tables.includes(event.table)) continue;
-        if (filters.folderIds && event.folderId && !filters.folderIds.includes(event.folderId)) continue;
+        // If folder filter is set, reject events that don't match — including events without a folderId
+        if (filters.folderIds && (!event.folderId || !filters.folderIds.includes(event.folderId))) continue;
         if (filters.iocTypes && event.table === 'standaloneIOCs' && event.data) {
           const iocType = event.data.type as string;
           if (!filters.iocTypes.includes(iocType)) continue;
@@ -271,11 +280,29 @@ export class BotManager {
       this.stats.queued++;
       return new Promise<void>((resolve) => {
         this.executionQueue.push(() => {
-          void this.executeBot(botId, trigger, event, webhookPayload).then(resolve);
+          // Run directly instead of re-entering executeBot to avoid double rate-limit consumption.
+          // Rate tokens were already consumed above, so just proceed to the execution phase.
+          this.activeRuns++;
+          void this.executeBotInner(botId, trigger, event, webhookPayload).then(resolve);
         });
       });
     }
     this.activeRuns++;
+    await this.executeBotInner(botId, trigger, event, webhookPayload);
+  }
+
+  /** Inner execution logic — called after rate limiting and concurrency checks */
+  private async executeBotInner(
+    botId: string,
+    trigger: BotTriggerType,
+    event?: BotEvent,
+    webhookPayload?: Record<string, unknown>,
+  ): Promise<void> {
+    const config = this.configs.get(botId);
+    if (!config) {
+      this.activeRuns--;
+      return;
+    }
 
     const runId = nanoid();
     const startTime = Date.now();
@@ -300,7 +327,7 @@ export class BotManager {
     });
 
     const ctx: BotContext = {
-      botConfig: { ...config, config: decryptConfigSecrets(config.config) },
+      botConfig: { ...config, config: this.decryptedConfigs.get(botId) || config.config },
       botUserId: config.userId,
       runId,
       trigger,

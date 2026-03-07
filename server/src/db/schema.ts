@@ -311,7 +311,7 @@ export const botConfigs = pgTable('bot_configs', {
   config: jsonb('config').notNull().default({}),    // bot-specific settings (secrets encrypted within)
   capabilities: jsonb('capabilities').notNull().default([]),
   allowedDomains: jsonb('allowed_domains').notNull().default([]),
-  scopeType: text('scope_type', { enum: ['global', 'investigation', 'tag-based'] }).notNull().default('investigation'),
+  scopeType: text('scope_type', { enum: ['global', 'investigation'] }).notNull().default('investigation'),
   scopeFolderIds: jsonb('scope_folder_ids').notNull().default([]),
   rateLimitPerHour: integer('rate_limit_per_hour').notNull().default(100),
   rateLimitPerDay: integer('rate_limit_per_day').notNull().default(1000),

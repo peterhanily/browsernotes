@@ -61,7 +61,7 @@ export interface BotConfig {
   config: Record<string, unknown>;  // bot-specific settings (encrypted secrets within)
   capabilities: BotCapability[];
   allowedDomains: string[];      // outbound HTTP domain allowlist
-  scopeType: 'global' | 'investigation' | 'tag-based';
+  scopeType: 'global' | 'investigation';
   scopeFolderIds: string[];      // which investigations this bot can access
   rateLimitPerHour: number;
   rateLimitPerDay: number;

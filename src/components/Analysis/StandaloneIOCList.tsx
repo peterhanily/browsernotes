@@ -88,7 +88,7 @@ export function StandaloneIOCList({
             <TableVirtuoso
               data={iocs}
               components={{
-                Table: (props) => <table {...props} className="w-full text-xs" />,
+                Table: (props) => <table {...props} className="w-full min-w-[640px] text-xs" />,
                 TableHead: forwardRef((props, ref) => <thead ref={ref} {...props} />),
                 TableRow: (props) => <tr {...props} className="border-b border-gray-800/50 group" />,
                 TableBody: forwardRef((props, ref) => <tbody ref={ref} {...props} />),

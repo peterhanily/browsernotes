@@ -285,15 +285,15 @@ export function SearchOverlay({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" onKeyDown={handleKeyDown}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] sm:pt-[10vh]" onKeyDown={handleKeyDown}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Overlay panel */}
-      <div className="relative w-full max-w-2xl mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col max-h-[70vh]">
+      <div className="relative w-full max-w-2xl mx-2 sm:mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[70vh]">
         {/* Header: mode toggle + input */}
         <div className="p-3 border-b border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             {/* Mode toggle */}
             <div className="flex rounded-lg border border-gray-700 overflow-hidden shrink-0">
               {modes.map((m) => (

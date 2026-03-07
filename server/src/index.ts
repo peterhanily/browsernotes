@@ -8,7 +8,7 @@ import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
@@ -31,9 +31,12 @@ import { handleWSConnection, handleWSMessage, handleWSClose } from './ws/handler
 import { db, sql as pgSql } from './db/index.js';
 import { sessions } from './db/schema.js';
 import { rateLimiter } from './middleware/rate-limit.js';
+import { requestId } from './middleware/request-id.js';
+import { globalErrorHandler } from './middleware/error-handler.js';
 import { logger } from './lib/logger.js';
 
 const app = new Hono();
+app.onError(globalErrorHandler);
 const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
 // Configurable CORS
@@ -59,6 +62,7 @@ app.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 });
 
+app.use('*', requestId);
 app.use('*', cors({
   origin: corsOrigin,
   allowHeaders: ['Content-Type', 'Authorization'],
@@ -82,7 +86,15 @@ app.use('/api/caddyshack/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
 app.use('/api/backups', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.use('/api/bots/*/webhook', rateLimiter({ windowMs: 60_000, max: 30 }));
 
-// Health check with DB connectivity and file storage
+// Read version once at startup
+let serverVersion = 'unknown';
+try {
+  const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json');
+  const pkgRaw = await readFile(pkgPath, 'utf-8');
+  serverVersion = (JSON.parse(pkgRaw) as { version?: string }).version ?? 'unknown';
+} catch { /* leave as unknown */ }
+
+// Health check with DB connectivity, file storage, memory & uptime
 app.get('/health', async (c) => {
   const checks: Record<string, string> = {};
 
@@ -104,7 +116,20 @@ app.get('/health', async (c) => {
   }
 
   const ok = Object.values(checks).every(v => v === 'connected' || v === 'accessible');
-  return c.json({ status: ok ? 'ok' : 'degraded', ...checks, timestamp: new Date().toISOString() }, ok ? 200 : 503);
+
+  const mem = process.memoryUsage();
+  return c.json({
+    status: ok ? 'ok' : 'degraded',
+    ...checks,
+    version: serverVersion,
+    uptime: Math.round(process.uptime()),
+    memory: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+    },
+    timestamp: new Date().toISOString(),
+  }, ok ? 200 : 503);
 });
 
 // Public server info (no auth required — needed by CaddyShack)
@@ -144,6 +169,7 @@ app.get('/ws', upgradeWebSocket(() => {
 
 // ─── Admin panel on a separate port ─────────────────────────────
 const adminApp = new Hono();
+adminApp.onError(globalErrorHandler);
 
 // Admin security headers
 adminApp.use('*', async (c, next) => {
@@ -154,6 +180,8 @@ adminApp.use('*', async (c, next) => {
   c.header('X-DNS-Prefetch-Control', 'off');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 });
+
+adminApp.use('*', requestId);
 
 // Admin CORS: reject all cross-origin requests (admin UI is same-origin)
 adminApp.use('*', cors({
@@ -252,6 +280,19 @@ async function main() {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
+
+// ─── Process-level error tracking ────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', {
+    error: String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  process.exit(1);
+});
 
 main().catch((err) => {
   logger.error('Failed to start server', { error: String(err) });

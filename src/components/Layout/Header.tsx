@@ -68,7 +68,7 @@ export function Header({
       {/* Mobile: toggle mobile overlay sidebar */}
       <button
         onClick={onMobileMenuToggle}
-        className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors md:hidden"
+        className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-label="Toggle menu"
         title="Toggle menu"
       >

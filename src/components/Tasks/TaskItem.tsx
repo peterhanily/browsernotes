@@ -61,7 +61,7 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
         onClick={() => onSelect(task.id)}
         className="flex-1 text-left min-w-0"
       >
-        <span className={cn('text-sm', task.completed ? 'text-gray-500 line-through' : 'text-gray-200')}>
+        <span className={cn('text-sm truncate block', task.completed ? 'text-gray-500 line-through' : 'text-gray-200')}>
           {task.title || 'Untitled task'}
         </span>
       </button>

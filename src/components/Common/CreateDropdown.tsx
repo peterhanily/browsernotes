@@ -54,7 +54,7 @@ export function CreateDropdown({ onQuickNote, onNewNote, onNewTask, onNewTimelin
             <button
               key={item.label}
               onClick={() => { item.action(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700"
+              className="w-full flex items-center gap-2 px-3 py-2 sm:py-1.5 text-xs text-gray-300 hover:bg-gray-700 min-h-[44px] sm:min-h-0"
             >
               <item.icon size={14} />
               {item.label}

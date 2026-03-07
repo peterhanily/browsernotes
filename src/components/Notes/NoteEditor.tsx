@@ -608,11 +608,11 @@ export function NoteEditor({
         {onBack && (
           <button
             onClick={onBack}
-            className="p-1.5 rounded text-gray-500 hover:text-gray-300 md:hidden"
+            className="p-1.5 rounded text-gray-500 hover:text-gray-300 md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Back to notes list"
             title="Back to list"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} />
           </button>
         )}
         <button
@@ -686,7 +686,7 @@ export function NoteEditor({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="hidden sm:flex items-center gap-1">
           <Briefcase size={16} className="text-gray-500" />
           <select
             value={note.folderId || ''}

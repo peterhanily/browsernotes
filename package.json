@@ -16,7 +16,9 @@
     "test:coverage": "vitest run --coverage",
     "build:extension": "cd extension && npm run build",
     "build:extension:chrome": "cd extension && npm run build:chrome",
-    "build:extension:firefox": "cd extension && npm run build:firefox"
+    "build:extension:firefox": "cd extension && npm run build:firefox",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
@@ -41,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

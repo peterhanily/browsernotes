@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield } from 'lucide-react';
+import { Plus, Trash2, MessageSquare, Share2, Pencil, FileText, Key, Puzzle, Shield, ArrowLeft } from 'lucide-react';
 import type { ChatThread, ChatMessage, LLMProvider, Settings, Folder, ToolUseBlock } from '../../types';
 import { ChatMessageBubble } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -348,8 +348,11 @@ export function ChatView({
 
   return (
     <div className="relative flex flex-1 overflow-hidden">
-      {/* Thread list */}
-      <div className="w-56 border-r border-border-subtle flex flex-col shrink-0">
+      {/* Thread list — hidden on mobile when a thread is selected */}
+      <div className={cn(
+        'w-56 border-r border-border-subtle flex flex-col shrink-0',
+        activeThread ? 'hidden md:flex' : 'w-full md:w-56'
+      )}>
         <div className="p-2 border-b border-border-subtle">
           <button
             onClick={handleNewChat}
@@ -399,12 +402,20 @@ export function ChatView({
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Chat area — hidden on mobile when no thread selected */}
+      <div className={cn('flex-1 flex flex-col min-w-0', !activeThread && 'hidden md:flex')}>
         {activeThread ? (
           <>
             {/* Header toolbar */}
             <div className="flex items-center gap-2 px-4 py-2 border-b border-border-subtle shrink-0">
+              {/* Mobile back button */}
+              <button
+                onClick={() => onSelectThread('')}
+                className="md:hidden p-1.5 -ml-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Back to threads"
+              >
+                <ArrowLeft size={18} />
+              </button>
               {editingTitle ? (
                 <input
                   ref={titleInputRef}

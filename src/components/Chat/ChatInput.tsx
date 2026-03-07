@@ -234,7 +234,7 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
         {isStreaming ? (
           <button
             onClick={onStop}
-            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+            className="shrink-0 w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
             title="Stop generating"
           >
             <Square size={14} />
@@ -243,7 +243,7 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
           <button
             onClick={handleSend}
             disabled={!text.trim() || !extensionAvailable || disabled}
-            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-purple/20 text-purple hover:bg-purple/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="shrink-0 w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-purple/20 text-purple hover:bg-purple/30 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             title="Send message"
           >
             <Send size={14} />

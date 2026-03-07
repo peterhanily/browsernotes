@@ -1,0 +1,4435 @@
+openapi: 3.1.0
+info:
+  title: ThreatCaddy API
+  version: 1.0.0
+  description: |
+    ThreatCaddy is a collaborative threat investigation platform. This API powers
+    the Chrome extension and web clients, providing authentication, real-time sync,
+    investigation management, a social feed ("CaddyShack"), file uploads, LLM chat,
+    audit logging, notifications, user profiles, bot automation, and backups.
+
+    **Two servers run on separate ports:**
+    - **Main API** (default 3001) -- all `/api/*` and `/health` endpoints
+    - **Admin API** (default 3002) -- all `/admin/*` endpoints, served on an internal-only port
+
+servers:
+  - url: http://localhost:3001
+    description: Main API server (configurable via PORT env)
+  - url: http://localhost:3002
+    description: Admin panel server (configurable via ADMIN_PORT env)
+
+tags:
+  - name: Health
+    description: Health check endpoint
+  - name: Server
+    description: Public server info
+  - name: Auth
+    description: User authentication (register, login, refresh, logout, profile)
+  - name: Sync
+    description: Real-time data synchronization (push/pull/snapshot)
+  - name: Investigations
+    description: Investigation (folder) management and membership
+  - name: Feed
+    description: CaddyShack social feed -- posts, replies, reactions
+  - name: Files
+    description: File upload and retrieval
+  - name: Backups
+    description: Encrypted backup upload, listing, download, and deletion
+  - name: LLM
+    description: LLM chat proxy with SSE streaming
+  - name: Audit
+    description: Activity audit log
+  - name: Notifications
+    description: User notifications
+  - name: Users
+    description: User profiles, search, feeds, and admin user management
+  - name: Bots
+    description: Bot automation -- CRUD, webhook, trigger, run history
+  - name: Admin
+    description: Admin panel -- setup, login, accounts, settings, investigations, users, bots, audit, AI assistant
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User JWT access token obtained from /api/auth/login or /api/auth/register
+    AdminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin JWT token obtained from /admin/api/login or /admin/api/bootstrap
+    WebhookHMAC:
+      type: apiKey
+      in: header
+      name: X-Webhook-Signature
+      description: "HMAC-SHA256 signature of the request body, prefixed with `sha256=`"
+    WebhookSecret:
+      type: apiKey
+      in: header
+      name: X-Webhook-Secret
+      description: Raw webhook secret for simple authentication
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          const: true
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [admin, analyst, viewer]
+        avatarUrl:
+          type: string
+          nullable: true
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+
+    SyncChange:
+      type: object
+      properties:
+        table:
+          type: string
+        op:
+          type: string
+          enum: [put, delete]
+        entityId:
+          type: string
+        data:
+          type: object
+        clientVersion:
+          type: integer
+
+    SyncResult:
+      type: object
+      properties:
+        table:
+          type: string
+        entityId:
+          type: string
+        status:
+          type: string
+          enum: [accepted, conflict, rejected]
+        serverVersion:
+          type: integer
+        serverData:
+          type: object
+        serverRecord:
+          type: object
+
+    InvestigationMembership:
+      type: object
+      properties:
+        folderId:
+          type: string
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+        joinedAt:
+          type: string
+          format: date-time
+        folderName:
+          type: string
+        folderStatus:
+          type: string
+        folderColor:
+          type: string
+        folderIcon:
+          type: string
+
+    InvestigationMember:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+        joinedAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+        authorId:
+          type: string
+        content:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        folderId:
+          type: string
+          nullable: true
+        parentId:
+          type: string
+          nullable: true
+        replyToId:
+          type: string
+          nullable: true
+        mentions:
+          type: array
+          items:
+            type: string
+        pinned:
+          type: boolean
+        deleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        authorDisplayName:
+          type: string
+        authorAvatarUrl:
+          type: string
+          nullable: true
+        reactions:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              count:
+                type: integer
+              userIds:
+                type: array
+                items:
+                  type: string
+        replyCount:
+          type: integer
+
+    Attachment:
+      type: object
+      required: [id, url, type, mimeType, filename]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        type:
+          type: string
+          enum: [image, video, audio, document]
+        mimeType:
+          type: string
+        filename:
+          type: string
+
+    FileUploadResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+        mimeType:
+          type: string
+        size:
+          type: integer
+        filename:
+          type: string
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        sourceUserId:
+          type: string
+          nullable: true
+        postId:
+          type: string
+          nullable: true
+        folderId:
+          type: string
+          nullable: true
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        sourceUserDisplayName:
+          type: string
+          nullable: true
+        sourceUserAvatarUrl:
+          type: string
+          nullable: true
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        category:
+          type: string
+        action:
+          type: string
+        detail:
+          type: string
+        itemId:
+          type: string
+          nullable: true
+        itemTitle:
+          type: string
+          nullable: true
+        folderId:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        userDisplayName:
+          type: string
+        userAvatarUrl:
+          type: string
+          nullable: true
+
+    Backup:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [full, differential]
+        scope:
+          type: string
+          enum: [all, investigation, entity]
+        scopeId:
+          type: string
+          nullable: true
+        entityCount:
+          type: integer
+        sizeBytes:
+          type: integer
+        parentBackupId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    BotConfig:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          type: object
+
+    BotRun:
+      type: object
+      properties:
+        id:
+          type: string
+        botConfigId:
+          type: string
+        trigger:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        active:
+          type: boolean
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        db:
+          type: string
+          enum: [connected, disconnected]
+        storage:
+          type: string
+          enum: [accessible, inaccessible]
+        timestamp:
+          type: string
+          format: date-time
+
+paths:
+  # ─── Health ──────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns DB and file-storage connectivity status.
+      security: []
+      responses:
+        '200':
+          description: All systems operational
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: One or more subsystems degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # ─── Server Info ─────────────────────────────────────────────────
+  /api/server/info:
+    get:
+      tags: [Server]
+      summary: Get server info
+      description: Returns public server metadata (no auth required).
+      security: []
+      responses:
+        '200':
+          description: Server info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serverName:
+                    type: string
+
+  # ─── Auth ────────────────────────────────────────────────────────
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: |
+        Creates a new user account. Registration may be open or invite-only
+        depending on the server's registration mode. Rate limited to 5 req/min.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, displayName, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 15
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Registration is invite-only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      description: Authenticates with email and password. Rate limited to 10 req/min.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account disabled or bot account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: |
+        Exchanges a refresh token for a new access token + refresh token pair.
+        The old refresh token is rotated (deleted). Rate limited to 20 req/min.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '400':
+          description: Missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out
+      description: Invalidates the provided refresh token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  email:
+                    type: string
+                  displayName:
+                    type: string
+                  role:
+                    type: string
+                  avatarUrl:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Auth]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 15
+                avatarUrl:
+                  type: string
+                  format: uri
+                  nullable: true
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password
+      description: Changes the current user's password. Invalidates all existing sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Incorrect current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Sync ────────────────────────────────────────────────────────
+  /api/sync/push:
+    post:
+      tags: [Sync]
+      summary: Push changes
+      description: |
+        Pushes an array of entity changes to the server. Each change is authorized
+        against the user's investigation membership. Accepted changes are broadcast
+        via WebSocket. Auto-creates owner membership for newly created folders.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [changes]
+              properties:
+                changes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SyncChange'
+      responses:
+        '200':
+          description: Push results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SyncResult'
+
+  /api/sync/pull:
+    get:
+      tags: [Sync]
+      summary: Pull changes since timestamp
+      description: |
+        Returns entities modified since the given timestamp. If folderId is specified,
+        only that folder's changes are returned (requires viewer access). Otherwise,
+        returns changes from all folders the user is a member of.
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: ISO timestamp to pull changes since
+        - name: folderId
+          in: query
+          schema:
+            type: string
+          description: Optional folder ID to scope the pull
+      responses:
+        '200':
+          description: Changes since the given timestamp
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                  serverTimestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: Missing since parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: No access to specified investigation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/sync/snapshot/{folderId}:
+    get:
+      tags: [Sync]
+      summary: Get full snapshot of a folder
+      description: Returns all current data for a folder. Requires viewer access.
+      parameters:
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full folder snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                description: All entity data for the folder
+        '403':
+          description: No access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Investigations ─────────────────────────────────────────────
+  /api/investigations:
+    get:
+      tags: [Investigations]
+      summary: List user's investigations
+      description: Returns all investigations the authenticated user is a member of.
+      responses:
+        '200':
+          description: List of investigation memberships
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvestigationMembership'
+
+  /api/investigations/{id}:
+    delete:
+      tags: [Investigations]
+      summary: Delete investigation
+      description: Permanently deletes an investigation and all its content. Owner only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Investigation deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '403':
+          description: Not an owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/investigations/{id}/members:
+    get:
+      tags: [Investigations]
+      summary: List investigation members
+      description: Returns all members of an investigation. Requires viewer access.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InvestigationMember'
+        '403':
+          description: No access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Investigations]
+      summary: Add member by user ID
+      description: Adds a user to the investigation. Owner only. Sends notification to invited user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+                  enum: [owner, editor, viewer]
+                  default: editor
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already a member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/investigations/{id}/members/{userId}:
+    patch:
+      tags: [Investigations]
+      summary: Update member role
+      description: Changes a member's role in the investigation. Owner only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [owner, editor, viewer]
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Investigations]
+      summary: Remove member
+      description: Removes a member from the investigation. Users can remove themselves; owners can remove others.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/investigations/{id}/invite:
+    post:
+      tags: [Investigations]
+      summary: Invite member by email
+      description: Invites a user by email address. Owner only. Sends notification to invited user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [owner, editor, viewer]
+                  default: editor
+      responses:
+        '201':
+          description: User invited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already a member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Feed (CaddyShack) ──────────────────────────────────────────
+  /api/caddyshack:
+    get:
+      tags: [Feed]
+      summary: Get paginated feed
+      description: |
+        Returns top-level posts in reverse chronological order.
+        Optionally scoped to a folder (requires viewer access).
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Cursor for pagination (createdAt of last post)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: folderId
+          in: query
+          schema:
+            type: string
+          description: Optional folder ID to scope the feed
+      responses:
+        '200':
+          description: Array of posts with reactions and reply counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '403':
+          description: No access to folder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/caddyshack/posts:
+    post:
+      tags: [Feed]
+      summary: Create a post
+      description: |
+        Creates a new post or reply. Supports attachments and mentions.
+        Rate limited to 30 req/min. Content max 50,000 characters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 50000
+                attachments:
+                  type: array
+                  maxItems: 10
+                  items:
+                    $ref: '#/components/schemas/Attachment'
+                mentions:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    maxLength: 128
+                folderId:
+                  type: string
+                  nullable: true
+                parentId:
+                  type: string
+                  nullable: true
+                  description: ID of the post being replied to
+                replyToId:
+                  type: string
+                  nullable: true
+                  description: Direct reply target (for flat threading)
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: No access to investigation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Parent post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/caddyshack/posts/{id}:
+    get:
+      tags: [Feed]
+      summary: Get post with replies
+      description: Returns a post and all its flat replies with reactions.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post with replies
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Post'
+                  - type: object
+                    properties:
+                      replies:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Post'
+        '403':
+          description: No access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Feed]
+      summary: Edit post
+      description: Edits a post's content or pinned status. Author or admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  maxLength: 50000
+                pinned:
+                  type: boolean
+      responses:
+        '200':
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Feed]
+      summary: Soft-delete post
+      description: Marks a post as deleted. Author or admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Post deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/caddyshack/posts/{id}/reactions:
+    post:
+      tags: [Feed]
+      summary: Add reaction
+      description: Adds an emoji reaction to a post. One reaction per emoji per user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emoji]
+              properties:
+                emoji:
+                  type: string
+                  maxLength: 32
+      responses:
+        '201':
+          description: Reaction added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Already reacted with this emoji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/caddyshack/posts/{id}/reactions/{emoji}:
+    delete:
+      tags: [Feed]
+      summary: Remove reaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: emoji
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reaction removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  # ─── Files ──────────────────────────────────────────────────────
+  /api/files/upload:
+    post:
+      tags: [Files]
+      summary: Upload a file
+      description: |
+        Multipart file upload. Max 50MB. Generates thumbnails for images.
+        Requires admin or analyst role. SVG uploads are blocked.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folderId:
+                  type: string
+                  description: Optional investigation folder to associate the file with
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '400':
+          description: No file, disallowed type, or SVG detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File too large (max 50MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/files/{id}:
+    get:
+      tags: [Files]
+      summary: Download a file
+      description: |
+        Serves the file with appropriate Content-Type and Content-Disposition.
+        Access requires investigation membership (for folder-scoped files) or
+        being the uploader (for unscoped files).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: No access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/files/{id}/thumbnail:
+    get:
+      tags: [Files]
+      summary: Download file thumbnail
+      description: Serves the WebP thumbnail for an image file.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thumbnail image (WebP)
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: No access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Thumbnail not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Backups ─────────────────────────────────────────────────────
+  /api/backups:
+    post:
+      tags: [Backups]
+      summary: Upload encrypted backup
+      description: |
+        Uploads a client-encrypted backup blob with metadata.
+        Max 50 backups per user. Rate limited to 5 req/min.
+        Body limit 100MB.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [metadata, blob]
+              properties:
+                metadata:
+                  type: string
+                  description: |
+                    JSON string with fields: name (required), type (full|differential),
+                    scope (all|investigation|entity), scopeId, entityCount, parentBackupId
+                blob:
+                  type: string
+                  format: binary
+                  description: Encrypted backup data
+      responses:
+        '201':
+          description: Backup created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Backup'
+        '400':
+          description: Missing fields, invalid metadata, or backup limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Backups]
+      summary: List user's backups
+      description: Returns all backups belonging to the authenticated user.
+      responses:
+        '200':
+          description: List of backups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Backup'
+
+  /api/backups/{id}:
+    get:
+      tags: [Backups]
+      summary: Download backup
+      description: Downloads the encrypted backup blob. Only accessible by the owning user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Encrypted backup data
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Backup not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Backups]
+      summary: Delete backup
+      description: Deletes a backup and its file from disk. Only accessible by the owning user.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backup deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Backup not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── LLM ────────────────────────────────────────────────────────
+  /api/llm/chat:
+    post:
+      tags: [LLM]
+      summary: Chat with LLM (SSE streaming)
+      description: |
+        Proxies a chat request to the configured LLM provider and streams
+        the response via Server-Sent Events. Requires admin or analyst role.
+        Rate limited to 20 req/min.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, model, messages]
+              properties:
+                provider:
+                  type: string
+                  description: LLM provider (anthropic, openai, gemini, mistral)
+                model:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        oneOf:
+                          - type: string
+                          - type: array
+                systemPrompt:
+                  type: string
+                tools:
+                  type: array
+      responses:
+        '200':
+          description: SSE stream with chunks, done, or error events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Events: { type: "chunk", content: string },
+                  { type: "done", stopReason: string },
+                  { type: "error", error: string }
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/llm/config:
+    get:
+      tags: [LLM]
+      summary: Get available LLM providers
+      description: Returns the list of providers with configured API keys (keys not exposed).
+      responses:
+        '200':
+          description: Available providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                        models:
+                          type: array
+                          items:
+                            type: string
+
+  # ─── Audit ──────────────────────────────────────────────────────
+  /api/audit:
+    get:
+      tags: [Audit]
+      summary: Query audit log
+      description: |
+        Returns audit log entries. Non-admin users must specify a folderId and
+        be an owner of that investigation. Admin users can query without restrictions.
+      parameters:
+        - name: folderId
+          in: query
+          schema:
+            type: string
+          description: Required for non-admin users
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLogEntry'
+        '400':
+          description: folderId required (non-admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an investigation owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Notifications ──────────────────────────────────────────────
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Returns the current user's notifications, optionally filtered to unread only.
+      parameters:
+        - name: unread
+          in: query
+          schema:
+            type: string
+            enum: ['true']
+          description: Set to "true" to return only unread notifications
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  /api/notifications/read:
+    delete:
+      tags: [Notifications]
+      summary: Delete all read notifications
+      description: Permanently removes all read notifications for the current user.
+      responses:
+        '200':
+          description: Read notifications deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  deleted:
+                    type: integer
+
+  /api/notifications/mark-all-read:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  # ─── Users ──────────────────────────────────────────────────────
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List or search users
+      description: |
+        With `search` query: any authenticated user can search by display name or email (returns max 20 active users).
+        Without `search`: requires admin role, returns full user list.
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by display name or email (case insensitive)
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    email:
+                      type: string
+                    displayName:
+                      type: string
+                    avatarUrl:
+                      type: string
+                      nullable: true
+                    role:
+                      type: string
+                    active:
+                      type: boolean
+                    lastLoginAt:
+                      type: string
+                      format: date-time
+                      description: Only included in admin (no-search) response
+                    createdAt:
+                      type: string
+                      format: date-time
+                      description: Only included in admin (no-search) response
+        '403':
+          description: Admin access required (when no search query)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  email:
+                    type: string
+                  displayName:
+                    type: string
+                  avatarUrl:
+                    type: string
+                    nullable: true
+                  role:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Users]
+      summary: Admin update user
+      description: Update a user's role, active status, or display name. Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [admin, analyst, viewer]
+                active:
+                  type: boolean
+                displayName:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+    delete:
+      tags: [Users]
+      summary: Deactivate user (admin)
+      description: Deactivates a user, invalidates all sessions, and disconnects WebSocket. Admin only. Cannot deactivate yourself.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Cannot deactivate yourself
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/users/{id}/feed:
+    get:
+      tags: [Users]
+      summary: Get user's post timeline
+      description: Returns the target user's non-deleted posts (global and investigation-scoped), filtered to ones the requesting user can access. Max 50.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User's posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /api/users/{id}/likes:
+    get:
+      tags: [Users]
+      summary: Get posts the user has liked
+      description: Returns posts that the target user has reacted to, filtered by the requesting user's access. Max 50.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liked posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /api/users/{id}/activity:
+    get:
+      tags: [Users]
+      summary: Get user's recent activity
+      description: Returns the target user's recent audit log entries, filtered by folder access. Max 50.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Activity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    category:
+                      type: string
+                    action:
+                      type: string
+                    detail:
+                      type: string
+                    itemId:
+                      type: string
+                      nullable: true
+                    itemTitle:
+                      type: string
+                      nullable: true
+                    folderId:
+                      type: string
+                      nullable: true
+                    timestamp:
+                      type: string
+                      format: date-time
+
+  # ─── Bots ───────────────────────────────────────────────────────
+  /api/bots:
+    get:
+      tags: [Bots]
+      summary: List all bots
+      description: Requires admin or analyst role.
+      responses:
+        '200':
+          description: Bot list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotConfig'
+    post:
+      tags: [Bots]
+      summary: Create a new bot
+      description: Admin only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Bot creation payload (validated by bot-service)
+      responses:
+        '201':
+          description: Bot created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bot:
+                    $ref: '#/components/schemas/BotConfig'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}:
+    get:
+      tags: [Bots]
+      summary: Get bot config
+      description: Requires admin or analyst role.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bot:
+                    $ref: '#/components/schemas/BotConfig'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Bots]
+      summary: Update bot config
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Bot updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Bots]
+      summary: Delete bot
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}/enable:
+    post:
+      tags: [Bots]
+      summary: Enable bot
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  enabled:
+                    type: boolean
+                    const: true
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}/disable:
+    post:
+      tags: [Bots]
+      summary: Disable bot
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  enabled:
+                    type: boolean
+                    const: false
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}/trigger:
+    post:
+      tags: [Bots]
+      summary: Manually trigger bot
+      description: Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Bot error (e.g., not enabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}/webhook:
+    post:
+      tags: [Bots]
+      summary: Webhook endpoint
+      description: |
+        Receives webhook events for a bot. Authenticated via HMAC-SHA256 signature
+        (X-Webhook-Signature header with `sha256=` prefix) or raw secret
+        (X-Webhook-Secret header). No Bearer token required.
+        Rate limited to 30 req/min.
+      security:
+        - WebhookHMAC: []
+        - WebhookSecret: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Webhook payload (passed to bot execution)
+      responses:
+        '200':
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid JSON body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid webhook secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bots/{id}/runs:
+    get:
+      tags: [Bots]
+      summary: Get bot run history
+      description: Requires admin or analyst role.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotRun'
+
+  /api/bots/{id}/runs/{runId}:
+    get:
+      tags: [Bots]
+      summary: Get bot run detail
+      description: Requires admin or analyst role.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run:
+                    $ref: '#/components/schemas/BotRun'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Admin Panel (port 3002) ────────────────────────────────────
+
+  /admin:
+    get:
+      tags: [Admin]
+      summary: Admin panel HTML page
+      description: Returns the admin panel SPA. Sets CSP headers with a nonce.
+      security: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: HTML page
+
+  /admin/api/setup-status:
+    get:
+      tags: [Admin]
+      summary: Check if admin accounts exist
+      description: Used by the admin UI to decide whether to show the login or setup form.
+      security: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasAdminAccounts:
+                    type: boolean
+
+  /admin/api/bootstrap:
+    post:
+      tags: [Admin]
+      summary: Create first admin account
+      description: Uses the bootstrap secret (from ADMIN_SECRET env var) to create the first admin account.
+      security: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bootstrapSecret, username, displayName, password]
+              properties:
+                bootstrapSecret:
+                  type: string
+                username:
+                  type: string
+                  minLength: 2
+                  pattern: "^[a-zA-Z0-9._-]+$"
+                displayName:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  minLength: 12
+      responses:
+        '200':
+          description: Admin account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  admin:
+                    $ref: '#/components/schemas/AdminAccount'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid bootstrap secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/login:
+    post:
+      tags: [Admin]
+      summary: Admin login
+      description: Authenticates admin user. Rate limited to 5 req/min.
+      security: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  admin:
+                    $ref: '#/components/schemas/AdminAccount'
+        '400':
+          description: Missing credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/admin-accounts:
+    get:
+      tags: [Admin]
+      summary: List admin accounts
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Admin accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminAccount'
+    post:
+      tags: [Admin]
+      summary: Create admin account
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, displayName, password]
+              properties:
+                username:
+                  type: string
+                  minLength: 2
+                  pattern: "^[a-zA-Z0-9._-]+$"
+                displayName:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  minLength: 12
+      responses:
+        '201':
+          description: Admin account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  admin:
+                    $ref: '#/components/schemas/AdminAccount'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/admin-accounts/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update admin account
+      description: Update display name or active status. Cannot disable your own account.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error or self-disable attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Admin]
+      summary: Delete admin account
+      description: Cannot delete your own account.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Cannot delete yourself
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/admin-accounts/me/change-password:
+    post:
+      tags: [Admin]
+      summary: Change own admin password
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 12
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Incorrect current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/admin-accounts/{id}/reset-password:
+    post:
+      tags: [Admin]
+      summary: Reset another admin's password
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 12
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/stats:
+    get:
+      tags: [Admin]
+      summary: Get server statistics
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Server stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUsers:
+                    type: integer
+                  activeUsers:
+                    type: integer
+                  investigations:
+                    type: integer
+                  activeSessions:
+                    type: integer
+                  auditLogEntries24h:
+                    type: integer
+
+  /admin/api/settings:
+    get:
+      tags: [Admin]
+      summary: Get server settings
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Server settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  serverName:
+                    type: string
+                  registrationMode:
+                    type: string
+                    enum: [open, invite]
+                  ttlHours:
+                    type: integer
+                    description: Session TTL in hours
+                  maxPerUser:
+                    type: integer
+                    description: Max sessions per user (0 = unlimited)
+                  notificationRetentionDays:
+                    type: integer
+                  auditLogRetentionDays:
+                    type: integer
+    patch:
+      tags: [Admin]
+      summary: Update server settings
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serverName:
+                  type: string
+                  maxLength: 100
+                registrationMode:
+                  type: string
+                  enum: [open, invite]
+                ttlHours:
+                  type: integer
+                  minimum: 1
+                maxPerUser:
+                  type: integer
+                  minimum: 0
+                notificationRetentionDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 3650
+                auditLogRetentionDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 3650
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  serverName:
+                    type: string
+                  registrationMode:
+                    type: string
+                  ttlHours:
+                    type: integer
+                  maxPerUser:
+                    type: integer
+                  notificationRetentionDays:
+                    type: integer
+                  auditLogRetentionDays:
+                    type: integer
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/allowed-emails:
+    get:
+      tags: [Admin]
+      summary: List allowed emails (invite list)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Allowed emails
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emails:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        email:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+    post:
+      tags: [Admin]
+      summary: Add email to allowlist
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Email added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  email:
+                    type: string
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/allowed-emails/{email}:
+    delete:
+      tags: [Admin]
+      summary: Remove email from allowlist
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Email not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users:
+    get:
+      tags: [Admin]
+      summary: List all users (admin)
+      description: Returns all non-bot users.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        email:
+                          type: string
+                        displayName:
+                          type: string
+                        role:
+                          type: string
+                        active:
+                          type: boolean
+                        lastLoginAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        createdAt:
+                          type: string
+                          format: date-time
+    post:
+      tags: [Admin]
+      summary: Create user (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, displayName, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                displayName:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [admin, analyst, viewer]
+                  default: analyst
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                      displayName:
+                        type: string
+                      role:
+                        type: string
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update user (admin panel)
+      description: Update role or active status.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [admin, analyst, viewer]
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users/{id}/reset-password:
+    post:
+      tags: [Admin]
+      summary: Reset user password (admin)
+      description: Generates a temporary password for the user.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Temporary password generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  temporaryPassword:
+                    type: string
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users/{id}/detail:
+    get:
+      tags: [Admin]
+      summary: Get user detail (admin)
+      description: Returns user info, active sessions, investigation memberships, and recent activity.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User detail composite
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                  memberships:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        folderId:
+                          type: string
+                        role:
+                          type: string
+                        folderName:
+                          type: string
+                          nullable: true
+                  recentActivity:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users/bulk:
+    post:
+      tags: [Admin]
+      summary: Bulk user action
+      description: Perform bulk actions (changeRole, enable, disable) on multiple users.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds, action]
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                action:
+                  type: string
+                  enum: [changeRole, enable, disable]
+                role:
+                  type: string
+                  enum: [admin, analyst, viewer]
+                  description: Required when action is "changeRole"
+      responses:
+        '200':
+          description: Bulk action applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  affected:
+                    type: integer
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/users/export:
+    get:
+      tags: [Admin]
+      summary: Export users as CSV
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /admin/api/change-secret:
+    post:
+      tags: [Admin]
+      summary: Change admin bootstrap secret
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentSecret, newSecret]
+              properties:
+                currentSecret:
+                  type: string
+                newSecret:
+                  type: string
+                  minLength: 12
+      responses:
+        '200':
+          description: Secret changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Incorrect current secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/sessions:
+    get:
+      tags: [Admin]
+      summary: List active sessions
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        userId:
+                          type: string
+                        userEmail:
+                          type: string
+                        userDisplayName:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+
+  /admin/api/sessions/user/{userId}:
+    delete:
+      tags: [Admin]
+      summary: Force-logout a user
+      description: Deletes all sessions for a specific user.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sessions deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  deletedCount:
+                    type: integer
+
+  /admin/api/sessions/all:
+    delete:
+      tags: [Admin]
+      summary: Force-logout all users
+      description: Deletes all sessions server-wide.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: All sessions deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  deletedCount:
+                    type: integer
+
+  /admin/api/investigations:
+    get:
+      tags: [Admin]
+      summary: List all investigations (admin)
+      description: Returns all investigations with creator info and member counts.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Investigation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  investigations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        status:
+                          type: string
+                        color:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        creatorName:
+                          type: string
+                        creatorEmail:
+                          type: string
+                        memberCount:
+                          type: integer
+
+  /admin/api/investigations/{id}/detail:
+    get:
+      tags: [Admin]
+      summary: Get investigation detail (admin)
+      description: Returns investigation metadata, members, and entity counts.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Investigation detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  investigation:
+                    type: object
+                  members:
+                    type: array
+                    items:
+                      type: object
+                  entityCounts:
+                    type: object
+                    properties:
+                      notes:
+                        type: integer
+                      tasks:
+                        type: integer
+                      timelineEvents:
+                        type: integer
+                      whiteboards:
+                        type: integer
+                      standaloneIOCs:
+                        type: integer
+                      chatThreads:
+                        type: integer
+                      files:
+                        type: integer
+        '404':
+          description: Investigation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/investigations/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update investigation status (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [active, closed, archived]
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/investigations/{id}/members:
+    post:
+      tags: [Admin]
+      summary: Add member (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+                  enum: [owner, editor, viewer]
+                  default: editor
+      responses:
+        '200':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/investigations/{id}/members/{userId}:
+    patch:
+      tags: [Admin]
+      summary: Update member role (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [owner, editor, viewer]
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Admin]
+      summary: Remove member (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/investigations/{id}/content:
+    delete:
+      tags: [Admin]
+      summary: Purge investigation and all content
+      description: |
+        Permanently deletes an investigation and all its content (notes, tasks, timeline events,
+        whiteboards, IOCs, chat threads, posts, files, notifications, and memberships).
+        Requires confirmation by providing the investigation name.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmName]
+              properties:
+                confirmName:
+                  type: string
+                  description: Must match the investigation's name exactly
+      responses:
+        '200':
+          description: Investigation purged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  deleted:
+                    type: object
+                    description: Count of deleted entities per type
+        '400':
+          description: Confirmation name mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Investigation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/audit-log:
+    get:
+      tags: [Admin]
+      summary: Query audit log (admin, paginated)
+      description: Full audit log with pagination, filtering, and search.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: folderId
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in detail and itemTitle fields
+      responses:
+        '200':
+          description: Paginated audit log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        userId:
+                          type: string
+                        userDisplayName:
+                          type: string
+                        userEmail:
+                          type: string
+                        category:
+                          type: string
+                        action:
+                          type: string
+                        detail:
+                          type: string
+                        itemId:
+                          type: string
+                          nullable: true
+                        itemTitle:
+                          type: string
+                          nullable: true
+                        folderId:
+                          type: string
+                          nullable: true
+                        folderName:
+                          type: string
+                          nullable: true
+                        timestamp:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+
+  /admin/api/audit-log/export:
+    get:
+      tags: [Admin]
+      summary: Export audit log as CSV
+      description: Exports up to 50,000 audit log entries as CSV with the same filters as the paginated endpoint.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: folderId
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /admin/api/bots:
+    get:
+      tags: [Admin]
+      summary: List all bots (admin)
+      description: Returns bots with creator info.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Bot list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotConfig'
+    post:
+      tags: [Admin]
+      summary: Create bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Bot created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  bot:
+                    $ref: '#/components/schemas/BotConfig'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/bots/{id}:
+    get:
+      tags: [Admin]
+      summary: Get bot detail (admin)
+      description: Returns bot config with runs and memberships.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot detail
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Admin]
+      summary: Update bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Bot updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Admin]
+      summary: Delete bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/bots/{id}/enable:
+    post:
+      tags: [Admin]
+      summary: Enable bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  enabled:
+                    type: boolean
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/bots/{id}/disable:
+    post:
+      tags: [Admin]
+      summary: Disable bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  enabled:
+                    type: boolean
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/bots/{id}/trigger:
+    post:
+      tags: [Admin]
+      summary: Manually trigger bot (admin panel)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bot triggered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '400':
+          description: Bot error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/bots/{id}/runs:
+    get:
+      tags: [Admin]
+      summary: Get bot run history (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BotRun'
+
+  /admin/api/bots/{id}/runs/{runId}:
+    get:
+      tags: [Admin]
+      summary: Get bot run detail (admin)
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run detail with execution log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run:
+                    $ref: '#/components/schemas/BotRun'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/ai/providers:
+    get:
+      tags: [Admin]
+      summary: List available AI providers
+      description: Returns providers with API keys configured, plus local provider if endpoint is set.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: Provider list with default settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                        models:
+                          type: array
+                          items:
+                            type: string
+                  settings:
+                    type: object
+                    properties:
+                      defaultProvider:
+                        type: string
+                      defaultModel:
+                        type: string
+
+  /admin/api/ai/settings:
+    get:
+      tags: [Admin]
+      summary: Get AI assistant settings
+      description: Returns AI settings (local API key is masked).
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      responses:
+        '200':
+          description: AI settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  localEndpoint:
+                    type: string
+                  localApiKey:
+                    type: string
+                    description: Masked as "***configured***" if set
+                  localModelName:
+                    type: string
+                  customSystemPrompt:
+                    type: string
+                  defaultProvider:
+                    type: string
+                  defaultModel:
+                    type: string
+                  temperature:
+                    type: number
+    patch:
+      tags: [Admin]
+      summary: Update AI assistant settings
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                localEndpoint:
+                  type: string
+                  description: Must start with http:// or https://
+                localApiKey:
+                  type: string
+                localModelName:
+                  type: string
+                customSystemPrompt:
+                  type: string
+                defaultProvider:
+                  type: string
+                defaultModel:
+                  type: string
+                temperature:
+                  type: number
+                  minimum: 0
+                  maximum: 2
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/api/ai/chat:
+    post:
+      tags: [Admin]
+      summary: Admin AI assistant chat (SSE with tool use)
+      description: |
+        Multi-turn AI assistant with tool use (agentic loop). Streams responses via SSE.
+        Supports Anthropic, OpenAI, Gemini, Mistral, and local providers.
+        Max 50 messages, max 20 tool calls per request.
+      security:
+        - AdminBearerAuth: []
+      servers:
+        - url: http://localhost:3002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+                provider:
+                  type: string
+                  description: Override default provider
+                model:
+                  type: string
+                  description: Override default model
+      responses:
+        '200':
+          description: |
+            SSE stream with events:
+            - `{ type: "provider", provider, model }` -- selected provider info
+            - `{ type: "text", text }` -- text response chunks
+            - `{ type: "tool_call", name, input, requiresConfirm }` -- tool invocation
+            - `{ type: "tool_result", name, result }` -- tool result
+            - `{ type: "tool_error", name, error }` -- tool error
+            - `{ type: "done", stopReason }` -- completion
+            - `{ type: "error", error }` -- fatal error
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          description: Missing or invalid messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: No AI provider configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

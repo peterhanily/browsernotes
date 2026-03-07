@@ -67,6 +67,15 @@ jobs:
       - run: pnpm build
       - run: pnpm build:single
 
+      - name: Report bundle size
+        run: |
+          echo "### Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          du -sh dist/ >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ls -lhS dist/assets/*.js | head -10 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   build-server:
     name: Build Server
     runs-on: ubuntu-latest

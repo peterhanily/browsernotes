@@ -8,6 +8,7 @@ import {
 } from '../../services/admin-secret.js';
 import { getAdminHtml } from '../admin-html/index.js';
 import { logger } from '../../lib/logger.js';
+import { isLocked, recordFailedAttempt, resetAttempts } from '../../services/login-limiter.js';
 import { requireAdminAuth, logAdminAction, getAdminId } from './shared.js';
 
 import usersRouter from './users.js';
@@ -88,12 +89,27 @@ app.post('/api/login', async (c) => {
     return c.json({ error: 'Missing username or password' }, 400);
   }
 
+  // Check if account is locked before verifying credentials
+  const lockStatus = isLocked(username);
+  if (lockStatus.locked) {
+    const retryMin = lockStatus.retryAfterMinutes ?? 15;
+    c.header('Retry-After', String(retryMin * 60));
+    return c.json({ error: `Account temporarily locked. Try again in ${retryMin} minutes.` }, 429);
+  }
+
   const admin = await verifyAdminUser(username, password);
   if (!admin) {
+    const result = recordFailedAttempt(username);
     logger.info('Admin login failed', { username });
+    if (result.locked) {
+      const retryMin = result.retryAfterMinutes ?? 15;
+      c.header('Retry-After', String(retryMin * 60));
+      return c.json({ error: `Account temporarily locked. Try again in ${retryMin} minutes.` }, 429);
+    }
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
+  resetAttempts(username);
   const token = await signAdminToken(admin.id, admin.username);
   logger.info('Admin login successful', { username: admin.username, adminId: admin.id });
   return c.json({ token, admin: { id: admin.id, username: admin.username, displayName: admin.displayName } });

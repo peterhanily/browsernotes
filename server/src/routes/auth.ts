@@ -8,6 +8,7 @@ import { users, sessions, allowedEmails } from '../db/schema.js';
 import { requireAuth, signAccessToken } from '../middleware/auth.js';
 import { getRegistrationMode, getSessionSettings, ADMIN_SYSTEM_USER_ID } from '../services/admin-secret.js';
 import { logActivity } from '../services/audit-service.js';
+import { isLocked, recordFailedAttempt, resetAttempts } from '../services/login-limiter.js';
 import type { AuthUser } from '../types.js';
 
 const app = new Hono<{ Variables: { user: AuthUser } }>();
@@ -141,9 +142,23 @@ app.post('/login', async (c) => {
 
   const { email, password } = parsed.data;
 
+  // Check if account is locked before verifying credentials
+  const lockStatus = isLocked(email);
+  if (lockStatus.locked) {
+    const retryMin = lockStatus.retryAfterMinutes ?? 15;
+    c.header('Retry-After', String(retryMin * 60));
+    return c.json({ error: `Account temporarily locked. Try again in ${retryMin} minutes.` }, 429);
+  }
+
   const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (result.length === 0) {
+    const failResult = recordFailedAttempt(email);
     await logActivity({ userId: ADMIN_SYSTEM_USER_ID, category: 'auth', action: 'login.failed', detail: `Login failed for unknown email ${email}` });
+    if (failResult.locked) {
+      const retryMin = failResult.retryAfterMinutes ?? 15;
+      c.header('Retry-After', String(retryMin * 60));
+      return c.json({ error: `Account temporarily locked. Try again in ${retryMin} minutes.` }, 429);
+    }
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
@@ -158,10 +173,17 @@ app.post('/login', async (c) => {
 
   const valid = await argon2.verify(user.passwordHash, password);
   if (!valid) {
+    const failResult = recordFailedAttempt(email);
     await logActivity({ userId: user.id, category: 'auth', action: 'login.failed', detail: 'Login failed' });
+    if (failResult.locked) {
+      const retryMin = failResult.retryAfterMinutes ?? 15;
+      c.header('Retry-After', String(retryMin * 60));
+      return c.json({ error: `Account temporarily locked. Try again in ${retryMin} minutes.` }, 429);
+    }
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
+  resetAttempts(email);
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
   const authUser: AuthUser = {

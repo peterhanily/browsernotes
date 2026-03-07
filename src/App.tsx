@@ -1106,6 +1106,7 @@ function AppInner() {
     return (
       <ScreenshareContext.Provider value={screenshareCtx}>
       <ActivityLogContext.Provider value={activityLog.log}>
+        <ErrorBoundary region="exec-dashboard">
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <ExecDashboard
           folders={folders}
@@ -1128,6 +1129,7 @@ function AppInner() {
           }}
         />
         </Suspense>
+        </ErrorBoundary>
       </ActivityLogContext.Provider>
       <ToastContainer />
       </ScreenshareContext.Provider>
@@ -1207,7 +1209,7 @@ function AppInner() {
           />
         }
       >
-        <ErrorBoundary>
+        <ErrorBoundary region="main-content">
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <div className={activeView === 'graph' && !showSettings ? 'hidden' : 'flex flex-col flex-1 overflow-hidden'}>
         {filterBar}
@@ -1505,9 +1507,9 @@ function AppInner() {
 
       {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-          <div className="relative h-full w-[260px] shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+          <div className="absolute inset-0 bg-black/50 animate-[fadeIn_150ms_ease-out]" onClick={() => setMobileSidebarOpen(false)} />
+          <div className="relative h-full w-[280px] max-w-[85vw] shrink-0 animate-[slideInLeft_200ms_ease-out]" onClick={(e) => e.stopPropagation()}>
             <Sidebar
               {...sidebarProps}
               collapsed={false}

@@ -353,6 +353,23 @@
   }
 }
 
+/* ─── Global mobile utilities ─── */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+}
+
+/* ─── Mobile sidebar slide-in animation ─── */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ─── Tour overlay ─── */
 .tour-overlay {
   position: fixed;

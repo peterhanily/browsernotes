@@ -14,7 +14,8 @@ export type BotCapability =
   | 'notify_users'        // send notifications
   | 'call_external_apis'  // make outbound HTTP requests
   | 'cross_investigation' // search/read across investigations
-  | 'execute_remote';     // SSH commands, SOAR playbook triggers
+  | 'execute_remote'      // SSH commands, SOAR playbook triggers
+  | 'run_code';           // execute code in sandboxed Docker containers
 
 export interface BotEvent {
   type: BotEventType;

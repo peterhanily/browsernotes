@@ -433,6 +433,7 @@ ${adminStyles()}
         <label><input type="checkbox" class="bot-cap-check" value="call_external_apis"> Call External APIs</label>
         <label><input type="checkbox" class="bot-cap-check" value="cross_investigation"> Cross Investigation</label>
         <label><input type="checkbox" class="bot-cap-check" value="execute_remote"> Execute Remote</label>
+        <label><input type="checkbox" class="bot-cap-check" value="run_code"> Run Code (Docker)</label>
       </div>
     </div>
     <div id="aiAgentConfigGroup" style="display:none;">

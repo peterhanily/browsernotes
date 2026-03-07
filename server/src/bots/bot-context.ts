@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { lookup } from 'node:dns/promises';
 import { Client as SSHClient } from 'ssh2';
 import { eq, and, or, isNull, ilike, inArray } from 'drizzle-orm';
+import { executeCode, type CodeExecutionResult } from './sandbox.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { processPush, lookupEntityFolderId } from '../services/sync-service.js';
@@ -710,6 +711,23 @@ export class BotExecutionContext {
     }
 
     throw new Error(`Polling timed out after ${pollTimeout}ms (${pollCount} polls) for ${pollUrl}`);
+  }
+
+  // ─── Code Execution (run_code) ──────────────────────────────
+
+  async runCode(language: string, code: string, opts?: { timeout?: number; stdin?: string }): Promise<CodeExecutionResult> {
+    this.requireCapability('run_code');
+    this.checkAborted();
+
+    const result = await executeCode(language, code, {
+      timeout: opts?.timeout,
+      stdin: opts?.stdin,
+      signal: this.ctx.signal,
+    });
+
+    await this.audit('code.execute', `Ran ${language} code (${result.durationMs}ms, exit ${result.exitCode})`).catch(() => {});
+
+    return result;
   }
 
   // ─── Audit Helper ────────────────────────────────────────────

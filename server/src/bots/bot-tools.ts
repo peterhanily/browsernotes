@@ -395,6 +395,29 @@ const fetchAndPollTool: BotTool = {
   },
 };
 
+// ─── Code Execution Tools ───────────────────────────────────────
+
+const runCodeTool: BotTool = {
+  name: 'run_code',
+  description: 'Execute code in a sandboxed Docker container. Supports python, nodejs, and bash. The container has no network access, limited memory (128MB), and auto-removes on completion.',
+  parameters: {
+    type: 'object',
+    properties: {
+      language: { type: 'string', description: 'Language to run: "python", "nodejs", or "bash"' },
+      code: { type: 'string', description: 'Code to execute' },
+      timeout: { type: 'number', description: 'Timeout in seconds (default 30, max 120)' },
+      stdin: { type: 'string', description: 'Optional stdin input to provide to the program' },
+    },
+    required: ['language', 'code'],
+  },
+  async execute(args, ctx) {
+    return ctx.runCode(args.language as string, args.code as string, {
+      timeout: args.timeout as number | undefined,
+      stdin: args.stdin as string | undefined,
+    });
+  },
+};
+
 // ─── Capability → Tool mapping ──────────────────────────────────
 
 const CAPABILITY_TOOLS: Array<{ capability: BotCapability; tools: BotTool[] }> = [
@@ -425,6 +448,10 @@ const CAPABILITY_TOOLS: Array<{ capability: BotCapability; tools: BotTool[] }> =
   {
     capability: 'execute_remote',
     tools: [sshExecTool, triggerPlaybookTool, fetchAndPollTool],
+  },
+  {
+    capability: 'run_code',
+    tools: [runCodeTool],
   },
 ];
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Loader2, Trash2, Download, Upload, AlertCircle, CheckCircle, Lock } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
+import { useToast } from '../../contexts/ToastContext';
 import { db } from '../../db';
 import { encryptBackup, decryptBackup, type BackupPayload, type EncryptedBackupBlob } from '../../lib/backup-crypto';
 import { buildFullBackupPayload, buildDifferentialPayload, countPayloadEntities } from '../../lib/backup-data';
@@ -23,6 +24,7 @@ function formatBytes(bytes: number): string {
 
 export function ServerBackup() {
   const { settings } = useSettings();
+  const { addToast } = useToast();
   const isConnected = !!settings.serverUrl;
 
   // Backup list
@@ -128,10 +130,12 @@ export function ServerBackup() {
       setCreateStep('done');
       setPassword('');
       setConfirmPassword('');
+      addToast('success', 'Backup created');
       refreshList();
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Backup failed');
       setCreateStep('error');
+      addToast('error', 'Backup creation failed');
     }
   };
 
@@ -153,6 +157,7 @@ export function ServerBackup() {
     } catch (err) {
       setRestoreError(err instanceof Error ? err.message : 'Decryption failed');
       setRestoreStep('error');
+      addToast('error', 'Decryption failed');
     }
   };
 
@@ -170,9 +175,11 @@ export function ServerBackup() {
       }
       setRestoreResult(result);
       setRestoreStep('done');
+      addToast('success', 'Backup restored');
     } catch (err) {
       setRestoreError(err instanceof Error ? err.message : 'Restore failed');
       setRestoreStep('error');
+      addToast('error', 'Restore failed');
     }
   };
 
@@ -181,9 +188,10 @@ export function ServerBackup() {
     try {
       await deleteBackup(deleteId);
       setDeleteId(null);
+      addToast('success', 'Backup deleted');
       refreshList();
     } catch {
-      // ignore
+      addToast('error', 'Failed to delete backup');
     }
   };
 

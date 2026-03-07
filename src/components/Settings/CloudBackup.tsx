@@ -6,6 +6,7 @@ import { testDestination } from '../../lib/cloud-sync';
 import { CLOUD_PROVIDERS, detectProvider } from '../../lib/cloud-providers';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
+import { useToast } from '../../contexts/ToastContext';
 import type { CloudProvider, BackupDestination } from '../../types';
 
 const PROVIDER_OPTIONS: { value: CloudProvider; label: string }[] = [
@@ -19,6 +20,7 @@ export function CloudBackup() {
   const { settings, updateSettings } = useSettings();
   const cloud = useCloudSync(settings.backupDestinations);
   const logActivity = useLogActivity();
+  const { addToast } = useToast();
 
   const destinations = settings.backupDestinations ?? [];
 
@@ -100,7 +102,10 @@ export function CloudBackup() {
     await cloud.pushFullBackup();
     if (!cloud.error) {
       showMessage('Backup pushed successfully');
+      addToast('success', 'Cloud backup pushed');
       logActivity('sync', 'backup', `Pushed full backup to ${cloud.lastResults.length} destination(s)`);
+    } else {
+      addToast('error', 'Cloud backup failed');
     }
   };
 

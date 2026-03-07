@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Shield, ShieldOff, KeyRound, Clock, AlertTriangle } from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import { EncryptionSetup } from './EncryptionSetup';
+import { useToast } from '../../contexts/ToastContext';
 import {
   deriveWrappingKey,
   unwrapMasterKey,
@@ -27,6 +28,7 @@ import { decryptAllExistingData, setSessionKey, getSessionKeyRaw } from '../../l
 import { db } from '../../db';
 
 export function EncryptionSettings() {
+  const { addToast } = useToast();
   const [enabled, setEnabled] = useState(isEncryptionEnabled);
   const [showSetup, setShowSetup] = useState(false);
   const [showDisable, setShowDisable] = useState(false);
@@ -83,6 +85,7 @@ export function EncryptionSettings() {
       setEnabled(false);
       setShowDisable(false);
       setDisablePass('');
+      addToast('info', 'Encryption disabled');
     } catch {
       setDisableError('Wrong passphrase.');
       setDisabling(false);
@@ -146,6 +149,7 @@ export function EncryptionSettings() {
       setCurrentPass('');
       setNewPass('');
       setConfirmPass('');
+      addToast('success', 'Passphrase changed');
     } catch {
       setChangeError('Wrong current passphrase.');
     } finally {

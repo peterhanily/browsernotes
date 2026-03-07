@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Upload, Download, X, FileJson, Users, ChevronDown, ChevronRight, RotateCcw, Plus, Search } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
+import { useToast } from '../../contexts/ToastContext';
 import type { IOCType, IOCRelationshipDef } from '../../types';
 import { IOC_TYPE_LABELS, DEFAULT_IOC_SUBTYPES, DEFAULT_RELATIONSHIP_TYPES } from '../../types';
 import { getEffectiveClsLevels } from '../../lib/classification';
@@ -31,6 +32,7 @@ const BULK_KEY_MAP: Record<string, 'tiClsLevels' | 'tiIocStatuses' | 'attributio
 
 export function ThreatIntelConfig() {
   const { settings, updateSettings } = useSettings();
+  const { addToast } = useToast();
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const bulkRef = useRef<HTMLInputElement>(null);
   const actorsRef = useRef<HTMLInputElement>(null);
@@ -176,9 +178,10 @@ export function ThreatIntelConfig() {
         }
         if (Object.keys(updates).length > 0) {
           updateSettings(updates);
+          addToast('success', 'Config imported');
         }
       } catch {
-        // invalid JSON - silently ignore
+        addToast('error', 'Invalid JSON config file');
       }
     };
     reader.readAsText(file);

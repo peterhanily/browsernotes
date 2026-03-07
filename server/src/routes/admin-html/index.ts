@@ -517,6 +517,7 @@ ${adminStyles()}
 <div id="createBotModal" class="modal-overlay">
   <div class="modal" style="max-width:600px;">
     <h3>Create Bot</h3>
+    <div id="botModalModeBar" style="display:none;padding:0.4rem 0.75rem;border-radius:4px;font-size:0.8rem;font-weight:500;margin-bottom:1rem;border:1px solid transparent;"></div>
     <div class="form-group">
       <label>Name *</label>
       <input type="text" id="newBotName" placeholder="e.g. IOC Enricher" maxlength="100">
@@ -579,7 +580,10 @@ ${adminStyles()}
       </div>
     </div>
     <div class="form-group">
-      <label>Bot Config (JSON)</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <label>Bot Config (JSON)</label>
+        <button type="button" id="formatBotConfig" class="btn btn-outline btn-sm" style="padding:0.15rem 0.4rem;font-size:0.7rem;">Format JSON</button>
+      </div>
       <textarea id="newBotConfig" rows="4" placeholder='{"apiKey": "...", "baseUrl": "..."}'
         style="font-family:monospace;font-size:0.8rem;resize:vertical;"></textarea>
       <span style="font-size:0.75rem;color:#8b949e;">Bot-specific settings (API keys, URLs, etc). Secret fields are auto-encrypted.</span>

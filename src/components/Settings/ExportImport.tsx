@@ -3,6 +3,7 @@ import { Download, Upload, FileText, AlertCircle } from 'lucide-react';
 import { exportJSON, importJSON, exportNotesMarkdown, downloadFile } from '../../lib/export';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { useLogActivity } from '../../hooks/ActivityLogContext';
+import { useToast } from '../../contexts/ToastContext';
 import type { Note } from '../../types';
 
 interface ExportImportProps {
@@ -12,6 +13,7 @@ interface ExportImportProps {
 
 export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
   const logActivity = useLogActivity();
+  const { addToast } = useToast();
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -29,6 +31,7 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
     const json = await exportJSON();
     downloadFile(json, `threatcaddy-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
     showMessage('Backup exported successfully');
+    addToast('success', 'Backup exported');
     logActivity('data', 'export', 'Exported JSON backup');
   };
 
@@ -54,10 +57,13 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
       const text = await pendingFile.text();
       const counts = await importJSON(text);
       showMessage(`Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} investigations, ${counts.tags} tags`);
+      addToast('success', `Imported ${counts.notes} notes, ${counts.tasks} tasks`);
       logActivity('data', 'import', `Imported ${counts.notes} notes, ${counts.tasks} tasks, ${counts.folders} investigations, ${counts.tags} tags`);
       onImportComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import');
+      const msg = err instanceof Error ? err.message : 'Failed to import';
+      setError(msg);
+      addToast('error', 'Import failed');
     } finally {
       setImporting(false);
       setPendingFile(null);

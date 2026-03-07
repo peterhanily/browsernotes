@@ -1,11 +1,38 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../../lib/server-api';
 import type { Notification } from '../../types';
 
+function relativeTime(date: string | Date): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diffSec = Math.floor((now - then) / 1000);
+  if (diffSec < 60) return 'just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return new Date(date).toLocaleDateString();
+}
+
+function notifColor(type: string): string {
+  switch (type) {
+    case 'mention': return 'bg-blue-600';
+    case 'reply': return 'bg-green-600';
+    case 'reaction': return 'bg-amber-500';
+    case 'invite': return 'bg-purple-600';
+    case 'entity-update': return 'bg-teal-600';
+    default: return 'bg-gray-600';
+  }
+}
+
 export function NotificationBell() {
   const { connected } = useAuth();
+  const { addToast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,11 +46,11 @@ export function NotificationBell() {
       const data = await fetchNotifications(false, 20);
       setNotifications(data);
     } catch {
-      console.warn('NotificationBell: failed to load notifications');
+      addToast('error', 'Failed to load notifications');
     } finally {
       setLoading(false);
     }
-  }, [connected]);
+  }, [connected, addToast]);
 
   // Initial load + listen for WS push events
   useEffect(() => {
@@ -42,12 +69,22 @@ export function NotificationBell() {
     };
   }, [loadNotifications]);
 
+  // Close dropdown on Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open]);
+
   const handleMarkRead = async (id: string) => {
     try {
       await markNotificationRead(id);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     } catch {
-      console.warn('NotificationBell: failed to mark notification read');
+      addToast('error', 'Failed to mark notification read');
     }
   };
 
@@ -64,7 +101,7 @@ export function NotificationBell() {
       await markAllNotificationsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {
-      console.warn('NotificationBell: failed to mark all read');
+      addToast('error', 'Failed to mark all read');
     }
   };
 
@@ -104,7 +141,11 @@ export function NotificationBell() {
               {loading && notifications.length === 0 ? (
                 <div className="p-4 text-center text-sm text-gray-500">Loading...</div>
               ) : notifications.length === 0 ? (
-                <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
+                <div className="p-8 text-center">
+                  <Bell size={24} className="mx-auto mb-2 text-gray-700" />
+                  <p className="text-sm text-gray-500">All caught up</p>
+                  <p className="text-xs text-gray-600 mt-0.5">No new notifications</p>
+                </div>
               ) : (
                 notifications.map((n) => (
                   <div
@@ -114,13 +155,13 @@ export function NotificationBell() {
                     }`}
                     onClick={() => handleNotificationClick(n)}
                   >
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs shrink-0 mt-0.5">
+                    <div className={`w-6 h-6 rounded-full ${notifColor(n.type)} flex items-center justify-center text-white text-xs shrink-0 mt-0.5`}>
                       {n.sourceUserDisplayName?.[0]?.toUpperCase() || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-300 line-clamp-2">{n.message}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {new Date(n.createdAt).toLocaleString()}
+                        {relativeTime(n.createdAt)}
                       </p>
                     </div>
                     {!n.read && (

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Server, LogIn, LogOut, UserPlus, CheckCircle, XCircle, Wifi, WifiOff, RotateCw, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { ServerProfiles } from './ServerProfiles';
+import { upsertServerProfile, type ServerProfile } from '../../lib/server-profiles';
 
 const LAST_SESSION_KEY = 'threatcaddy-last-session';
 
@@ -33,6 +36,7 @@ interface ServerConnectionProps {
 
 export function ServerConnection({ settings, onUpdateSettings }: ServerConnectionProps) {
   const { user, connected, serverUrl, login, register, logout, setServerUrl } = useAuth();
+  const { addToast } = useToast();
   const [mode, setMode] = useState<'connect' | 'login' | 'register' | 'reconnect'>('connect');
   const [url, setUrl] = useState(settings.serverUrl || '');
   const [email, setEmail] = useState('');
@@ -57,6 +61,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
   useEffect(() => {
     if (connected && user && serverUrl) {
       saveLastSession({ serverUrl, email: user.email, displayName: user.displayName });
+      upsertServerProfile(serverUrl, user.email, user.displayName);
     }
   }, [connected, user, serverUrl]);
 
@@ -74,6 +79,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     try {
       await login(email, password);
       setPassword('');
+      addToast('success', 'Connected to server');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -87,6 +93,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     try {
       await register(email, displayName, password);
       setPassword('');
+      addToast('success', 'Account created');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -102,6 +109,7 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
       await login(lastSession.email, password, lastSession.serverUrl);
       onUpdateSettings({ serverUrl: lastSession.serverUrl });
       setPassword('');
+      addToast('success', 'Reconnected to server');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -117,11 +125,24 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
     setError('');
   };
 
+  const handleSelectProfile = (profile: ServerProfile) => {
+    const cleanUrl = profile.url.replace(/\/+$/, '');
+    setServerUrl(cleanUrl);
+    onUpdateSettings({ serverUrl: cleanUrl });
+    setUrl(cleanUrl);
+    setEmail(profile.email);
+    setDisplayName(profile.displayName);
+    setMode('login');
+    setError('');
+    setPassword('');
+  };
+
   const handleDisconnect = async () => {
     // Session details already saved via the useEffect above
     await logout();
     setServerUrl(null);
     onUpdateSettings({ serverUrl: undefined, serverDisplayName: undefined });
+    addToast('info', 'Disconnected from server');
     // Reload last session for reconnect
     const session = getLastSession();
     if (session) {
@@ -187,6 +208,9 @@ export function ServerConnection({ settings, onUpdateSettings }: ServerConnectio
         <Server size={16} />
         Team Server
       </div>
+
+      {/* Saved server profiles */}
+      <ServerProfiles onSelectProfile={handleSelectProfile} currentUrl={serverUrl || undefined} />
 
       {/* Quick Reconnect — shown when we have a cached session */}
       {mode === 'reconnect' && lastSession && (

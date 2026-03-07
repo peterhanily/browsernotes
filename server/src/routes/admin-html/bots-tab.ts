@@ -175,6 +175,14 @@ function openBotDetail(botId) {
       html += '<span class="lbl">Schedule</span><span class="val">' + esc(triggers.schedule) + '</span>';
     }
     html += '<span class="lbl">Webhook</span><span class="val">' + (triggers.webhook ? 'Yes' : 'No') + '</span>';
+    if (triggers.webhook) {
+      var cfg = b.config || {};
+      var secretStatus = cfg.webhookSecret === '***configured***' ? 'Configured' : (cfg.webhookSecret === '***not set***' || !cfg.webhookSecret ? 'Not set' : 'Configured');
+      var secretBadge = secretStatus === 'Configured'
+        ? '<span class="badge badge-green">' + secretStatus + '</span>'
+        : '<span class="badge badge-yellow">' + secretStatus + '</span>';
+      html += '<span class="lbl">Webhook Secret</span><span class="val">' + secretBadge + '</span>';
+    }
     html += '</div></div>';
 
     // Allowed Domains
@@ -227,6 +235,7 @@ function openBotDetail(botId) {
       html += '<button class="btn btn-primary btn-sm" onclick="toggleBotFromDetail(\\'' + esc(b.id) + '\\', true)">Enable</button>';
     }
     html += '<button class="btn btn-outline btn-sm" onclick="editBotFromDetail(\\'' + esc(b.id) + '\\')">Edit</button>';
+    html += '<button class="btn btn-outline btn-sm" onclick="duplicateBotFromDetail(\\'' + esc(b.id) + '\\')">Duplicate</button>';
     html += '<button class="btn btn-danger btn-sm" onclick="deleteBotFromDetail(\\'' + esc(b.id) + '\\', \\'' + esc(b.name) + '\\')">Delete</button>';
     html += '</div>';
 
@@ -253,6 +262,25 @@ function deleteBotFromDetail(botId, botName) {
   api('/bots/' + botId, { method: 'DELETE' })
     .then(function() { toast('Bot deleted'); loadBotsData(); closeDetailPanel(); })
     .catch(function(err) { toast(err.message, 'error'); });
+}
+
+function duplicateBotFromDetail(botId) {
+  var b = allBots.find(function(bot) { return bot.id === botId; });
+  if (!b) { toast('Bot not found', 'error'); return; }
+
+  editBotFromDetail(botId);
+  // Override to create mode
+  editingBotId = null;
+  document.getElementById('newBotName').value = b.name + ' (Copy)';
+  document.querySelector('#createBotModal .modal h3').textContent = 'Duplicate Bot';
+  document.getElementById('submitCreateBot').textContent = 'Create Bot';
+  // Show duplicate mode indicator
+  var modeBar = document.getElementById('botModalModeBar');
+  modeBar.style.display = '';
+  modeBar.textContent = 'Duplicating from: ' + b.name;
+  modeBar.style.background = 'rgba(88,166,255,0.1)';
+  modeBar.style.borderColor = '#58a6ff';
+  modeBar.style.color = '#58a6ff';
 }
 
 // ─── Create Bot Modal ──────────────────────────────────────
@@ -304,6 +332,17 @@ function updateEventFilterUI() {
 
 document.querySelectorAll('.bot-event-check').forEach(function(cb) {
   cb.addEventListener('change', function() { updateEventFilterUI(); });
+});
+
+document.getElementById('formatBotConfig').addEventListener('click', function() {
+  var textarea = document.getElementById('newBotConfig');
+  var val = textarea.value.trim();
+  if (!val) return;
+  try {
+    textarea.value = JSON.stringify(JSON.parse(val), null, 2);
+  } catch(e) {
+    toast('Invalid JSON: ' + e.message, 'error');
+  }
 });
 
 function editBotFromDetail(botId) {
@@ -377,6 +416,13 @@ function editBotFromDetail(botId) {
   // Change modal title and button
   document.querySelector('#createBotModal .modal h3').textContent = 'Edit Bot';
   document.getElementById('submitCreateBot').textContent = 'Save Changes';
+  // Show edit mode indicator
+  var modeBar = document.getElementById('botModalModeBar');
+  modeBar.style.display = '';
+  modeBar.textContent = 'Editing: ' + b.name;
+  modeBar.style.background = 'rgba(210,153,34,0.1)';
+  modeBar.style.borderColor = '#d29922';
+  modeBar.style.color = '#e3b341';
 
   document.getElementById('createBotModal').classList.add('active');
 }
@@ -385,6 +431,7 @@ document.getElementById('createBotBtn').addEventListener('click', function() {
   editingBotId = null;
   document.querySelector('#createBotModal .modal h3').textContent = 'Create Bot';
   document.getElementById('submitCreateBot').textContent = 'Create Bot';
+  document.getElementById('botModalModeBar').style.display = 'none';
   document.getElementById('newBotName').value = '';
   document.getElementById('newBotDesc').value = '';
   document.getElementById('newBotType').value = 'enrichment';
@@ -415,6 +462,7 @@ document.getElementById('cancelCreateBot').addEventListener('click', function() 
   editingBotId = null;
   document.querySelector('#createBotModal .modal h3').textContent = 'Create Bot';
   document.getElementById('submitCreateBot').textContent = 'Create Bot';
+  document.getElementById('botModalModeBar').style.display = 'none';
   document.getElementById('createBotModal').classList.remove('active');
 });
 

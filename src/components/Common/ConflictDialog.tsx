@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { X, AlertTriangle, Check, ArrowDownToLine } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { AlertTriangle, ChevronDown, ChevronUp, Check, ArrowDownToLine, X } from 'lucide-react';
 import type { SyncResult } from '../../lib/server-api';
 
 const TABLE_LABELS: Record<string, string> = {
@@ -32,103 +32,102 @@ interface ConflictDialogProps {
 }
 
 export function ConflictDialog({ conflicts, onResolve, onResolveAll, onClose }: ConflictDialogProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
-  const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; });
+  const handleResolve = useCallback((entityId: string, choice: 'mine' | 'theirs') => {
+    onResolve(entityId, choice);
+    setResolvedIds(prev => new Set(prev).add(entityId));
+  }, [onResolve]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onCloseRef.current();
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [handleKeyDown]);
+  const unresolvedConflicts = conflicts.filter(c => !resolvedIds.has(c.entityId));
 
   if (conflicts.length === 0) return null;
 
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="conflict-dialog-title"
-    >
-      <div className="bg-gray-900 rounded-xl shadow-2xl border border-gray-700 w-full max-w-md max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-gray-700">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
-            <AlertTriangle size={16} className="text-amber-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 id="conflict-dialog-title" className="text-sm font-semibold text-gray-100">Sync Conflicts</h2>
-            <p className="text-xs text-gray-500">
-              {conflicts.length} {conflicts.length === 1 ? 'item has' : 'items have'} conflicting changes
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Bulk actions */}
-        <div className="flex gap-2 px-4 py-3 border-b border-gray-700">
-          <button
-            onClick={() => onResolveAll('mine')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors"
-          >
-            <Check size={14} /> Keep All Mine
-          </button>
-          <button
-            onClick={() => onResolveAll('theirs')}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors"
-          >
-            <ArrowDownToLine size={14} /> Accept All Theirs
-          </button>
-        </div>
-
-        {/* Conflict list */}
-        <div className="overflow-y-auto flex-1">
-          {conflicts.map((conflict) => (
-            <div
-              key={conflict.entityId}
-              className="px-4 py-3 border-b border-gray-800 last:border-b-0 hover:bg-gray-800/50 transition-colors"
-            >
-              <div className="text-sm font-medium text-gray-100 mb-0.5 truncate">
-                {getEntityLabel(conflict)}
-              </div>
-              {conflict.serverVersion && (
-                <div className="text-[11px] text-gray-500 mb-2">
-                  Server version: v{conflict.serverVersion}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onResolve(conflict.entityId, 'mine')}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
-                >
-                  Keep Mine
-                </button>
-                <button
-                  onClick={() => onResolve(conflict.entityId, 'theirs')}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
-                >
-                  Use Theirs
-                </button>
-              </div>
+    <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
+      <div className="max-w-3xl mx-auto px-4 pt-2 pointer-events-auto">
+        <div className="bg-amber-950/90 backdrop-blur-sm border border-amber-700/50 rounded-lg shadow-lg overflow-hidden">
+          {/* Summary bar -- always visible */}
+          <div className="flex items-center gap-3 px-4 py-2.5">
+            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+            <span className="text-sm text-amber-200 flex-1">
+              {unresolvedConflicts.length} sync {unresolvedConflicts.length === 1 ? 'conflict' : 'conflicts'}
+              {resolvedIds.size > 0 && <span className="text-amber-400/60 ml-1">({resolvedIds.size} resolved)</span>}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onResolveAll('mine')}
+                className="px-2.5 py-1 text-xs font-medium rounded bg-amber-600/30 text-amber-200 hover:bg-amber-600/50 transition-colors"
+              >
+                Keep All Mine
+              </button>
+              <button
+                onClick={() => onResolveAll('theirs')}
+                className="px-2.5 py-1 text-xs font-medium rounded bg-amber-600/30 text-amber-200 hover:bg-amber-600/50 transition-colors"
+              >
+                Accept All Theirs
+              </button>
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="p-1 rounded hover:bg-amber-600/30 text-amber-300 transition-colors"
+                title={expanded ? 'Collapse' : 'Expand details'}
+              >
+                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-1 rounded hover:bg-amber-600/30 text-amber-400/60 hover:text-amber-300 transition-colors"
+                title="Dismiss"
+              >
+                <X size={14} />
+              </button>
             </div>
-          ))}
+          </div>
+
+          {/* Expanded conflict list */}
+          {expanded && (
+            <div className="border-t border-amber-700/30 max-h-[40vh] overflow-y-auto">
+              {conflicts.map((conflict) => {
+                const resolved = resolvedIds.has(conflict.entityId);
+                return (
+                  <div
+                    key={conflict.entityId}
+                    className={`flex items-center gap-3 px-4 py-2 border-b border-amber-900/50 last:border-b-0 transition-all ${
+                      resolved ? 'opacity-40' : ''
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${resolved ? 'bg-green-400' : 'bg-amber-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-amber-100 truncate block">{getEntityLabel(conflict)}</span>
+                      {conflict.serverVersion && (
+                        <span className="text-[10px] text-amber-400/50">v{conflict.serverVersion}</span>
+                      )}
+                    </div>
+                    {!resolved && (
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleResolve(conflict.entityId, 'mine')}
+                          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-blue-600/30 text-blue-200 hover:bg-blue-600/50 transition-colors"
+                        >
+                          <Check size={10} /> Mine
+                        </button>
+                        <button
+                          onClick={() => handleResolve(conflict.entityId, 'theirs')}
+                          className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-gray-600/30 text-gray-300 hover:bg-gray-600/50 transition-colors"
+                        >
+                          <ArrowDownToLine size={10} /> Theirs
+                        </button>
+                      </div>
+                    )}
+                    {resolved && (
+                      <span className="text-[10px] text-green-400 shrink-0">Resolved</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

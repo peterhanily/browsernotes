@@ -78,6 +78,7 @@ export function SearchOverlay({
   const [searchFolderId, setSearchFolderId] = useState<string | undefined>(undefined);
   const [folderQuery, setFolderQuery] = useState('');
   const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
+  const [activeTypes, setActiveTypes] = useState<Set<SearchResultType>>(new Set(['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat']));
   const inputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const folderDropdownRef = useRef<HTMLDivElement>(null);
@@ -202,8 +203,8 @@ export function SearchOverlay({
     return groups;
   }, [results]);
 
-  // Flat list for keyboard navigation
-  const flatResults = results;
+  // Flat list for keyboard navigation (filtered by active types)
+  const flatResults = useMemo(() => results.filter(r => activeTypes.has(r.type)), [results, activeTypes]);
 
   // Reset activeIndex when results change
   useEffect(() => {
@@ -263,18 +264,31 @@ export function SearchOverlay({
     setQuery(saved.query.raw);
   }, []);
 
+  const toggleType = useCallback((type: SearchResultType) => {
+    setActiveTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type); // don't allow empty
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
+
   // Pre-compute a flat index map for keyboard navigation (avoids mutable counter during render)
   const indexMap = useMemo(() => {
     const map = new Map<string, number>();
     let idx = 0;
     for (const type of ['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat'] as SearchResultType[]) {
+      if (!activeTypes.has(type)) continue;
       const group = grouped[type];
       if (group) {
         for (const r of group) { map.set(r.id, idx++); }
       }
     }
     return map;
-  }, [grouped]);
+  }, [grouped, activeTypes]);
 
   if (!open) return null;
 
@@ -422,8 +436,34 @@ export function SearchOverlay({
               <span className="text-xs text-red-400 ml-2">{error}</span>
             )}
             {debouncedQuery && !error && (
-              <span className="text-xs text-gray-500 ml-auto">{results.length} result{results.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-gray-500 ml-auto">
+                {results.filter(r => activeTypes.has(r.type)).length} result{results.filter(r => activeTypes.has(r.type)).length !== 1 ? 's' : ''}
+              </span>
             )}
+          </div>
+
+          {/* Type filter chips */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <span className="text-[10px] text-gray-600 mr-1">Types:</span>
+            {(['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat'] as SearchResultType[]).map((type) => {
+              const Icon = TYPE_ICONS[type];
+              const active = activeTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors border',
+                    active
+                      ? 'border-accent/40 bg-accent/10 text-accent'
+                      : 'border-gray-700 text-gray-600 hover:text-gray-400 hover:border-gray-600'
+                  )}
+                >
+                  <Icon size={10} />
+                  {TYPE_LABELS[type].replace(/s$/, '')}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -436,6 +476,7 @@ export function SearchOverlay({
           )}
 
           {(['note', 'clip', 'task', 'timeline', 'whiteboard', 'ioc', 'chat'] as SearchResultType[]).map((type) => {
+            if (!activeTypes.has(type)) return null;
             const group = grouped[type];
             if (!group || group.length === 0) return null;
             return (

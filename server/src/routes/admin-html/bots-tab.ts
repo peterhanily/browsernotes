@@ -151,6 +151,20 @@ function openBotDetail(botId) {
     }
     html += '</div>';
 
+    // AI Agent Config (show provider, model, prompt if type is ai-agent)
+    if (b.type === 'ai-agent') {
+      var agentCfg = b.config || {};
+      html += '<div class="section"><h4>Agent Configuration</h4><div class="info-grid">';
+      html += '<span class="lbl">LLM Provider</span><span class="val">' + esc(agentCfg.llmProvider || 'anthropic') + '</span>';
+      html += '<span class="lbl">Model</span><span class="val">' + esc(agentCfg.llmModel || 'default') + '</span>';
+      html += '<span class="lbl">Max Iterations</span><span class="val">' + (agentCfg.maxIterations || 10) + '</span>';
+      html += '</div>';
+      if (agentCfg.systemPrompt) {
+        html += '<p style="color:#8b949e;font-size:0.8rem;margin-top:0.5rem;white-space:pre-wrap;background:#1c2128;padding:0.5rem;border-radius:4px;">' + esc(agentCfg.systemPrompt) + '</p>';
+      }
+      html += '</div>';
+    }
+
     // Triggers
     html += '<div class="section"><h4>Triggers</h4><div class="info-grid">';
     var triggers = b.triggers || {};
@@ -167,6 +181,16 @@ function openBotDetail(botId) {
     if (b.allowedDomains && b.allowedDomains.length > 0) {
       html += '<div class="section"><h4>Allowed Domains</h4>';
       html += b.allowedDomains.map(function(d) { return '<span class="cap-tag">' + esc(d) + '</span>'; }).join(' ');
+      html += '</div>';
+    }
+
+    // Investigation Memberships
+    var memberships = data.memberships || [];
+    if (memberships.length > 0) {
+      html += '<div class="section"><h4>Investigation Access (' + memberships.length + ')</h4>';
+      html += memberships.map(function(m) {
+        return '<span class="cap-tag">' + esc(m.folderName || m.folderId) + ' (' + esc(m.role) + ')</span>';
+      }).join(' ');
       html += '</div>';
     }
 
@@ -235,6 +259,13 @@ function deleteBotFromDetail(botId, botName) {
 
 var editingBotId = null;
 
+// Type toggle — show/hide AI agent fields
+function updateBotTypeUI() {
+  var isAgent = document.getElementById('newBotType').value === 'ai-agent';
+  document.getElementById('aiAgentConfigGroup').style.display = isAgent ? '' : 'none';
+}
+document.getElementById('newBotType').addEventListener('change', function() { updateBotTypeUI(); });
+
 // Scope type toggle — show/hide investigation picker
 function updateScopeUI() {
   var scopeType = document.getElementById('newBotScope').value;
@@ -291,9 +322,27 @@ function editBotFromDetail(botId) {
     cb.checked = (b.capabilities || []).indexOf(cb.value) !== -1;
   });
 
-  // Config JSON
-  var configVal = b.config && typeof b.config === 'object' && Object.keys(b.config).length > 0
-    ? JSON.stringify(b.config, null, 2) : '';
+  // AI Agent fields (extract from config before showing raw JSON)
+  var cfg = b.config && typeof b.config === 'object' ? Object.assign({}, b.config) : {};
+  if (b.type === 'ai-agent') {
+    document.getElementById('newBotLlmProvider').value = cfg.llmProvider || 'anthropic';
+    document.getElementById('newBotLlmModel').value = cfg.llmModel || '';
+    document.getElementById('newBotSystemPrompt').value = cfg.systemPrompt || '';
+    document.getElementById('newBotMaxIter').value = cfg.maxIterations || 10;
+  } else {
+    document.getElementById('newBotLlmProvider').value = 'anthropic';
+    document.getElementById('newBotLlmModel').value = '';
+    document.getElementById('newBotSystemPrompt').value = '';
+    document.getElementById('newBotMaxIter').value = '10';
+  }
+  updateBotTypeUI();
+
+  // Config JSON — strip agent fields from raw display
+  var displayCfg = Object.assign({}, cfg);
+  delete displayCfg.llmProvider; delete displayCfg.llmModel;
+  delete displayCfg.systemPrompt; delete displayCfg.maxIterations;
+  var configVal = Object.keys(displayCfg).length > 0
+    ? JSON.stringify(displayCfg, null, 2) : '';
   document.getElementById('newBotConfig').value = configVal;
   document.getElementById('botConfigSecretNote').style.display = configVal ? '' : 'none';
 
@@ -342,6 +391,12 @@ document.getElementById('createBotBtn').addEventListener('click', function() {
   document.querySelectorAll('.bot-cap-check').forEach(function(cb) { cb.checked = false; });
   document.getElementById('newBotConfig').value = '';
   document.getElementById('botConfigSecretNote').style.display = 'none';
+  // Reset AI agent fields
+  document.getElementById('newBotLlmProvider').value = 'anthropic';
+  document.getElementById('newBotLlmModel').value = '';
+  document.getElementById('newBotSystemPrompt').value = '';
+  document.getElementById('newBotMaxIter').value = '10';
+  updateBotTypeUI();
   document.getElementById('newBotScope').value = 'investigation';
   updateScopeUI();
   document.getElementById('newBotDomains').value = '';
@@ -427,6 +482,19 @@ document.getElementById('submitCreateBot').addEventListener('click', function() 
     rateLimitPerHour: parseInt(document.getElementById('newBotRateHour').value, 10) || 100,
     rateLimitPerDay: parseInt(document.getElementById('newBotRateDay').value, 10) || 1000,
   };
+
+  // Merge AI agent fields into config
+  if (type === 'ai-agent') {
+    config = config || {};
+    var provider = document.getElementById('newBotLlmProvider').value;
+    var model = document.getElementById('newBotLlmModel').value.trim();
+    var sysPrompt = document.getElementById('newBotSystemPrompt').value.trim();
+    var maxIter = parseInt(document.getElementById('newBotMaxIter').value, 10) || 10;
+    if (provider) config.llmProvider = provider;
+    if (model) config.llmModel = model;
+    if (sysPrompt) config.systemPrompt = sysPrompt;
+    config.maxIterations = Math.min(Math.max(maxIter, 1), 25);
+  }
 
   if (config !== undefined) {
     body.config = config;

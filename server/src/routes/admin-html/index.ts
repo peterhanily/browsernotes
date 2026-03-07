@@ -434,6 +434,32 @@ ${adminStyles()}
         <label><input type="checkbox" class="bot-cap-check" value="cross_investigation"> Cross Investigation</label>
       </div>
     </div>
+    <div id="aiAgentConfigGroup" style="display:none;">
+      <div class="form-group">
+        <label>LLM Provider</label>
+        <select id="newBotLlmProvider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="mistral">Mistral</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>LLM Model</label>
+        <input type="text" id="newBotLlmModel" placeholder="e.g. claude-sonnet-4-20250514">
+      </div>
+      <div class="form-group">
+        <label>System Prompt</label>
+        <textarea id="newBotSystemPrompt" rows="4" placeholder="Custom instructions for the AI agent..."
+          style="font-size:0.85rem;resize:vertical;"></textarea>
+        <span style="font-size:0.75rem;color:#8b949e;">Appended to the agent's built-in system prompt.</span>
+      </div>
+      <div class="form-group">
+        <label>Max Iterations</label>
+        <input type="number" id="newBotMaxIter" value="10" min="1" max="25">
+        <span style="font-size:0.75rem;color:#8b949e;">Max tool-calling loops per run (hard cap: 25)</span>
+      </div>
+    </div>
     <div class="form-group">
       <label>Bot Config (JSON)</label>
       <textarea id="newBotConfig" rows="4" placeholder='{"apiKey": "...", "baseUrl": "..."}'

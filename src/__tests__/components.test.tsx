@@ -7,6 +7,15 @@ import { NoteCard } from '../components/Notes/NoteCard';
 import { Header } from '../components/Layout/Header';
 import type { Note } from '../types';
 
+vi.mock('../contexts/ToastContext', () => ({
+  useToast: () => ({ addToast: vi.fn(), toasts: [], removeToast: vi.fn() }),
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ connected: false, user: null, serverUrl: null }),
+}));
+
 describe('Modal', () => {
   it('renders nothing when closed', () => {
     const { container } = render(

@@ -3,6 +3,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
 import { logActivity } from '../services/audit-service.js';
+import { createNotification } from '../services/notification-service.js';
 import { logger } from '../lib/logger.js';
 import { botEventBus, botEventDepth, botEventOrigins } from './event-bus.js';
 import { botRateLimiter } from './rate-limiter.js';
@@ -10,8 +11,9 @@ import { decryptConfigSecrets } from './secret-store.js';
 import type { Bot, BotConfig, BotContext, BotEvent, BotEventType, BotRunStatus, BotTriggerType, BotCapability } from './types.js';
 import { createBotImplementation } from './implementations/index.js';
 
-const BOT_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max per run
-const MAX_CONCURRENT_RUNS = 10;
+const BOT_EXECUTION_TIMEOUT_MS = parseInt(process.env.BOT_EXECUTION_TIMEOUT_MS || '', 10) || 5 * 60 * 1000;
+const MAX_CONCURRENT_RUNS = parseInt(process.env.BOT_MAX_CONCURRENT_RUNS || '', 10) || 10;
+const MAX_QUEUE_SIZE = 50;
 
 /**
  * BotManager: lifecycle management, event routing, scheduling, and execution.
@@ -32,6 +34,12 @@ export class BotManager {
 
   /** Wildcard listener reference for cleanup on shutdown */
   private wildcardListener: ((event: BotEvent) => void) | null = null;
+
+  /** Simple FIFO execution queue for when concurrency limit is hit */
+  private executionQueue: Array<() => void> = [];
+
+  /** Counters for observability */
+  private stats = { queued: 0, dropped: 0, rateLimited: 0 };
 
   /** Load all enabled bot configs from DB and start them */
   async init(): Promise<void> {
@@ -101,6 +109,7 @@ export class BotManager {
     this.configs.clear();
     this.cronIntervals.clear();
     this.eventTypeIndex.clear();
+    this.executionQueue.length = 0;
     this.initialized = false;
   }
 
@@ -245,16 +254,26 @@ export class BotManager {
     const hourlyKey = `bot:${botId}:hour`;
     const dailyKey = `bot:${botId}:day`;
     if (!botRateLimiter.canConsume(hourlyKey) || !botRateLimiter.canConsume(dailyKey)) {
+      this.stats.rateLimited++;
       logger.warn(`Bot ${config.name} rate limited`, { botId });
       return;
     }
     botRateLimiter.tryConsume(hourlyKey);
     botRateLimiter.tryConsume(dailyKey);
 
-    // Concurrency limit
+    // Concurrency limit — queue if at capacity, drop if queue is full
     if (this.activeRuns >= MAX_CONCURRENT_RUNS) {
-      logger.warn('Max concurrent bot runs reached, skipping', { botId, activeRuns: this.activeRuns });
-      return;
+      if (this.executionQueue.length >= MAX_QUEUE_SIZE) {
+        this.stats.dropped++;
+        logger.warn('Bot execution queue full, dropping', { botId, queueSize: this.executionQueue.length });
+        return;
+      }
+      this.stats.queued++;
+      return new Promise<void>((resolve) => {
+        this.executionQueue.push(() => {
+          void this.executeBot(botId, trigger, event, webhookPayload).then(resolve);
+        });
+      });
     }
     this.activeRuns++;
 
@@ -344,6 +363,12 @@ export class BotManager {
       clearTimeout(timeout);
       this.activeRuns--;
 
+      // Drain one item from the execution queue
+      if (this.executionQueue.length > 0) {
+        const next = this.executionQueue.shift()!;
+        next();
+      }
+
       // Remove this AbortController from tracking
       const controllers = this.activeAbortControllers.get(botId);
       if (controllers) {
@@ -406,6 +431,12 @@ export class BotManager {
             logger.warn(`Circuit breaker: auto-disabling bot "${config.name}" after 5 consecutive failures`, { botId });
             await db.update(schema.botConfigs).set({ enabled: false, updatedAt: new Date() }).where(eq(schema.botConfigs.id, botId));
             await this.unloadBot(botId);
+            // Notify the bot creator
+            createNotification({
+              userId: config.createdBy,
+              type: 'bot_disabled',
+              message: `Bot "${config.name}" was auto-disabled after 5 consecutive failures. Last error: ${error}`,
+            }).catch(() => { /* best effort */ });
           }
         } catch (err) {
           logger.error(`Failed to check circuit breaker for bot ${botId}`, { error: String(err) });
@@ -470,6 +501,16 @@ export class BotManager {
   /** Get all loaded bot configs (for admin API) */
   getLoadedBots(): BotConfig[] {
     return Array.from(this.configs.values());
+  }
+
+  /** Get runtime stats for observability */
+  getStats() {
+    return {
+      loadedBots: this.bots.size,
+      activeRuns: this.activeRuns,
+      queueSize: this.executionQueue.length,
+      ...this.stats,
+    };
   }
 }
 

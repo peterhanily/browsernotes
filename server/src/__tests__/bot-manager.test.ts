@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ───────────────────────────────────────────────────────
 
@@ -214,7 +214,8 @@ describe('validateCronExpression', () => {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-function makeBotConfig(overrides: Partial<any> = {}): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeBotConfig(overrides: Record<string, any> = {}): any {
   return {
     id: 'bot-test',
     userId: 'bot-user-test',

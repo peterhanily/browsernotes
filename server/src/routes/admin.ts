@@ -621,9 +621,9 @@ app.delete('/api/investigations/:id/content', requireAdminAuth, async (c) => {
   const folderFiles = await db.select({ storagePath: files.storagePath, thumbnailPath: files.thumbnailPath })
     .from(files).where(eq(files.folderId, folderId));
   for (const f of folderFiles) {
-    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch { /* ignore */ }
+    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch (err) { logger.warn('Failed to unlink file', { path: f.storagePath, error: String(err) }); }
     if (f.thumbnailPath) {
-      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch { /* ignore */ }
+      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch (err) { logger.warn('Failed to unlink file', { path: f.thumbnailPath, error: String(err) }); }
     }
   }
 

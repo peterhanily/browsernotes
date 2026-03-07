@@ -11,6 +11,7 @@ import { revokeUserFolderAccess, broadcastToUser } from '../ws/handler.js';
 import type { AuthUser } from '../types.js';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { logger } from '../lib/logger.js';
 
 const FILE_STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
 
@@ -256,9 +257,9 @@ app.delete('/:id', async (c) => {
   const folderFiles = await db.select({ storagePath: files.storagePath, thumbnailPath: files.thumbnailPath })
     .from(files).where(eq(files.folderId, folderId));
   for (const f of folderFiles) {
-    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch { /* ignore */ }
+    try { await unlink(join(FILE_STORAGE_PATH, f.storagePath)); } catch (err) { logger.warn('Failed to unlink file', { path: f.storagePath, error: String(err) }); }
     if (f.thumbnailPath) {
-      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch { /* ignore */ }
+      try { await unlink(join(FILE_STORAGE_PATH, f.thumbnailPath)); } catch (err) { logger.warn('Failed to unlink file', { path: f.thumbnailPath, error: String(err) }); }
     }
   }
 

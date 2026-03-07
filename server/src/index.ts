@@ -8,6 +8,7 @@ import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { access } from 'node:fs/promises';
 
 import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
@@ -80,14 +81,29 @@ app.use('/api/caddyshack/posts', rateLimiter({ windowMs: 60_000, max: 30 }));
 app.use('/api/backups', rateLimiter({ windowMs: 60_000, max: 5 }));
 app.use('/api/bots/*/webhook', rateLimiter({ windowMs: 60_000, max: 30 }));
 
-// Health check with DB connectivity
+// Health check with DB connectivity and file storage
 app.get('/health', async (c) => {
+  const checks: Record<string, string> = {};
+
+  // DB check
   try {
     await db.execute(drizzleSql`SELECT 1`);
-    return c.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    checks.db = 'connected';
   } catch {
-    return c.json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() }, 503);
+    checks.db = 'disconnected';
   }
+
+  // File storage check
+  const storagePath = process.env.FILE_STORAGE_PATH || '/data/files';
+  try {
+    await access(storagePath);
+    checks.storage = 'accessible';
+  } catch {
+    checks.storage = 'inaccessible';
+  }
+
+  const ok = Object.values(checks).every(v => v === 'connected' || v === 'accessible');
+  return c.json({ status: ok ? 'ok' : 'degraded', ...checks, timestamp: new Date().toISOString() }, ok ? 200 : 503);
 });
 
 // Public server info (no auth required — needed by CaddyShack)

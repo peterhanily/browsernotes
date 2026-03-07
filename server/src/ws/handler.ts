@@ -308,3 +308,13 @@ export function disconnectUser(userId: string) {
     try { ws.close(4004, 'Account deactivated'); } catch { /* noop */ }
   }
 }
+
+// Periodic WS connection stats (every 5 minutes)
+const wsStatsInterval = setInterval(() => {
+  logger.info('WebSocket stats', {
+    connections: clients.size,
+    uniqueUsers: userConnections.size,
+    pendingAuth: pendingAuth.size,
+  });
+}, 5 * 60 * 1000);
+wsStatsInterval.unref(); // Don't prevent process exit

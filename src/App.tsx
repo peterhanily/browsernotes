@@ -234,6 +234,8 @@ function AppInner() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | undefined>(
     initialDeepLink?.type === 'note' ? initialDeepLink.id : savedNavState?.selectedNoteId,
   );
+  // Grace period to prevent auto-deselect from racing with Dexie live query after note creation
+  const noteNavGraceRef = useRef(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>(savedNavState?.selectedFolderId);
   const [selectedTag, setSelectedTag] = useState<string>();
   const [showTrash, setShowTrash] = useState(false);
@@ -669,7 +671,9 @@ function AppInner() {
   // Auto-deselect when selected note is no longer in filtered list
   // Fixes stale editor after trash, delete, archive, restore, tag change, etc.
   // Skip when notes list is empty (still loading after folder switch or sample import)
+  // Skip during grace period (note was just created, live query hasn't picked it up yet)
   useEffect(() => {
+    if (noteNavGraceRef.current) return;
     if (selectedNoteId && filteredNotes.length > 0 && !filteredNotes.find((n) => n.id === selectedNoteId)) {
       setSelectedNoteId(undefined);
     }
@@ -1363,8 +1367,11 @@ function AppInner() {
             onOpenSettings={() => { setSettingsInitialTab('integrations'); setShowSettings(true); }}
             onNavigateToSource={(sourceType, sourceId) => {
               if (sourceType === 'note') {
+                noteNavGraceRef.current = true;
                 setSelectedNoteId(sourceId);
                 navigateTo('notes', { selectedNoteId: sourceId });
+                // Clear grace after Dexie live query has time to propagate the new note
+                setTimeout(() => { noteNavGraceRef.current = false; }, 2000);
               } else if (sourceType === 'task') {
                 navigateTo('tasks');
               } else if (sourceType === 'event') {

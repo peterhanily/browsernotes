@@ -104,7 +104,8 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
                 const timestamp = new Date().toLocaleString('en-US', {
                   month: 'short', day: 'numeric', year: 'numeric',
                   hour: '2-digit', minute: '2-digit',
-                });
+                  timeZone: 'UTC',
+                }) + ' UTC';
                 const noteTitle = `${(fields.title as string) || 'Integration Note'} — ${timestamp}`;
 
                 await db.notes.add({

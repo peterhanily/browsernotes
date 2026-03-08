@@ -108,13 +108,19 @@ function bridgeProxyFetch(
   });
 }
 
+// Track extension bridge capabilities (populated by TC_EXTENSION_READY event)
+const _bridgeCaps = new Set<string>();
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || event.data?.type !== 'TC_EXTENSION_READY') return;
+    _bridgeCaps.clear();
+    for (const cap of event.data.capabilities || []) _bridgeCaps.add(cap);
+  });
+}
+
 /** Check if the extension bridge supports proxy_fetch */
 function hasBridgeProxyFetch(): boolean {
-  try {
-    return document.documentElement.dataset.tcBridgeLoaded === '1';
-  } catch {
-    return false;
-  }
+  return _bridgeCaps.has('proxy_fetch');
 }
 
 export class IntegrationExecutor {

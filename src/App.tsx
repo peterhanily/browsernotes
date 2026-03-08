@@ -1121,6 +1121,7 @@ function AppInner() {
       tagColor={selectedTagObj?.color}
       onClear={() => { setSelectedFolderId(undefined); setSelectedTag(undefined); }}
       onEditFolder={selectedFolderId ? () => setEditingFolderId(selectedFolderId) : undefined}
+      playbookExecution={selectedFolder?.playbookExecution}
     />
   ) : null;
 
@@ -1327,6 +1328,8 @@ function AppInner() {
               setShowArchive(false);
               setSelectedTag(undefined);
             }}
+            dashboardKPIs={settings.dashboardKPIs as import('./types').KPIMetricId[] | undefined}
+            onUpdateKPIs={(kpis) => updateSettings({ dashboardKPIs: kpis })}
           />
         ) : activeView === 'ioc-stats' ? (
           <IOCStatsView
@@ -1352,6 +1355,8 @@ function AppInner() {
             onRestoreIOC={loggedRestoreIOC}
             onToggleArchiveIOC={loggedToggleArchiveIOC}
             onOpenSettings={() => { setSettingsInitialTab('integrations'); setShowSettings(true); }}
+            iocTableColumns={settings.iocTableColumns}
+            onUpdateTableColumns={(columns) => updateSettings({ iocTableColumns: columns })}
           />
         ) : activeView === 'activity' ? (
           <ActivityLogView
@@ -1738,6 +1743,7 @@ function AppInner() {
               });
             }
           }}
+          playbookSteps={editingFolder?.playbookExecution ? playbooksHook.playbooks.find(p => p.id === editingFolder.playbookExecution?.templateId)?.steps : undefined}
         />
       )}
 

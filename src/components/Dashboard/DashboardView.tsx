@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, FileText, ListChecks, Clock, PenTool, Search, Network, Activity, MessageSquare } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import type { QuickLink, ViewMode, Folder, Note, Task, TimelineEvent, Whiteboard, StandaloneIOC } from '../../types';
+import type { QuickLink, ViewMode, Folder, Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, KPIMetricId } from '../../types';
 import { QuickLinkForm } from './QuickLinkForm';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { InvestigationCard } from '../Layout/InvestigationCard';
+import { KPIWidgets } from './KPIWidgets';
 
 const INTERNAL_TOOLS: { view: ViewMode; label: string; description: string; icon: typeof FileText; color: string }[] = [
   { view: 'notes', label: 'Notes', description: 'Investigation notes & IOC extraction', icon: FileText, color: '#38bdf8' },
@@ -28,9 +29,11 @@ interface DashboardViewProps {
   allWhiteboards?: Whiteboard[];
   allIOCs?: StandaloneIOC[];
   onFolderSelect?: (id: string) => void;
+  dashboardKPIs?: KPIMetricId[];
+  onUpdateKPIs?: (kpis: KPIMetricId[]) => void;
 }
 
-export function DashboardView({ links, onUpdateLinks, onViewChange, folders, allNotes, allTasks, allEvents, allWhiteboards, allIOCs, onFolderSelect }: DashboardViewProps) {
+export function DashboardView({ links, onUpdateLinks, onViewChange, folders, allNotes, allTasks, allEvents, allWhiteboards, allIOCs, onFolderSelect, dashboardKPIs, onUpdateKPIs }: DashboardViewProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<QuickLink | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -89,6 +92,19 @@ export function DashboardView({ links, onUpdateLinks, onViewChange, folders, all
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {/* KPI Widgets */}
+      {folders && allNotes && allTasks && allEvents && allIOCs && onUpdateKPIs && (
+        <KPIWidgets
+          folders={folders}
+          allNotes={allNotes}
+          allTasks={allTasks}
+          allEvents={allEvents}
+          allIOCs={allIOCs}
+          selectedKPIs={dashboardKPIs ?? []}
+          onUpdateKPIs={onUpdateKPIs}
+        />
+      )}
+
       {/* Header */}
       <div data-tour="quick-links" className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <div className="flex items-center gap-2">

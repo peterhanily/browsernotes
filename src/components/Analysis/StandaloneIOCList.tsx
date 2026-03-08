@@ -1,10 +1,11 @@
 import { useState, useMemo, forwardRef } from 'react';
-import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw, Search, ChevronUp, ChevronDown, X, ListPlus, Clipboard, Tag as TagIcon, GitMerge } from 'lucide-react';
 import type { StandaloneIOC, Folder, Tag, IOCType, ConfidenceLevel } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { StandaloneIOCForm } from './StandaloneIOCForm';
 import { BulkIOCImportModal } from './BulkIOCImportModal';
+import { IOCDeduplicator } from './IOCDeduplicator';
 import { RunIntegrationMenu } from '../Integrations/RunIntegrationMenu';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { useToast } from '../../contexts/ToastContext';
@@ -84,6 +85,15 @@ export function StandaloneIOCList({
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingIOC, setEditingIOC] = useState<StandaloneIOC | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false);
+  const [showBulkConfidenceMenu, setShowBulkConfidenceMenu] = useState(false);
+  const [showBulkTagInput, setShowBulkTagInput] = useState(false);
+  const [bulkTagText, setBulkTagText] = useState('');
+  const [showDeduplicator, setShowDeduplicator] = useState(false);
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('updatedAt');
@@ -167,6 +177,66 @@ export function StandaloneIOCList({
     setEditingIOC(undefined);
   };
 
+  // ─── Bulk operations ────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredSortedIOCs.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredSortedIOCs.map(i => i.id)));
+    }
+  };
+
+  const getSelectedIds = () => filteredSortedIOCs.filter(i => selectedIds.has(i.id)).map(i => i.id);
+
+  const handleBulkDelete = () => {
+    const ids = getSelectedIds();
+    for (const id of ids) {
+      if (onTrash) onTrash(id);
+      else onDelete(id);
+    }
+    setSelectedIds(new Set());
+    setShowBulkDelete(false);
+    addToast('success', `Deleted ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkSetStatus = (status: string) => {
+    const ids = getSelectedIds();
+    for (const id of ids) onUpdate(id, { iocStatus: status });
+    setSelectedIds(new Set());
+    setShowBulkStatusMenu(false);
+    addToast('success', `Updated status on ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkSetConfidence = (confidence: ConfidenceLevel) => {
+    const ids = getSelectedIds();
+    for (const id of ids) onUpdate(id, { confidence });
+    setSelectedIds(new Set());
+    setShowBulkConfidenceMenu(false);
+    addToast('success', `Updated confidence on ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkAddTags = () => {
+    if (!bulkTagText.trim()) return;
+    const newTags = bulkTagText.split(',').map(t => t.trim()).filter(Boolean);
+    const selected = filteredSortedIOCs.filter(i => selectedIds.has(i.id));
+    for (const ioc of selected) {
+      const merged = [...new Set([...ioc.tags, ...newTags])];
+      onUpdate(ioc.id, { tags: merged });
+    }
+    setSelectedIds(new Set());
+    setShowBulkTagInput(false);
+    setBulkTagText('');
+    addToast('success', `Added tags to ${selected.length} IOC${selected.length !== 1 ? 's' : ''}`);
+  };
+
   const SortHeader = ({ field, label, className }: { field: SortField; label: string; className: string }) => (
     <th
       className={`${className} cursor-pointer select-none hover:text-gray-300 transition-colors`}
@@ -199,6 +269,16 @@ export function StandaloneIOCList({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {iocs.length > 1 && (
+            <button
+              onClick={() => setShowDeduplicator(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm font-medium transition-colors"
+              title="Find duplicate IOCs"
+            >
+              <GitMerge size={16} />
+              Dedup
+            </button>
+          )}
           {iocs.length > 0 && (
             <button
               onClick={async () => {
@@ -234,6 +314,59 @@ export function StandaloneIOCList({
           </button>
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 bg-accent/5 flex-wrap">
+          <span className="text-xs font-medium text-accent">{selectedIds.size} selected</span>
+          <div className="w-px h-4 bg-gray-700" />
+          <button onClick={() => setShowBulkDelete(true)} className="flex items-center gap-1 px-2 py-1 rounded bg-red-900/20 text-red-400 hover:bg-red-900/40 text-xs">
+            <Trash2 size={12} /> Delete
+          </button>
+          <div className="relative">
+            <button onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)} className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs">
+              Set Status <ChevronDown size={10} />
+            </button>
+            {showBulkStatusMenu && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-44">
+                {STATUS_OPTIONS.map(s => (
+                  <button key={s} onClick={() => handleBulkSetStatus(s)} className="w-full px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 text-left flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                    {STATUS_LABELS[s] || s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowBulkConfidenceMenu(!showBulkConfidenceMenu)} className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs">
+              Set Confidence <ChevronDown size={10} />
+            </button>
+            {showBulkConfidenceMenu && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-36">
+                {CONFIDENCE_OPTIONS.map(c => (
+                  <button key={c} onClick={() => handleBulkSetConfidence(c)} className="w-full px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 text-left flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CONFIDENCE_LEVELS[c].color }} />
+                    {CONFIDENCE_LEVELS[c].label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowBulkTagInput(!showBulkTagInput)} className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs">
+              <TagIcon size={12} /> Add Tags
+            </button>
+            {showBulkTagInput && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-2 w-56">
+                <input autoFocus value={bulkTagText} onChange={e => setBulkTagText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleBulkAddTags(); }} placeholder="tag1, tag2, ..." className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-gray-600" />
+                <button onClick={handleBulkAddTags} disabled={!bulkTagText.trim()} className="mt-1.5 w-full px-2 py-1 rounded bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 disabled:opacity-40">Apply Tags</button>
+              </div>
+            )}
+          </div>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-gray-500 hover:text-gray-300 px-2 py-1">Clear selection</button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-col gap-2 px-4 pt-3 pb-2 border-b border-gray-800">
@@ -390,6 +523,9 @@ export function StandaloneIOCList({
               }}
               fixedHeaderContent={() => (
                 <tr className="border-b border-gray-800 bg-gray-900">
+                  <th className="text-left text-gray-500 font-medium py-2 pr-1 w-8">
+                    <input type="checkbox" checked={filteredSortedIOCs.length > 0 && selectedIds.size === filteredSortedIOCs.length} onChange={toggleSelectAll} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                  </th>
                   <SortHeader field="value" label="Value" className="text-left text-gray-500 font-medium py-2 pr-2" />
                   <SortHeader field="type" label="Type" className="text-left text-gray-500 font-medium py-2 px-2" />
                   <SortHeader field="confidence" label="Confidence" className="text-left text-gray-500 font-medium py-2 px-2" />
@@ -407,6 +543,9 @@ export function StandaloneIOCList({
                 const clsColor = ioc.clsLevel ? CLS_COLORS[ioc.clsLevel] || '#6b7280' : undefined;
                 return (
                   <>
+                    <td className="py-2 pr-1 w-8">
+                      <input type="checkbox" checked={selectedIds.has(ioc.id)} onChange={() => toggleSelect(ioc.id)} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                    </td>
                     <td className="py-2 pr-2 text-gray-200 font-mono max-w-[240px] truncate">{ioc.value}</td>
                     <td className="py-2 px-2">
                       <span
@@ -553,6 +692,24 @@ export function StandaloneIOCList({
         folders={folders}
         allTags={allTags}
         defaultFolderId={defaultFolderId}
+      />
+
+      <ConfirmDialog
+        open={showBulkDelete}
+        onClose={() => setShowBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected IOCs"
+        message={`Delete ${selectedIds.size} IOC${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`}
+        confirmLabel={`Delete ${selectedIds.size}`}
+        danger
+      />
+
+      <IOCDeduplicator
+        open={showDeduplicator}
+        onClose={() => setShowDeduplicator(false)}
+        iocs={allIOCs ?? iocs}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
       />
 
     </div>

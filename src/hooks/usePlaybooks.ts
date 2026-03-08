@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../db';
-import type { PlaybookTemplate, NoteTemplate, Note, Task, Folder, Timeline } from '../types';
+import type { PlaybookTemplate, NoteTemplate, Note, Task, Folder, Timeline, PlaybookExecution } from '../types';
 import { BUILTIN_PLAYBOOKS } from '../lib/builtin-playbooks';
 import { BUILTIN_NOTE_TEMPLATES } from '../lib/builtin-templates';
 import { nanoid } from 'nanoid';
@@ -124,8 +124,19 @@ export function usePlaybooks() {
       }
     }
 
+    // Build playbook execution tracker
+    const playbookExecution: PlaybookExecution = {
+      templateId: playbook.id,
+      templateName: playbook.name,
+      startedAt: now,
+      steps: playbook.steps.map((_, i) => ({
+        stepIndex: i,
+        completed: false,
+      })),
+    };
+
     // Update folder with playbook metadata
-    const folderUpdates: Partial<Folder> = { timelineId, updatedAt: now };
+    const folderUpdates: Partial<Folder> = { timelineId, updatedAt: now, playbookExecution };
     if (playbook.defaultClsLevel) folderUpdates.clsLevel = playbook.defaultClsLevel;
     if (playbook.defaultPapLevel) folderUpdates.papLevel = playbook.defaultPapLevel;
     if (playbook.defaultTags) folderUpdates.tags = [...(folder.tags || []), ...playbook.defaultTags];

@@ -1,5 +1,5 @@
 import { Briefcase, Tag } from 'lucide-react';
-import type { InvestigationStatus } from '../../types';
+import type { InvestigationStatus, PlaybookExecution } from '../../types';
 
 const statusLabels: Record<InvestigationStatus, string> = {
   active: 'Active',
@@ -21,12 +21,16 @@ interface ActiveFilterBarProps {
   tagColor?: string;
   onClear: () => void;
   onEditFolder?: () => void;
+  playbookExecution?: PlaybookExecution;
 }
 
-export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, onEditFolder }: ActiveFilterBarProps) {
+export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName, tagColor, onClear, onEditFolder, playbookExecution }: ActiveFilterBarProps) {
   if (!folderName && !tagName) return null;
 
   const accentColor = folderColor || tagColor || '#6366f1';
+  const pbCompleted = playbookExecution?.steps.filter(s => s.completed).length ?? 0;
+  const pbTotal = playbookExecution?.steps.length ?? 0;
+  const pbPct = pbTotal > 0 ? Math.round((pbCompleted / pbTotal) * 100) : 0;
 
   return (
     <div
@@ -62,6 +66,20 @@ export function ActiveFilterBar({ folderName, folderColor, folderStatus, tagName
       {folderStatus && (
         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusColors[folderStatus]}`}>
           {statusLabels[folderStatus]}
+        </span>
+      )}
+      {playbookExecution && pbTotal > 0 && (
+        <span className="flex items-center gap-1.5 ml-1" title={`${playbookExecution.templateName}: ${pbCompleted}/${pbTotal} steps`}>
+          <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${pbPct}%`,
+                backgroundColor: pbPct === 100 ? '#22c55e' : '#6366f1',
+              }}
+            />
+          </div>
+          <span className="text-[10px] text-gray-500 tabular-nums">{pbCompleted}/{pbTotal}</span>
         </span>
       )}
       <button

@@ -94,6 +94,21 @@ export const CLOSURE_RESOLUTION_LABELS: Record<ClosureResolution, string> = {
   'inconclusive': 'Inconclusive',
 };
 
+export interface PlaybookExecutionStep {
+  stepIndex: number;
+  completed: boolean;
+  completedAt?: number;
+  completedBy?: string;
+  notes?: string;
+}
+
+export interface PlaybookExecution {
+  templateId: string;
+  templateName: string;
+  startedAt: number;
+  steps: PlaybookExecutionStep[];
+}
+
 export interface Folder {
   id: string;
   name: string;
@@ -114,6 +129,7 @@ export interface Folder {
   createdBy?: string;
   updatedBy?: string;
   localOnly?: boolean;
+  playbookExecution?: PlaybookExecution;
 }
 
 export interface Tag {
@@ -201,6 +217,8 @@ export interface Settings {
     invite?: boolean;
     bot?: boolean;
   };
+  dashboardKPIs?: string[];
+  iocTableColumns?: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -210,6 +228,57 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarCollapsed: false,
   taskViewMode: 'list',
 };
+
+export const AVAILABLE_KPI_METRICS = [
+  'open-investigations',
+  'closed-this-month',
+  'avg-investigation-age',
+  'tasks-pending',
+  'tasks-completed-week',
+  'iocs-under-investigation',
+  'notes-created-week',
+  'timeline-events-week',
+  'overdue-tasks',
+] as const;
+
+export type KPIMetricId = typeof AVAILABLE_KPI_METRICS[number];
+
+export const KPI_METRIC_LABELS: Record<KPIMetricId, string> = {
+  'open-investigations': 'Open Investigations',
+  'closed-this-month': 'Closed This Month',
+  'avg-investigation-age': 'Avg Investigation Age',
+  'tasks-pending': 'Tasks Pending',
+  'tasks-completed-week': 'Tasks Completed (Week)',
+  'iocs-under-investigation': 'IOCs Under Investigation',
+  'notes-created-week': 'Notes Created (Week)',
+  'timeline-events-week': 'Timeline Events (Week)',
+  'overdue-tasks': 'Overdue Tasks',
+};
+
+export const DEFAULT_DASHBOARD_KPIS: KPIMetricId[] = [
+  'open-investigations',
+  'tasks-pending',
+  'iocs-under-investigation',
+  'notes-created-week',
+];
+
+export const DEFAULT_IOC_TABLE_COLUMNS = [
+  'value', 'type', 'confidence', 'source', 'iocStatus', 'attribution', 'clsLevel', 'updatedAt',
+];
+
+export const ALL_IOC_TABLE_COLUMNS: { key: string; label: string; alwaysVisible?: boolean; hiddenByDefault?: boolean; teamOnly?: boolean }[] = [
+  { key: 'value', label: 'Value', alwaysVisible: true },
+  { key: 'type', label: 'Type' },
+  { key: 'confidence', label: 'Confidence' },
+  { key: 'source', label: 'Source' },
+  { key: 'iocStatus', label: 'Status' },
+  { key: 'attribution', label: 'Attribution' },
+  { key: 'clsLevel', label: 'CLS' },
+  { key: 'updatedAt', label: 'Updated' },
+  { key: 'tags', label: 'Tags', hiddenByDefault: true },
+  { key: 'firstSeen', label: 'First Seen', hiddenByDefault: true },
+  { key: 'assignee', label: 'Assignee', hiddenByDefault: true, teamOnly: true },
+];
 
 // IOC Analysis types
 export type IOCType =

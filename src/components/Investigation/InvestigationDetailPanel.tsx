@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Briefcase, FileBarChart, Share2, Cloud, CloudOff } from 'lucide-react';
-import type { Folder, InvestigationStatus, ClosureResolution } from '../../types';
+import type { Folder, InvestigationStatus, ClosureResolution, PlaybookStep } from '../../types';
 import { NOTE_COLORS, CLOSURE_RESOLUTION_LABELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
 import type { Tag } from '../../types';
 import { cn, formatFullDate } from '../../lib/utils';
+import { PlaybookProgress } from '../Playbooks/PlaybookProgress';
 
 interface InvestigationDetailPanelProps {
   folder: Folder;
@@ -21,6 +22,7 @@ interface InvestigationDetailPanelProps {
   onShareLink?: (folderId: string) => void;
   serverConnected?: boolean;
   onToggleSync?: (folderId: string, syncEnabled: boolean) => void;
+  playbookSteps?: PlaybookStep[];
 }
 
 const STATUS_OPTIONS: { value: InvestigationStatus; label: string }[] = [
@@ -44,6 +46,7 @@ export function InvestigationDetailPanel({
   onShareLink,
   serverConnected,
   onToggleSync,
+  playbookSteps,
 }: InvestigationDetailPanelProps) {
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description || '');
@@ -260,6 +263,37 @@ export function InvestigationDetailPanel({
               <span>{entityCounts.whiteboards} whiteboards</span>
             </div>
           </div>
+
+          {/* Playbook Progress */}
+          {folder.playbookExecution && playbookSteps && playbookSteps.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1">Playbook Progress</label>
+              <PlaybookProgress
+                execution={folder.playbookExecution}
+                steps={playbookSteps.map(s => ({ title: s.title, content: s.content, phase: s.phase }))}
+                onToggleStep={(stepIndex, completed) => {
+                  const exec = folder.playbookExecution!;
+                  const updatedSteps = exec.steps.map(s =>
+                    s.stepIndex === stepIndex
+                      ? { ...s, completed, completedAt: completed ? Date.now() : undefined }
+                      : s
+                  );
+                  onUpdate(folder.id, {
+                    playbookExecution: { ...exec, steps: updatedSteps },
+                  });
+                }}
+                onUpdateStepNotes={(stepIndex, notes) => {
+                  const exec = folder.playbookExecution!;
+                  const updatedSteps = exec.steps.map(s =>
+                    s.stepIndex === stepIndex ? { ...s, notes } : s
+                  );
+                  onUpdate(folder.id, {
+                    playbookExecution: { ...exec, steps: updatedSteps },
+                  });
+                }}
+              />
+            </div>
+          )}
 
           {/* Timeline */}
           <div>

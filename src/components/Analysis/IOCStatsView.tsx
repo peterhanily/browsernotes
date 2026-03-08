@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, forwardRef } from 'react';
-import { ChevronDown, ChevronRight, Search, BarChart3, List, Plus, ListPlus, Clipboard, X, ChevronUp, Pencil, Trash2, Archive, RotateCcw, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, BarChart3, List, Plus, ListPlus, Clipboard, X, ChevronUp, Pencil, Trash2, Archive, RotateCcw, ExternalLink, Columns, GitMerge, Tag as TagIcon } from 'lucide-react';
 import type { Note, Task, TimelineEvent, StandaloneIOC, Settings, IOCEntry, IOCType, ConfidenceLevel, Folder, Tag } from '../../types';
-import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS } from '../../types';
+import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, ALL_IOC_TABLE_COLUMNS, DEFAULT_IOC_TABLE_COLUMNS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
 import { StandaloneIOCForm } from './StandaloneIOCForm';
 import { BulkIOCImportModal } from './BulkIOCImportModal';
+import { IOCDeduplicator } from './IOCDeduplicator';
 import { RunIntegrationMenu } from '../Integrations/RunIntegrationMenu';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { useToast } from '../../contexts/ToastContext';
+import { formatDate } from '../../lib/utils';
 import { TableVirtuoso } from 'react-virtuoso';
 
 // ─── Constants ─────────────────────────────────────────────────────
@@ -61,6 +63,8 @@ interface IOCStatsViewProps {
   onToggleArchiveIOC?: (id: string) => void;
   onOpenSettings?: () => void;
   onNavigateToSource?: (sourceType: 'note' | 'task' | 'event', sourceId: string) => void;
+  iocTableColumns?: string[];
+  onUpdateTableColumns?: (columns: string[]) => void;
 }
 
 interface UniqueIOC {
@@ -101,6 +105,7 @@ export function IOCStatsView({
   onCreateIOC, onUpdateIOC, onDeleteIOC,
   onTrashIOC, onRestoreIOC, onToggleArchiveIOC,
   onOpenSettings, onNavigateToSource,
+  iocTableColumns, onUpdateTableColumns,
 }: IOCStatsViewProps) {
   const [actorsExpanded, setActorsExpanded] = useState(false);
   const [scopeMode, setScopeMode] = useState<'investigation' | 'global'>('investigation');
@@ -536,6 +541,8 @@ export function IOCStatsView({
           currentFolderName={selectedFolderName}
           onOpenSettings={onOpenSettings}
           onNavigateToSource={onNavigateToSource}
+          iocTableColumns={iocTableColumns}
+          onUpdateTableColumns={onUpdateTableColumns}
         />
       )}
     </div>
@@ -632,6 +639,7 @@ function AllIOCsTab({
   onTrashIOC, onRestoreIOC, onToggleArchiveIOC,
   defaultFolderId, currentFolderId, currentFolderName,
   onOpenSettings, onNavigateToSource,
+  iocTableColumns, onUpdateTableColumns,
 }: {
   rows: UnifiedIOCRow[];
   folders: Folder[];
@@ -648,6 +656,8 @@ function AllIOCsTab({
   currentFolderName?: string;
   onOpenSettings?: () => void;
   onNavigateToSource?: (sourceType: 'note' | 'task' | 'event', sourceId: string) => void;
+  iocTableColumns?: string[];
+  onUpdateTableColumns?: (columns: string[]) => void;
 }) {
   const { getInstallationsForIOCType, addRun } = useIntegrations();
   const { addToast } = useToast();
@@ -667,6 +677,21 @@ function AllIOCsTab({
   const [typeFilter, setTypeFilter] = useState<IOCType[]>([]);
   const [searchText, setSearchText] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'note' | 'task' | 'event' | 'standalone'>('all');
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [showBulkStatusMenu, setShowBulkStatusMenu] = useState(false);
+  const [showBulkConfidenceMenu, setShowBulkConfidenceMenu] = useState(false);
+  const [showBulkTagInput, setShowBulkTagInput] = useState(false);
+  const [bulkTagText, setBulkTagText] = useState('');
+
+  // Column customization state
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const visibleColumns = useMemo(() => new Set(iocTableColumns ?? DEFAULT_IOC_TABLE_COLUMNS), [iocTableColumns]);
+
+  // Deduplication
+  const [showDeduplicator, setShowDeduplicator] = useState(false);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -728,6 +753,92 @@ function AllIOCsTab({
     setTypeFilter(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
   };
 
+  // ─── Bulk operations ────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredSortedRows.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredSortedRows.map(r => r.id)));
+    }
+  };
+
+  const selectedStandaloneCount = useMemo(() => {
+    return filteredSortedRows.filter(r => selectedIds.has(r.id) && r.sourceType === 'standalone').length;
+  }, [filteredSortedRows, selectedIds]);
+
+  const selectedExtractedCount = useMemo(() => {
+    return filteredSortedRows.filter(r => selectedIds.has(r.id) && r.sourceType !== 'standalone').length;
+  }, [filteredSortedRows, selectedIds]);
+
+  const getSelectedStandaloneIds = () => {
+    return filteredSortedRows
+      .filter(r => selectedIds.has(r.id) && r.sourceType === 'standalone')
+      .map(r => r.sourceId);
+  };
+
+  const handleBulkDelete = () => {
+    const ids = getSelectedStandaloneIds();
+    for (const id of ids) {
+      if (onTrashIOC) onTrashIOC(id);
+      else if (onDeleteIOC) onDeleteIOC(id);
+    }
+    setSelectedIds(new Set());
+    setShowBulkDelete(false);
+    addToast('success', `Deleted ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkSetStatus = (status: string) => {
+    const ids = getSelectedStandaloneIds();
+    for (const id of ids) onUpdateIOC?.(id, { iocStatus: status });
+    setSelectedIds(new Set());
+    setShowBulkStatusMenu(false);
+    addToast('success', `Updated status on ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkSetConfidence = (confidence: ConfidenceLevel) => {
+    const ids = getSelectedStandaloneIds();
+    for (const id of ids) onUpdateIOC?.(id, { confidence });
+    setSelectedIds(new Set());
+    setShowBulkConfidenceMenu(false);
+    addToast('success', `Updated confidence on ${ids.length} IOC${ids.length !== 1 ? 's' : ''}`);
+  };
+
+  const handleBulkAddTags = () => {
+    if (!bulkTagText.trim()) return;
+    const newTags = bulkTagText.split(',').map(t => t.trim()).filter(Boolean);
+    const standaloneRows = filteredSortedRows.filter(r => selectedIds.has(r.id) && r.sourceType === 'standalone' && r.standaloneIOC);
+    for (const row of standaloneRows) {
+      const existing = row.standaloneIOC!.tags || [];
+      const merged = [...new Set([...existing, ...newTags])];
+      onUpdateIOC?.(row.sourceId, { tags: merged });
+    }
+    setSelectedIds(new Set());
+    setShowBulkTagInput(false);
+    setBulkTagText('');
+    addToast('success', `Added tags to ${standaloneRows.length} IOC${standaloneRows.length !== 1 ? 's' : ''}`);
+  };
+
+  // ─── Column toggle helper ──────────────────────────────────
+  const toggleColumn = (key: string) => {
+    const col = ALL_IOC_TABLE_COLUMNS.find(c => c.key === key);
+    if (col?.alwaysVisible) return;
+    const currentCols = iocTableColumns ?? DEFAULT_IOC_TABLE_COLUMNS;
+    const next = currentCols.includes(key)
+      ? currentCols.filter(c => c !== key)
+      : [...currentCols, key];
+    onUpdateTableColumns?.(next);
+  };
+
+  const isColVisible = (key: string) => visibleColumns.has(key);
+
   const SortHeader = ({ field, label, className }: { field: SortField; label: string; className: string }) => (
     <th className={`${className} cursor-pointer select-none hover:text-gray-300 transition-colors`} onClick={() => handleSort(field)}>
       <span className="inline-flex items-center gap-0.5">
@@ -745,6 +856,55 @@ function AllIOCsTab({
           {hasActiveFilters ? `${filteredSortedRows.length} / ${rows.length}` : rows.length} IOCs
         </span>
         <div className="flex items-center gap-2">
+          {/* Column picker */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColumnPicker(!showColumnPicker)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs font-medium transition-colors"
+              title="Configure columns"
+            >
+              <Columns size={14} />
+            </button>
+            {showColumnPicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-48">
+                {ALL_IOC_TABLE_COLUMNS.map(col => (
+                  <button
+                    key={col.key}
+                    onClick={() => toggleColumn(col.key)}
+                    disabled={col.alwaysVisible}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-800 disabled:opacity-40"
+                  >
+                    <span className={`w-3.5 h-3.5 rounded border ${isColVisible(col.key) ? 'bg-accent border-accent' : 'border-gray-600'} flex items-center justify-center`}>
+                      {isColVisible(col.key) && <span className="text-white text-[8px]">&#10003;</span>}
+                    </span>
+                    <span className="text-gray-300">{col.label}</span>
+                    {col.hiddenByDefault && <span className="text-[9px] text-gray-600 ml-auto">hidden</span>}
+                  </button>
+                ))}
+                <div className="border-t border-gray-700 mt-1 pt-1 px-3">
+                  <button
+                    onClick={() => { onUpdateTableColumns?.(DEFAULT_IOC_TABLE_COLUMNS); setShowColumnPicker(false); }}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 py-0.5"
+                  >
+                    Reset to defaults
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Find Duplicates */}
+          {allStandaloneIOCs && allStandaloneIOCs.length > 1 && onUpdateIOC && onDeleteIOC && (
+            <button
+              onClick={() => setShowDeduplicator(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs font-medium transition-colors"
+              title="Find duplicate IOCs"
+            >
+              <GitMerge size={14} />
+              Dedup
+            </button>
+          )}
+
           {filteredSortedRows.length > 0 && (
             <button
               onClick={async () => {
@@ -784,6 +944,122 @@ function AllIOCsTab({
           )}
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-800 bg-accent/5 shrink-0 flex-wrap">
+          <span className="text-xs font-medium text-accent">{selectedIds.size} selected</span>
+          {selectedExtractedCount > 0 && (
+            <span className="text-[10px] text-gray-500">({selectedStandaloneCount} standalone, {selectedExtractedCount} extracted)</span>
+          )}
+          <div className="w-px h-4 bg-gray-700" />
+
+          {/* Delete */}
+          {selectedStandaloneCount > 0 && (onTrashIOC || onDeleteIOC) && (
+            <button
+              onClick={() => setShowBulkDelete(true)}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-red-900/20 text-red-400 hover:bg-red-900/40 text-xs"
+            >
+              <Trash2 size={12} />
+              Delete ({selectedStandaloneCount})
+            </button>
+          )}
+
+          {/* Set Status */}
+          {selectedStandaloneCount > 0 && onUpdateIOC && (
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkStatusMenu(!showBulkStatusMenu)}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs"
+              >
+                Set Status <ChevronDown size={10} />
+              </button>
+              {showBulkStatusMenu && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-44">
+                  {STATUS_OPTIONS.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => handleBulkSetStatus(s)}
+                      className="w-full px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 text-left flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                      {STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Set Confidence */}
+          {selectedStandaloneCount > 0 && onUpdateIOC && (
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkConfidenceMenu(!showBulkConfidenceMenu)}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs"
+              >
+                Set Confidence <ChevronDown size={10} />
+              </button>
+              {showBulkConfidenceMenu && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-36">
+                  {CONFIDENCE_OPTIONS.map(c => {
+                    const info = CONFIDENCE_LEVELS[c];
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => handleBulkSetConfidence(c)}
+                        className="w-full px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 text-left flex items-center gap-2"
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }} />
+                        {info.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add Tags */}
+          {selectedStandaloneCount > 0 && onUpdateIOC && (
+            <div className="relative">
+              <button
+                onClick={() => setShowBulkTagInput(!showBulkTagInput)}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs"
+              >
+                <TagIcon size={12} />
+                Add Tags
+              </button>
+              {showBulkTagInput && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-2 w-56">
+                  <input
+                    autoFocus
+                    value={bulkTagText}
+                    onChange={e => setBulkTagText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleBulkAddTags(); }}
+                    placeholder="tag1, tag2, ..."
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-gray-600"
+                  />
+                  <button
+                    onClick={handleBulkAddTags}
+                    disabled={!bulkTagText.trim()}
+                    className="mt-1.5 w-full px-2 py-1 rounded bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 disabled:opacity-40"
+                  >
+                    Apply Tags
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto text-xs text-gray-500 hover:text-gray-300 px-2 py-1"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-col gap-2 px-4 pt-2.5 pb-2 border-b border-gray-800 shrink-0">
@@ -957,12 +1233,24 @@ function AllIOCsTab({
               }}
               fixedHeaderContent={() => (
                 <tr className="border-b border-gray-800 bg-gray-900">
+                  <th className="text-left text-gray-500 font-medium py-2 pr-1 w-8">
+                    <input
+                      type="checkbox"
+                      checked={filteredSortedRows.length > 0 && selectedIds.size === filteredSortedRows.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
                   <SortHeader field="value" label="Value" className="text-left text-gray-500 font-medium py-2 pr-2" />
-                  <SortHeader field="type" label="Type" className="text-left text-gray-500 font-medium py-2 px-2" />
-                  <SortHeader field="confidence" label="Confidence" className="text-left text-gray-500 font-medium py-2 px-2" />
-                  <SortHeader field="source" label="Source" className="text-left text-gray-500 font-medium py-2 px-2" />
-                  <SortHeader field="iocStatus" label="Status" className="text-left text-gray-500 font-medium py-2 px-2" />
-                  <SortHeader field="attribution" label="Attribution" className="text-left text-gray-500 font-medium py-2 px-2" />
+                  {isColVisible('type') && <SortHeader field="type" label="Type" className="text-left text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('confidence') && <SortHeader field="confidence" label="Confidence" className="text-left text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('source') && <SortHeader field="source" label="Source" className="text-left text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('iocStatus') && <SortHeader field="iocStatus" label="Status" className="text-left text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('attribution') && <SortHeader field="attribution" label="Attribution" className="text-left text-gray-500 font-medium py-2 px-2" />}
+                  {isColVisible('clsLevel') && <th className="text-left text-gray-500 font-medium py-2 px-2" title="Classification">CLS</th>}
+                  {isColVisible('updatedAt') && <th className="text-left text-gray-500 font-medium py-2 px-2">Updated</th>}
+                  {isColVisible('tags') && <th className="text-left text-gray-500 font-medium py-2 px-2">Tags</th>}
+                  {isColVisible('firstSeen') && <th className="text-left text-gray-500 font-medium py-2 px-2">First Seen</th>}
                   <th className="text-right text-gray-500 font-medium py-2 pl-2">Actions</th>
                 </tr>
               )}
@@ -972,34 +1260,91 @@ function AllIOCsTab({
                 const statusColor = row.iocStatus ? STATUS_COLORS[row.iocStatus] || '#6b7280' : undefined;
                 const sourceColor: Record<string, string> = { note: '#3b82f6', task: '#22c55e', event: '#6366f1', standalone: '#f59e0b' };
                 const sColor = sourceColor[row.sourceType] || '#6b7280';
+                const si = row.standaloneIOC;
+                const CLS_COLORS: Record<string, string> = {
+                  'TLP:CLEAR': '#ffffff', 'TLP:GREEN': '#22c55e', 'TLP:AMBER': '#f59e0b', 'TLP:AMBER+STRICT': '#f59e0b', 'TLP:RED': '#ef4444',
+                };
+                const clsLevel = si?.clsLevel;
+                const clsColor = clsLevel ? CLS_COLORS[clsLevel] || '#6b7280' : undefined;
                 return (
                   <>
+                    <td className="py-2 pr-1 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.id)}
+                        onChange={() => toggleSelect(row.id)}
+                        className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer"
+                      />
+                    </td>
                     <td className="py-2 pr-2 text-gray-200 font-mono max-w-[220px] truncate">{row.value}</td>
-                    <td className="py-2 px-2">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: typeInfo.color + '22', color: typeInfo.color }}>
-                        {typeInfo.label}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: confInfo.color + '22', color: confInfo.color }}>
-                        {confInfo.label}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: sColor + '18', color: sColor }}>
-                        {row.source}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2">
-                      {row.iocStatus ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: statusColor + '22', color: statusColor }}>
-                          {STATUS_LABELS[row.iocStatus] || row.iocStatus}
+                    {isColVisible('type') && (
+                      <td className="py-2 px-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: typeInfo.color + '22', color: typeInfo.color }}>
+                          {typeInfo.label}
                         </span>
-                      ) : (
-                        <span className="text-gray-600">--</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-2 text-gray-400 max-w-[120px] truncate">{row.attribution || '--'}</td>
+                      </td>
+                    )}
+                    {isColVisible('confidence') && (
+                      <td className="py-2 px-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: confInfo.color + '22', color: confInfo.color }}>
+                          {confInfo.label}
+                        </span>
+                      </td>
+                    )}
+                    {isColVisible('source') && (
+                      <td className="py-2 px-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: sColor + '18', color: sColor }}>
+                          {row.source}
+                        </span>
+                      </td>
+                    )}
+                    {isColVisible('iocStatus') && (
+                      <td className="py-2 px-2">
+                        {row.iocStatus ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: statusColor + '22', color: statusColor }}>
+                            {STATUS_LABELS[row.iocStatus] || row.iocStatus}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">--</span>
+                        )}
+                      </td>
+                    )}
+                    {isColVisible('attribution') && (
+                      <td className="py-2 px-2 text-gray-400 max-w-[120px] truncate">{row.attribution || '--'}</td>
+                    )}
+                    {isColVisible('clsLevel') && (
+                      <td className="py-2 px-2">
+                        {clsLevel ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: clsColor + '22', color: clsColor }}>
+                            {clsLevel}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">--</span>
+                        )}
+                      </td>
+                    )}
+                    {isColVisible('updatedAt') && (
+                      <td className="py-2 px-2 text-gray-500">{formatDate(row.updatedAt)}</td>
+                    )}
+                    {isColVisible('tags') && (
+                      <td className="py-2 px-2">
+                        {si && si.tags.length > 0 ? (
+                          <div className="flex gap-0.5 flex-wrap max-w-[120px]">
+                            {si.tags.slice(0, 3).map(t => (
+                              <span key={t} className="text-[9px] px-1 py-0 rounded bg-gray-700 text-gray-400">{t}</span>
+                            ))}
+                            {si.tags.length > 3 && <span className="text-[9px] text-gray-600">+{si.tags.length - 3}</span>}
+                          </div>
+                        ) : (
+                          <span className="text-gray-600">--</span>
+                        )}
+                      </td>
+                    )}
+                    {isColVisible('firstSeen') && (
+                      <td className="py-2 px-2 text-gray-500">
+                        {si ? formatDate(si.createdAt) : '--'}
+                      </td>
+                    )}
                     <td className="py-2 pl-2">
                       <div className="flex items-center justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                         {row.sourceType === 'standalone' && row.standaloneIOC ? (
@@ -1108,6 +1453,28 @@ function AllIOCsTab({
         confirmLabel="Delete IOC"
         danger
       />
+
+      {/* Bulk delete confirmation */}
+      <ConfirmDialog
+        open={showBulkDelete}
+        onClose={() => setShowBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected IOCs"
+        message={`Delete ${selectedStandaloneCount} standalone IOC${selectedStandaloneCount !== 1 ? 's' : ''}? This cannot be undone.${selectedExtractedCount > 0 ? ` (${selectedExtractedCount} extracted IOCs will be skipped)` : ''}`}
+        confirmLabel={`Delete ${selectedStandaloneCount}`}
+        danger
+      />
+
+      {/* Deduplicator */}
+      {allStandaloneIOCs && onUpdateIOC && onDeleteIOC && (
+        <IOCDeduplicator
+          open={showDeduplicator}
+          onClose={() => setShowDeduplicator(false)}
+          iocs={allStandaloneIOCs}
+          onUpdate={onUpdateIOC}
+          onDelete={onDeleteIOC}
+        />
+      )}
     </div>
   );
 }

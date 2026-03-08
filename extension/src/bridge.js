@@ -21,6 +21,7 @@ if (document.documentElement.dataset.tcBridgeLoaded) {
   }
 } else {
 document.documentElement.dataset.tcBridgeLoaded = '1';
+document.documentElement.dataset.tcBridgeCaps = TC_CAPABILITIES.join(',');
 
 var ports = new Map(); // requestId → Port
 

@@ -10,6 +10,7 @@ interface AuthState {
   serverUrl: string | null;
   connected: boolean;
   getAccessToken: () => Promise<string | null>;
+  invalidateAccessToken?: () => void;
   setReachable: (ok: boolean) => void;
 }
 
@@ -38,7 +39,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
     let active = true;
 
     if (auth.serverUrl && auth.connected) {
-      configureServerApi(auth.serverUrl, auth.getAccessToken);
+      configureServerApi(auth.serverUrl, auth.getAccessToken, auth.invalidateAccessToken);
       enableSync();
       syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
       syncEngine.setRemoteChangeHandler((_changes, tables) => {

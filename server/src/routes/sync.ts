@@ -63,6 +63,18 @@ app.post('/push', async (c) => {
     }
 
     const hasAccess = await checkInvestigationAccess(user.id, folderId, 'editor');
+
+    // If the client is moving an entity to a different folder, also verify
+    // access to the destination folder to prevent cross-folder data exfil.
+    const clientFolderId = change.data?.folderId as string | undefined;
+    if (hasAccess && change.op === 'put' && clientFolderId && clientFolderId !== folderId) {
+      const hasDestAccess = await checkInvestigationAccess(user.id, clientFolderId, 'editor');
+      if (!hasDestAccess) {
+        authorized.push(false);
+        continue;
+      }
+    }
+
     if (hasAccess) {
       authorized.push(true);
     } else if (change.table === 'folders' && change.op === 'put') {

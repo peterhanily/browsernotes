@@ -9,6 +9,7 @@ interface AuthState {
   register(email: string, displayName: string, password: string): Promise<void>;
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
+  invalidateAccessToken(): void;
   setServerUrl(url: string | null): void;
   setReachable(reachable: boolean): void;
 }
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthState>({
   register: async () => {},
   logout: async () => {},
   getAccessToken: async () => null,
+  invalidateAccessToken: () => {},
   setServerUrl: () => {},
   setReachable: () => {},
 });
@@ -173,6 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, [serverUrl]);
 
+  const invalidateAccessToken = useCallback(() => {
+    accessTokenRef.current = null;
+  }, []);
+
   const getAccessToken = useCallback(async (): Promise<string | null> => {
     if (!serverUrl || !refreshTokenRef.current) return null;
 
@@ -232,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       getAccessToken,
+      invalidateAccessToken,
       setServerUrl,
       setReachable,
     }}>

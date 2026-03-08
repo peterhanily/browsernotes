@@ -263,22 +263,20 @@ app.delete('/:id', async (c) => {
     }
   }
 
-  // Delete all content
-  await db.delete(notes).where(eq(notes.folderId, folderId));
-  await db.delete(tasks).where(eq(tasks.folderId, folderId));
-  await db.delete(timelineEvents).where(eq(timelineEvents.folderId, folderId));
-  await db.delete(whiteboards).where(eq(whiteboards.folderId, folderId));
-  await db.delete(standaloneIOCs).where(eq(standaloneIOCs.folderId, folderId));
-  await db.delete(chatThreads).where(eq(chatThreads.folderId, folderId));
-  await db.delete(posts).where(eq(posts.folderId, folderId));
-  await db.delete(files).where(eq(files.folderId, folderId));
-  await db.delete(notifications).where(eq(notifications.folderId, folderId));
-
-  // Delete all memberships
-  await db.delete(investigationMembers).where(eq(investigationMembers.folderId, folderId));
-
-  // Delete the folder itself
-  await db.delete(folders).where(eq(folders.id, folderId));
+  // Delete all content atomically
+  await db.transaction(async (tx) => {
+    await tx.delete(notes).where(eq(notes.folderId, folderId));
+    await tx.delete(tasks).where(eq(tasks.folderId, folderId));
+    await tx.delete(timelineEvents).where(eq(timelineEvents.folderId, folderId));
+    await tx.delete(whiteboards).where(eq(whiteboards.folderId, folderId));
+    await tx.delete(standaloneIOCs).where(eq(standaloneIOCs.folderId, folderId));
+    await tx.delete(chatThreads).where(eq(chatThreads.folderId, folderId));
+    await tx.delete(posts).where(eq(posts.folderId, folderId));
+    await tx.delete(files).where(eq(files.folderId, folderId));
+    await tx.delete(notifications).where(eq(notifications.folderId, folderId));
+    await tx.delete(investigationMembers).where(eq(investigationMembers.folderId, folderId));
+    await tx.delete(folders).where(eq(folders.id, folderId));
+  });
 
   await logActivity({
     userId: user.id,

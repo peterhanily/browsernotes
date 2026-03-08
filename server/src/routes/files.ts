@@ -122,6 +122,14 @@ app.post('/upload', requireRole('admin', 'analyst'), async (c) => {
 
   const folderId = (body['folderId'] as string) || null;
 
+  // Verify the uploader has editor access to the target folder
+  if (folderId) {
+    const hasAccess = await checkInvestigationAccess(user.id, folderId, 'editor');
+    if (!hasAccess) {
+      return c.json({ error: 'No access to this investigation' }, 403);
+    }
+  }
+
   await db.insert(files).values({
     id,
     uploadedBy: user.id,

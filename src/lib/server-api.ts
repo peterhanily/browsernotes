@@ -1,14 +1,21 @@
 type GetTokenFn = () => Promise<string | null>;
+type InvalidateTokenFn = () => void;
 
 let _getToken: GetTokenFn = async () => null;
+let _invalidateToken: InvalidateTokenFn = () => {};
 let _serverUrl: string | null = null;
 
-export function configureServerApi(serverUrl: string | null, getToken: GetTokenFn) {
+export function configureServerApi(
+  serverUrl: string | null,
+  getToken: GetTokenFn,
+  invalidateToken?: InvalidateTokenFn,
+) {
   _serverUrl = serverUrl;
   _getToken = getToken;
+  _invalidateToken = invalidateToken || (() => {});
 }
 
-async function apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {
+async function apiFetch(path: string, opts: RequestInit = {}, _retry = false): Promise<Response> {
   if (!_serverUrl) throw new Error('Not connected to server');
 
   const token = await _getToken();
@@ -29,7 +36,16 @@ async function apiFetch(path: string, opts: RequestInit = {}): Promise<Response>
     headers,
   });
 
-  // If 401, token may be expired — caller should handle refresh + retry
+  // On 401, invalidate the cached token so getAccessToken triggers a refresh,
+  // then retry the request once with the fresh token.
+  if (resp.status === 401 && !_retry) {
+    _invalidateToken();
+    const freshToken = await _getToken();
+    if (freshToken) {
+      return apiFetch(path, opts, true);
+    }
+  }
+
   return resp;
 }
 

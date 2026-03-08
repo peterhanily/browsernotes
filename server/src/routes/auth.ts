@@ -140,7 +140,8 @@ app.post('/login', async (c) => {
     return c.json({ error: 'Validation failed' }, 400);
   }
 
-  const { email, password } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password } = parsed.data;
 
   // Check if account is locked before verifying credentials
   const lockStatus = isLocked(email);

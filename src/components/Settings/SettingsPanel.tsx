@@ -11,6 +11,7 @@ import { ServerBackup } from './ServerBackup';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { EncryptionSettings } from '../Encryption/EncryptionSettings';
 import { ServerConnection } from './ServerConnection';
+import { IntegrationPanel } from '../Integrations/IntegrationPanel';
 
 function SystemPromptEditor({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -89,7 +90,7 @@ interface SettingsPanelProps {
   };
 }
 
-type SettingsTab = 'general' | 'ai' | 'data' | 'templates' | 'intel' | 'shortcuts';
+type SettingsTab = 'general' | 'ai' | 'data' | 'templates' | 'intel' | 'integrations' | 'shortcuts';
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'general', label: 'General' },
@@ -97,6 +98,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'data', label: 'Data' },
   { key: 'templates', label: 'Templates' },
   { key: 'intel', label: 'Threat Intel' },
+  { key: 'integrations', label: 'Integrations' },
   { key: 'shortcuts', label: 'Shortcuts' },
 ];
 
@@ -499,6 +501,13 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       {activeTab === 'intel' && (
         <div className="space-y-6">
           <ThreatIntelConfig />
+        </div>
+      )}
+
+      {/* Integrations Tab */}
+      {activeTab === 'integrations' && (
+        <div className="space-y-6">
+          <IntegrationPanel />
         </div>
       )}
 

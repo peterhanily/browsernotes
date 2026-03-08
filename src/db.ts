@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Note, Task, Folder, Tag, TimelineEvent, Timeline, Whiteboard, ActivityLogEntry, StandaloneIOC, ChatThread, NoteTemplate, PlaybookTemplate } from './types';
+import type { IntegrationTemplate, InstalledIntegration, IntegrationRun } from './types/integration-types';
 import { installEncryptionMiddleware } from './lib/encryptionMiddleware';
 
 const db = new Dexie('ThreatCaddyDB') as Dexie & {
@@ -15,6 +16,9 @@ const db = new Dexie('ThreatCaddyDB') as Dexie & {
   chatThreads: EntityTable<ChatThread, 'id'>;
   noteTemplates: EntityTable<NoteTemplate, 'id'>;
   playbookTemplates: EntityTable<PlaybookTemplate, 'id'>;
+  integrationTemplates: EntityTable<IntegrationTemplate, 'id'>;
+  installedIntegrations: EntityTable<InstalledIntegration, 'id'>;
+  integrationRuns: EntityTable<IntegrationRun, 'id'>;
 };
 
 db.version(1).stores({
@@ -140,6 +144,13 @@ db.version(17).stores({
 db.version(18).stores({
   noteTemplates: 'id, name, category, source, createdAt, updatedAt',
   playbookTemplates: 'id, name, investigationType, source, createdAt, updatedAt',
+});
+
+// Version 19: Integration platform tables
+db.version(19).stores({
+  integrationTemplates: 'id, name, category, source, createdAt, updatedAt',
+  installedIntegrations: 'id, templateId, enabled, createdAt, updatedAt',
+  integrationRuns: 'id, integrationId, templateId, status, createdAt',
 });
 
 // Encryption-at-rest middleware (transparent to all CRUD hooks)

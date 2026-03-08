@@ -30,6 +30,9 @@ vi.mock('../components/Settings/KeyboardShortcuts', () => ({
 vi.mock('../components/Encryption/EncryptionSettings', () => ({
   EncryptionSettings: () => <div data-testid="encryption-settings">EncryptionSettings</div>,
 }));
+vi.mock('../components/Integrations/IntegrationPanel', () => ({
+  IntegrationPanel: () => <div data-testid="integration-panel">IntegrationPanel</div>,
+}));
 vi.mock('../components/Settings/ServerBackup', () => ({
   ServerBackup: () => <div data-testid="server-backup">ServerBackup</div>,
 }));
@@ -147,6 +150,12 @@ describe('SettingsPanel', () => {
     render(<SettingsPanel {...defaultProps} />);
     clickTab('Threat Intel');
     expect(screen.getByTestId('threat-intel-config')).toBeInTheDocument();
+  });
+
+  it('renders Integrations tab components', () => {
+    render(<SettingsPanel {...defaultProps} />);
+    clickTab('Integrations');
+    expect(screen.getByTestId('integration-panel')).toBeInTheDocument();
   });
 
   it('renders Shortcuts tab components', () => {

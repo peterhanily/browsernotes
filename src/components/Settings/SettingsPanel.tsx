@@ -106,7 +106,8 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
   const labelClass = 'text-sm text-gray-400';
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto space-y-8 min-h-[600px]">
+    <div className="flex-1 overflow-y-auto">
+    <div className="w-full max-w-2xl mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-100">Settings</h2>
         {onClose && (
@@ -479,6 +480,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
           <KeyboardShortcuts />
         </div>
       )}
+    </div>
     </div>
   );
 }

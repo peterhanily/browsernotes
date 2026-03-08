@@ -54,9 +54,9 @@ describe('SettingsPanel', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  it('renders Preferences section on General tab', () => {
+  it('renders Display Preferences section on General tab', () => {
     render(<SettingsPanel {...defaultProps} />);
-    expect(screen.getByText('Preferences')).toBeInTheDocument();
+    expect(screen.getByText('Display Preferences')).toBeInTheDocument();
   });
 
   it('renders Anthropic API Key input on AI tab', () => {

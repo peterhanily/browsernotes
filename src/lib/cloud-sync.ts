@@ -1,15 +1,63 @@
-import type { BackupDestination } from '../types';
+import type { BackupDestination, Note, SharedItemEnvelope, ExportData } from '../types';
 import { CLOUD_PROVIDERS } from './cloud-providers';
 
-// Re-export envelope/key helpers — they are provider-agnostic
-export {
-  buildNoteEnvelope,
-  buildIOCReportEnvelope,
-  buildFullBackupEnvelope,
-  buildObjectKey,
-} from './oci-sync';
-
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // 50 MB
+
+// ---- Envelope Helpers (provider-agnostic) ----
+
+export function buildNoteEnvelope(note: Note, label: string, clipsFolderId?: string): SharedItemEnvelope {
+  const isClip = clipsFolderId != null && note.folderId === clipsFolderId;
+  return {
+    version: 1,
+    type: isClip ? 'clip' : 'note',
+    sharedBy: label || 'anonymous',
+    sharedAt: Date.now(),
+    payload: note,
+  };
+}
+
+export function buildIOCReportEnvelope(note: Note, label: string): SharedItemEnvelope {
+  return {
+    version: 1,
+    type: 'ioc-report',
+    sharedBy: label || 'anonymous',
+    sharedAt: Date.now(),
+    payload: note, // note.iocAnalysis is included as part of the Note object
+  };
+}
+
+export function buildFullBackupEnvelope(exportData: ExportData, label: string): SharedItemEnvelope {
+  return {
+    version: 1,
+    type: 'full-backup',
+    sharedBy: label || 'anonymous',
+    sharedAt: Date.now(),
+    payload: exportData,
+  };
+}
+
+// ---- Object Key Convention ----
+
+function sanitizeLabel(label: string): string {
+  return (label || 'default').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+}
+
+export function buildObjectKey(type: SharedItemEnvelope['type'], id: string, label: string): string {
+  const timestamp = Date.now();
+  const safeLabel = sanitizeLabel(label);
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  switch (type) {
+    case 'full-backup':
+      return `threatcaddy/backups/${safeLabel}-${timestamp}.json`;
+    case 'note':
+      return `threatcaddy/shared/notes/${safeId}-${timestamp}.json`;
+    case 'clip':
+      return `threatcaddy/shared/clips/${safeId}-${timestamp}.json`;
+    case 'ioc-report':
+      return `threatcaddy/shared/ioc-reports/${safeId}-${timestamp}.json`;
+  }
+}
 
 export interface DestinationPutResult {
   destinationId: string;

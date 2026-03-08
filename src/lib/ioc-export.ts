@@ -146,8 +146,8 @@ function buildFlatIOCs(entries: IOCExportEntry[], config: ThreatIntelExportConfi
         ioc_type: ioc.type,
         ioc_subtype: ioc.iocSubtype || '',
         notes: ioc.analystNotes || '',
-        related_id: ioc.relatedId || '',
-        relationship_type: ioc.relationshipType || '',
+        related_id: ioc.relatedId || '',             // deprecated field, kept for CSV export compat
+        relationship_type: ioc.relationshipType || '', // deprecated field, kept for CSV export compat
         ioc_status: ioc.iocStatus || '',
         tags: tagsStr,
       });

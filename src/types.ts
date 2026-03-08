@@ -236,8 +236,18 @@ export interface IOCEntry {
   iocSubtype?: string;
   iocStatus?: string;
   clsLevel?: string;
-  relatedId?: string;          // deprecated — use relationships[]
-  relationshipType?: string;   // deprecated — use relationships[]
+  /**
+   * @deprecated Use `relationships[]` instead. Retained for backward compatibility
+   * with existing data. Legacy values are migrated at runtime in IOCItem.tsx and
+   * handled as fallback in graph-data.ts and export.ts. Do NOT use in new code.
+   */
+  relatedId?: string;
+  /**
+   * @deprecated Use `relationships[]` instead. Retained for backward compatibility
+   * with existing data. Legacy values are migrated at runtime in IOCItem.tsx and
+   * handled as fallback in graph-data.ts and export.ts. Do NOT use in new code.
+   */
+  relationshipType?: string;
   relationships?: IOCRelationship[];
 }
 

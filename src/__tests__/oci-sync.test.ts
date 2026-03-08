@@ -1,102 +1,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect } from 'vitest';
 import {
-  validatePAR,
-  buildObjectUrl,
   buildNoteEnvelope,
   buildIOCReportEnvelope,
   buildFullBackupEnvelope,
   buildObjectKey,
-} from '../lib/oci-sync';
+} from '../lib/cloud-sync';
 import type { Note, ExportData } from '../types';
-
-// ---- validatePAR ----
-
-describe('validatePAR', () => {
-  it('accepts a valid OCI PAR URL', () => {
-    const url = 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/abc123/n/ns/b/bucket/o/';
-    expect(validatePAR(url)).toEqual({ valid: true });
-  });
-
-  it('rejects empty string', () => {
-    expect(validatePAR('')).toEqual({ valid: false, error: 'PAR URL is required' });
-  });
-
-  it('rejects http:// URLs', () => {
-    const url = 'http://objectstorage.us-ashburn-1.oraclecloud.com/p/abc123/n/ns/b/bucket/o/';
-    const result = validatePAR(url);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('HTTPS');
-  });
-
-  it('rejects URLs without /p/ segment', () => {
-    const url = 'https://objectstorage.example.com/n/ns/b/bucket/o/';
-    const result = validatePAR(url);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('/p/');
-  });
-
-  it('rejects URLs without /o/ segment', () => {
-    const url = 'https://objectstorage.example.com/p/token/n/ns/b/bucket/';
-    const result = validatePAR(url);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('/o/');
-  });
-
-  it('rejects non-URL strings', () => {
-    const result = validatePAR('not a url');
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('Invalid URL');
-  });
-
-  it('rejects non-OCI hostnames with valid path segments', () => {
-    const url = 'https://evil.com/p/token/n/ns/b/bucket/o/';
-    const result = validatePAR(url);
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('Oracle Cloud');
-  });
-});
-
-// ---- buildObjectUrl ----
-
-describe('buildObjectUrl', () => {
-  const prefix = 'https://objectstorage.us-ashburn-1.oraclecloud.com/p/token/n/ns/b/bucket/o/';
-
-  it('appends path to prefix', () => {
-    const url = buildObjectUrl(prefix, 'threatcaddy/test.json');
-    expect(url).toBe(prefix + 'threatcaddy/test.json');
-  });
-
-  it('handles prefix without trailing slash', () => {
-    const prefixNoSlash = prefix.slice(0, -1);
-    const url = buildObjectUrl(prefixNoSlash, 'threatcaddy/test.json');
-    expect(url).toBe(prefix + 'threatcaddy/test.json');
-  });
-
-  it('strips leading slashes from object path', () => {
-    const url = buildObjectUrl(prefix, '/threatcaddy/test.json');
-    expect(url).toBe(prefix + 'threatcaddy/test.json');
-  });
-
-  it('sanitizes .. from object path', () => {
-    const url = buildObjectUrl(prefix, 'threatcaddy/../secret.json');
-    expect(url).not.toContain('..');
-  });
-
-  it('strips query params from object path', () => {
-    const url = buildObjectUrl(prefix, 'threatcaddy/test.json?param=evil');
-    expect(url).not.toContain('?');
-  });
-
-  it('strips hash from object path', () => {
-    const url = buildObjectUrl(prefix, 'threatcaddy/test.json#frag');
-    expect(url).not.toContain('#');
-  });
-
-  it('throws on empty object path after sanitization', () => {
-    expect(() => buildObjectUrl(prefix, '../../../')).toThrow('Invalid object path');
-  });
-});
 
 // ---- Envelope Helpers ----
 

@@ -90,6 +90,7 @@ function sanitizeIOCEntry(raw: unknown): IOCEntry | null {
     iocSubtype: r.iocSubtype != null ? str(r.iocSubtype) : undefined,
     iocStatus: r.iocStatus != null ? str(r.iocStatus) : undefined,
     clsLevel: r.clsLevel != null ? str(r.clsLevel) : undefined,
+    // Preserved for backward-compat import of legacy exports; deprecated in favor of relationships[]
     relatedId: r.relatedId != null ? str(r.relatedId) : undefined,
     relationshipType: r.relationshipType != null ? str(r.relationshipType) : undefined,
     relationships: Array.isArray(r.relationships)

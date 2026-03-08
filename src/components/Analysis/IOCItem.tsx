@@ -72,7 +72,9 @@ export function IOCItem({ ioc, onUpdate, onDismiss, onRestore, attributionActors
     copyTimer.current = setTimeout(() => setCopied(false), 1500);
   };
 
-  // Migrate legacy relatedId/relationshipType to relationships on first render
+  // Migration: convert deprecated relatedId/relationshipType into relationships[]
+  // on first render so the legacy fields are cleared from persisted data over time.
+  // Safe to remove once all users' data has been migrated.
   useEffect(() => {
     if (ioc.relatedId && ioc.relationshipType && (!ioc.relationships || ioc.relationships.length === 0)) {
       onUpdate(ioc.id, {

@@ -268,7 +268,9 @@ export function buildGraphData(
     if (!sourceNodeId) continue;
 
     const rels = ioc.relationships || [];
-    // Also handle legacy relatedId/relationshipType
+    // Legacy fallback: convert deprecated relatedId/relationshipType to relationships[]
+    // format when no modern relationships exist. Safe to remove once all persisted data
+    // has been migrated (IOCItem.tsx migrates on first render).
     if (ioc.relatedId && ioc.relationshipType && rels.length === 0) {
       rels.push({ targetIOCId: ioc.relatedId, relationshipType: ioc.relationshipType });
     }

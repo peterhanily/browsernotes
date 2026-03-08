@@ -206,6 +206,15 @@ export function Sidebar({
         aria-label="Main navigation"
         data-tour="sidebar-nav"
       >
+        {/* Top expand button */}
+        <div className="shrink-0 flex flex-col items-center py-1.5 border-b border-border-subtle w-full">
+          <CollapsedIcon
+            icon={PanelLeft}
+            label="Expand sidebar"
+            onClick={onToggleCollapsed}
+          />
+        </div>
+
         {/* Scrollable view icons */}
         <div className="flex-1 flex flex-col items-center py-2 gap-0.5 overflow-y-auto overflow-x-hidden w-full">
           {collapsedViewItems.map((item) => (

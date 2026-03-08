@@ -266,6 +266,7 @@ describe('POST /api/files/upload', () => {
   });
 
   it('accepts folderId to scope file to an investigation', async () => {
+    mockCheckAccess.mockResolvedValue(true);
     const formData = new FormData();
     const blob = new File(['content'], 'doc.pdf', { type: 'application/pdf' });
     formData.append('file', blob);

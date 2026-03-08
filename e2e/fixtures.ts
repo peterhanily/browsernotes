@@ -84,7 +84,7 @@ export async function openNewTaskForm(page: Page) {
  */
 export async function navigateToView(
   page: Page,
-  view: 'Dashboard' | 'Notes' | 'Tasks' | 'Timeline' | 'Whiteboards' | 'IOC Stats' | 'Graph' | 'Activity' | 'CaddyShack' | 'CaddyAI',
+  view: 'Dashboard' | 'Notes' | 'Tasks' | 'Timeline' | 'Whiteboards' | 'IOCs' | 'Graph' | 'Activity' | 'CaddyShack' | 'CaddyAI',
 ) {
   const sidebar = page.locator('aside[role="navigation"] nav[aria-label="Views"]');
   await sidebar.getByText(view, { exact: true }).click();

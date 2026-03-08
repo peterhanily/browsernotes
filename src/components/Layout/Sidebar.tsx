@@ -190,7 +190,7 @@ export function Sidebar({
     { view: 'tasks', icon: ListChecks, label: 'Tasks', badge: investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total, badgeColor: 'bg-accent-amber', dataTour: 'tasks' },
     { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
     { view: 'whiteboard', icon: PenTool, label: 'Whiteboards', badge: investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount, dataTour: 'whiteboards' },
-    { view: 'ioc-stats', icon: Search, label: 'IOC Stats', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
+    { view: 'ioc-stats', icon: Search, label: 'IOCs', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
     { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
@@ -506,12 +506,12 @@ export function Sidebar({
           />
         </div>
 
-        {/* 6px gap between Whiteboards and IOC Stats */}
+        {/* 6px gap between Whiteboards and IOCs */}
         <div className="h-1.5" />
 
         <NavItem
           icon={<Search size={16} />}
-          label="IOC Stats"
+          label="IOCs"
           badge={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
           badgeColor="bg-accent-green/15 text-accent-green"
           active={activeView === 'ioc-stats'}

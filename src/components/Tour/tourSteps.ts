@@ -62,7 +62,7 @@ export const tourSteps: TourStep[] = [
     id: 'graph-iocs',
     target: '[data-tour="graph-canvas"]',
     title: 'Graph & IOCs',
-    description: 'Interactive entity graph for IOCs, notes, and events. See aggregate IOC stats in the IOC Stats view.',
+    description: 'Interactive entity graph for IOCs, notes, and events. See aggregate IOC stats in the IOCs view.',
     placement: 'bottom',
     view: 'graph',
   },

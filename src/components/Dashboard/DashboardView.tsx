@@ -11,7 +11,7 @@ const INTERNAL_TOOLS: { view: ViewMode; label: string; description: string; icon
   { view: 'tasks', label: 'Tasks', description: 'Task board with kanban & list views', icon: ListChecks, color: '#fbbf24' },
   { view: 'timeline', label: 'Timeline', description: 'Chronological event tracking', icon: Clock, color: '#4ade80' },
   { view: 'whiteboard', label: 'Whiteboards', description: 'Visual diagramming & collaboration', icon: PenTool, color: '#a855f7' },
-  { view: 'ioc-stats', label: 'IOC Stats', description: 'Indicator of compromise analytics', icon: Search, color: '#10b981' },
+  { view: 'ioc-stats', label: 'IOCs', description: 'Indicators of compromise and analytics', icon: Search, color: '#10b981' },
   { view: 'graph', label: 'Graph', description: 'Relationship & link analysis', icon: Network, color: '#6366f1' },
   { view: 'activity', label: 'Activity', description: 'Audit log of all actions', icon: Activity, color: '#f472b6' },
   { view: 'chat', label: 'CaddyAI', description: 'AI-powered investigation assistant', icon: MessageSquare, color: '#8b5cf6' },

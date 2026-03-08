@@ -89,13 +89,14 @@ interface SettingsPanelProps {
   };
 }
 
-type SettingsTab = 'general' | 'ai' | 'data' | 'templates' | 'shortcuts';
+type SettingsTab = 'general' | 'ai' | 'data' | 'templates' | 'intel' | 'shortcuts';
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'general', label: 'General' },
   { key: 'ai', label: 'AI' },
   { key: 'data', label: 'Data' },
   { key: 'templates', label: 'Templates' },
+  { key: 'intel', label: 'Threat Intel' },
   { key: 'shortcuts', label: 'Shortcuts' },
 ];
 
@@ -105,7 +106,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
   const labelClass = 'text-sm text-gray-400';
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto space-y-8">
+    <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto space-y-8 min-h-[600px]">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-100">Settings</h2>
         {onClose && (
@@ -465,11 +466,17 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
         </div>
       )}
 
+      {/* Threat Intel Tab */}
+      {activeTab === 'intel' && (
+        <div className="space-y-6">
+          <ThreatIntelConfig />
+        </div>
+      )}
+
       {/* Shortcuts Tab */}
       {activeTab === 'shortcuts' && (
         <div className="space-y-6">
           <KeyboardShortcuts />
-          <ThreatIntelConfig />
         </div>
       )}
     </div>

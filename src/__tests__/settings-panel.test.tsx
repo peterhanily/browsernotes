@@ -143,10 +143,15 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('cloud-backup')).toBeInTheDocument();
   });
 
+  it('renders Threat Intel tab components', () => {
+    render(<SettingsPanel {...defaultProps} />);
+    clickTab('Threat Intel');
+    expect(screen.getByTestId('threat-intel-config')).toBeInTheDocument();
+  });
+
   it('renders Shortcuts tab components', () => {
     render(<SettingsPanel {...defaultProps} />);
     clickTab('Shortcuts');
     expect(screen.getByTestId('keyboard-shortcuts')).toBeInTheDocument();
-    expect(screen.getByTestId('threat-intel-config')).toBeInTheDocument();
   });
 });

@@ -943,7 +943,7 @@ export function NoteEditor({
               style={editorMode === 'split' ? { width: `${(1 - editorPreview.ratio) * 100}%` } : { flex: 1 }}
             >
               {content ? (
-                <MarkdownPreview content={content} defanged={defangPreview} allNotes={allNotes} onNavigateToNote={onNavigateToNote} />
+                <MarkdownPreview content={content} defanged={defangPreview} allNotes={allNotes} onNavigateToNote={onNavigateToNote} iocs={note.iocAnalysis?.iocs} />
               ) : (
                 <p className="text-gray-600 text-sm italic">Nothing to preview</p>
               )}

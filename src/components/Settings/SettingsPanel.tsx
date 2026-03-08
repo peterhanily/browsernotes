@@ -72,6 +72,7 @@ interface SettingsPanelProps {
   onLoadSample?: () => void;
   onDeleteSample?: () => void;
   onClose?: () => void;
+  initialTab?: SettingsTab;
   templateProps?: {
     templates: NoteTemplate[];
     userTemplates: NoteTemplate[];
@@ -102,8 +103,8 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'shortcuts', label: 'Shortcuts' },
 ];
 
-export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose, templateProps, playbookProps }: SettingsPanelProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose, initialTab, templateProps, playbookProps }: SettingsPanelProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'general');
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
 

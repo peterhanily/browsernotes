@@ -30,7 +30,10 @@ export function AppShell() {
       .finally(() => setReady(true));
   }, [cachedKey]);
 
-  if (!ready) return null; // brief flash while importing cached key
+  if (!ready) {
+    // Return a minimal placeholder that matches the app background to prevent a white flash
+    return <div className="min-h-screen bg-gray-950 dark:bg-gray-950" />;
+  }
 
   if (!isUnlocked) {
     return <PassphraseDialog onUnlocked={() => setIsUnlocked(true)} />;

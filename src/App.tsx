@@ -49,7 +49,7 @@ const GraphView = lazy(() => import('./components/Graph/GraphView').then(m => ({
 const ChatView = lazy(() => import('./components/Chat/ChatView').then(m => ({ default: m.ChatView })));
 const IOCStatsView = lazy(() => import('./components/Analysis/IOCStatsView').then(m => ({ default: m.IOCStatsView })));
 const StandaloneIOCForm = lazy(() => import('./components/Analysis/StandaloneIOCForm').then(m => ({ default: m.StandaloneIOCForm })));
-const StandaloneIOCList = lazy(() => import('./components/Analysis/StandaloneIOCList').then(m => ({ default: m.StandaloneIOCList })));
+
 const TrashArchiveView = lazy(() => import('./components/TrashArchive/TrashArchiveView').then(m => ({ default: m.TrashArchiveView })));
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
@@ -245,6 +245,7 @@ function AppInner() {
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showPlaybookPicker, setShowPlaybookPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [shareLinkPayload, setShareLinkPayload] = useState<SharePayload | null>(null);
@@ -1259,7 +1260,8 @@ function AppInner() {
             sampleLoaded={sampleLoaded}
             onLoadSample={handleLoadSample}
             onDeleteSample={handleDeleteSample}
-            onClose={() => setShowSettings(false)}
+            onClose={() => { setShowSettings(false); setSettingsInitialTab(undefined); }}
+            initialTab={settingsInitialTab as 'general' | 'ai' | 'data' | 'templates' | 'intel' | 'integrations' | 'shortcuts' | undefined}
             templateProps={{
               templates: noteTemplatesHook.templates,
               userTemplates: noteTemplatesHook.userTemplates,
@@ -1327,39 +1329,30 @@ function AppInner() {
             }}
           />
         ) : activeView === 'ioc-stats' ? (
-          <div className="flex-1 flex flex-col overflow-y-auto">
-            <IOCStatsView
-              notes={screensafeNotes}
-              tasks={screensafeTasks}
-              timelineEvents={screensafeTimelineEvents}
-              standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
-              settings={settings}
-              scopedNotes={investigationNotes}
-              scopedTasks={investigationTasks}
-              scopedTimelineEvents={investigationTimelineEvents}
-              scopedStandaloneIOCs={investigationStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
-              selectedFolderId={selectedFolderId}
-              selectedFolderName={selectedFolder?.name}
-            />
-            <div className="border-t border-gray-800">
-              <StandaloneIOCList
-                iocs={filteredStandaloneIOCs}
-                folders={folders}
-                allTags={tags}
-                allIOCs={standaloneIOCsHook.iocs}
-                onCreate={loggedCreateIOC}
-                onUpdate={standaloneIOCsHook.updateIOC}
-                onDelete={loggedDeleteIOC}
-                onTrash={loggedTrashIOC}
-                onRestore={loggedRestoreIOC}
-                onToggleArchive={loggedToggleArchiveIOC}
-                defaultFolderId={selectedFolderId}
-                currentFolderId={selectedFolderId}
-                currentFolderName={selectedFolder?.name}
-                onOpenSettings={() => setShowSettings(true)}
-              />
-            </div>
-          </div>
+          <IOCStatsView
+            notes={screensafeNotes}
+            tasks={screensafeTasks}
+            timelineEvents={screensafeTimelineEvents}
+            standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
+            settings={settings}
+            scopedNotes={investigationNotes}
+            scopedTasks={investigationTasks}
+            scopedTimelineEvents={investigationTimelineEvents}
+            scopedStandaloneIOCs={investigationStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
+            selectedFolderId={selectedFolderId}
+            selectedFolderName={selectedFolder?.name}
+            folders={folders}
+            allTags={tags}
+            allStandaloneIOCs={standaloneIOCsHook.iocs}
+            filteredStandaloneIOCs={filteredStandaloneIOCs}
+            onCreateIOC={loggedCreateIOC}
+            onUpdateIOC={standaloneIOCsHook.updateIOC}
+            onDeleteIOC={loggedDeleteIOC}
+            onTrashIOC={loggedTrashIOC}
+            onRestoreIOC={loggedRestoreIOC}
+            onToggleArchiveIOC={loggedToggleArchiveIOC}
+            onOpenSettings={() => { setSettingsInitialTab('integrations'); setShowSettings(true); }}
+          />
         ) : activeView === 'activity' ? (
           <ActivityLogView
             entries={activityLog.entries}

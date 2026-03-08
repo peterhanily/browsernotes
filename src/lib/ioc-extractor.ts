@@ -184,7 +184,29 @@ export interface ExtractIOCsOptions {
   defaultConfidence?: string;        // default 'medium'
 }
 
+// Simple LRU-ish cache for extraction results keyed by content + options
+const EXTRACTION_CACHE_MAX = 8;
+const extractionCache: { key: string; result: IOCEntry[] }[] = [];
+
+function makeExtractCacheKey(content: string, options?: ExtractIOCsOptions): string {
+  // Use content length + first/last 200 chars + a hash-like fingerprint to keep keys cheap
+  const prefix = content.slice(0, 200);
+  const suffix = content.slice(-200);
+  const optKey = options ? `${options.enabledTypes?.join(',') ?? ''}|${options.defaultConfidence ?? ''}` : '';
+  return `${content.length}:${prefix}:${suffix}:${optKey}`;
+}
+
 export function extractIOCs(content: string, options?: ExtractIOCsOptions): IOCEntry[] {
+  const cacheKey = makeExtractCacheKey(content, options);
+  const cached = extractionCache.find((e) => e.key === cacheKey);
+  if (cached) return cached.result;
+  const result = extractIOCsUncached(content, options);
+  extractionCache.push({ key: cacheKey, result });
+  if (extractionCache.length > EXTRACTION_CACHE_MAX) extractionCache.shift();
+  return result;
+}
+
+function extractIOCsUncached(content: string, options?: ExtractIOCsOptions): IOCEntry[] {
   // Truncate very large content to prevent excessive processing
   const normalized = defang(content.length > MAX_IOC_INPUT_LEN ? content.slice(0, MAX_IOC_INPUT_LEN) : content);
   const entries: IOCEntry[] = [];

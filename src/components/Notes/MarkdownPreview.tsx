@@ -2,7 +2,7 @@ import { useMemo, useCallback } from 'react';
 import { renderMarkdown } from '../../lib/markdown';
 import type { WikiLinkTarget } from '../../lib/markdown';
 import { extractIOCs, refangToDefanged } from '../../lib/ioc-extractor';
-import type { Note } from '../../types';
+import type { Note, IOCEntry } from '../../types';
 
 const NETWORK_IOC_TYPES = new Set(['url', 'domain', 'ipv4', 'ipv6', 'email']);
 
@@ -11,9 +11,11 @@ interface MarkdownPreviewProps {
   defanged?: boolean;
   allNotes?: Note[];
   onNavigateToNote?: (noteId: string) => void;
+  /** Pre-extracted IOCs — avoids redundant extraction when available */
+  iocs?: IOCEntry[];
 }
 
-export function MarkdownPreview({ content, defanged, allNotes, onNavigateToNote }: MarkdownPreviewProps) {
+export function MarkdownPreview({ content, defanged, allNotes, onNavigateToNote, iocs: preExtractedIOCs }: MarkdownPreviewProps) {
   const wikiLinkTargets = useMemo<WikiLinkTarget[] | undefined>(() => {
     if (!allNotes) return undefined;
     return allNotes
@@ -24,7 +26,8 @@ export function MarkdownPreview({ content, defanged, allNotes, onNavigateToNote 
   const html = useMemo(() => {
     let src = content;
     if (defanged) {
-      const iocs = extractIOCs(content);
+      // Use pre-extracted IOCs if available, otherwise extract (cached)
+      const iocs = preExtractedIOCs ?? extractIOCs(content);
       const networkValues = iocs
         .filter((i) => NETWORK_IOC_TYPES.has(i.type))
         .map((i) => i.value);
@@ -36,7 +39,7 @@ export function MarkdownPreview({ content, defanged, allNotes, onNavigateToNote 
       src = defangedContent;
     }
     return renderMarkdown(src, wikiLinkTargets);
-  }, [content, defanged, wikiLinkTargets]);
+  }, [content, defanged, wikiLinkTargets, preExtractedIOCs]);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!onNavigateToNote) return;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://static.cloudflareinsights.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.basemaps.cartocdn.com; font-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://*.objectstorage.*.oraclecloud.com https://*.s3.*.amazonaws.com https://*.s3.amazonaws.com https://*.blob.core.windows.net https://storage.googleapis.com https://*.basemaps.cartocdn.com; frame-src 'none'; object-src 'none'; base-uri 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.basemaps.cartocdn.com; font-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://*.objectstorage.*.oraclecloud.com https://*.s3.*.amazonaws.com https://*.s3.amazonaws.com https://*.blob.core.windows.net https://storage.googleapis.com https://*.basemaps.cartocdn.com; frame-src 'none'; object-src 'none'; base-uri 'self';" />
 
     <meta name="description" content="ThreatCaddy — Threat Investigation Workspace. Notes, IOCs, Timelines & Graphs. Local-first. Your data is yours." />
     <meta name="theme-color" content="#030712" />
@@ -46,8 +46,31 @@
     </script>
 
     <title>ThreatCaddy</title>
+
+    <!-- Apply theme before first paint to prevent flash -->
+    <script>
+      try {
+        var s = localStorage.getItem('threatcaddy-settings');
+        if (s) {
+          var t = JSON.parse(s).theme;
+          if (t === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+          }
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body class="bg-gray-950 text-gray-100">
+    <script>
+      try {
+        var s = localStorage.getItem('threatcaddy-settings');
+        if (s && JSON.parse(s).theme === 'light') {
+          document.body.classList.remove('bg-gray-950', 'text-gray-100');
+          document.body.classList.add('bg-white', 'text-gray-900');
+        }
+      } catch (e) {}
+    </script>
     <div id="root">
       <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px">
         <style>@keyframes tc-spin{to{transform:rotate(360deg)}}</style>

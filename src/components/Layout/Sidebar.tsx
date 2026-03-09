@@ -99,6 +99,7 @@ export function Sidebar({
   onNavigate,
   onRenameTag,
   onDeleteTag,
+  onEditFolder,
   investigationScopedCounts,
   chatCount,
 }: SidebarProps) {
@@ -268,17 +269,36 @@ export function Sidebar({
             <ChevronLeft size={14} />
             All Investigations
           </button>
-          <div className="flex items-center gap-2">
-            {selectedFolder.color ? (
-              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedFolder.color }} />
-            ) : (
-              <div className={cn('w-2 h-2 rounded-full shrink-0', statusColor)} />
+          {/* Clickable investigation card — opens settings */}
+          <button
+            onClick={() => onEditFolder?.(selectedFolder.id)}
+            className="w-full text-left rounded-lg border border-border-subtle bg-bg-raised hover:border-border-medium hover:bg-bg-hover transition-colors p-2 group"
+            title="Investigation settings"
+          >
+            {selectedFolder.color && (
+              <div className="h-0.5 rounded-full mb-1.5 -mx-0.5" style={{ backgroundColor: selectedFolder.color }} />
             )}
-            <span className="text-sm font-medium text-text-primary truncate flex-1">{selectedFolder.name}</span>
-            <span className={cn('text-[10px] font-medium uppercase tracking-wide', statusTextColor)}>
-              {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
-            </span>
-          </div>
+            <div className="flex items-center gap-2">
+              {!selectedFolder.color && (
+                <div className={cn('w-2 h-2 rounded-full shrink-0', statusColor)} />
+              )}
+              <span className="text-sm font-medium text-text-primary truncate flex-1">{selectedFolder.name}</span>
+              <SettingsIcon size={12} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            </div>
+            {investigationScopedCounts && (
+              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-text-muted">
+                <span className="flex items-center gap-1"><FileText size={10} className="text-accent-blue" />{investigationScopedCounts.notes}</span>
+                <span className="flex items-center gap-1"><ListChecks size={10} className="text-accent-amber" />{investigationScopedCounts.tasks}</span>
+                <span className="flex items-center gap-1"><Clock size={10} className="text-accent-green" />{investigationScopedCounts.events}</span>
+                <span className="flex items-center gap-1"><Search size={10} className="text-accent-green" />{investigationScopedCounts.iocs}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-1">
+              <span className={cn('text-[10px] font-medium uppercase tracking-wide', statusTextColor)}>
+                {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
+              </span>
+            </div>
+          </button>
         </div>
       )}
 

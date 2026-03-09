@@ -49,7 +49,7 @@ export const NoteCard = React.memo(function NoteCard({ note, active, onSelect, o
       {note.color && (
         <div className="w-full h-0.5 rounded-full mb-2" style={{ backgroundColor: note.color }} />
       )}
-      <div className="flex items-start gap-2">
+      <div className={cn('flex items-start gap-2', onTrash && !note.trashed && 'pl-6')}>
         <h3 className="font-medium text-sm text-gray-200 flex-1 truncate">
           {note.title || 'Untitled'}
         </h3>

@@ -175,6 +175,24 @@ npm run build && npm start  # production
 | PATCH | `/:id` | Admin update user |
 | DELETE | `/:id` | Admin deactivate user |
 
+### Saved Searches (`/api/saved-searches`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | List saved searches (own + shared) |
+| POST | `/` | Create saved search |
+| PUT | `/:id` | Update saved search (owner only) |
+| DELETE | `/:id` | Delete saved search (owner or admin) |
+
+### Integrations (`/api/integrations`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/templates` | List all shared integration templates |
+| GET | `/templates/:id` | Get a single integration template |
+| POST | `/templates` | Share an integration template |
+| DELETE | `/templates/:id` | Delete a shared template (admin only) |
+
 ### Bots (`/api/bots`)
 
 | Method | Path | Description |

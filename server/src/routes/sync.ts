@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
 import { processPush, pullChanges, getSnapshot, lookupEntityFolderId, bulkLookupEntityFolderIds } from '../services/sync-service.js';
-import { logActivity } from '../services/audit-service.js';
+import { logActivity, logActivityBatch } from '../services/audit-service.js';
 import { logger } from '../lib/logger.js';
 import { broadcastToFolder } from '../ws/handler.js';
 import { db } from '../db/index.js';
@@ -36,7 +36,50 @@ app.post('/push', async (c) => {
   }
   const folderIdCache = await bulkLookupEntityFolderIds(lookupsNeeded);
 
-  // Build authorization list
+  // P7: Pre-fetch all accessible folderIds in one query instead of N checkInvestigationAccess calls
+  const accessibleEditorFolders = new Set<string>();
+  {
+    const memberships = await db
+      .select({ folderId: investigationMembers.folderId })
+      .from(investigationMembers)
+      .where(
+        eq(investigationMembers.userId, user.id),
+      );
+    for (const m of memberships) {
+      // editor and owner roles have editor-level access
+      accessibleEditorFolders.add(m.folderId);
+    }
+  }
+  // Refine: we need role-based check. Re-query with role filter for editor+ access.
+  accessibleEditorFolders.clear();
+  {
+    const memberships = await db
+      .select({ folderId: investigationMembers.folderId, role: investigationMembers.role })
+      .from(investigationMembers)
+      .where(eq(investigationMembers.userId, user.id));
+    for (const m of memberships) {
+      if (m.role === 'owner' || m.role === 'editor') {
+        accessibleEditorFolders.add(m.folderId);
+      }
+    }
+  }
+
+  // Batch check for new folder creates: find which folder entityIds already exist
+  const folderCreates = changes
+    .filter(c => c.table === 'folders' && c.op === 'put')
+    .map(c => c.entityId);
+  const existingFolderIds = new Set<string>();
+  if (folderCreates.length > 0) {
+    const existingRows = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(inArray(folders.id, folderCreates));
+    for (const row of existingRows) {
+      existingFolderIds.add(row.id);
+    }
+  }
+
+  // Build authorization list using in-memory Set lookups
   const authorized: boolean[] = [];
   for (const change of changes) {
     if (TABLES_WITHOUT_FOLDER.has(change.table)) {
@@ -70,13 +113,14 @@ app.post('/push', async (c) => {
       continue;
     }
 
-    const hasAccess = await checkInvestigationAccess(user.id, folderId, 'editor');
+    // P7: Use pre-fetched Set for O(1) access check instead of per-change DB query
+    const hasAccess = accessibleEditorFolders.has(folderId);
 
     // If the client is moving an entity to a different folder, also verify
     // access to the destination folder to prevent cross-folder data exfil.
     const clientFolderId = change.data?.folderId as string | undefined;
     if (hasAccess && change.op === 'put' && clientFolderId && clientFolderId !== folderId) {
-      const hasDestAccess = await checkInvestigationAccess(user.id, clientFolderId, 'editor');
+      const hasDestAccess = accessibleEditorFolders.has(clientFolderId);
       if (!hasDestAccess) {
         authorized.push(false);
         continue;
@@ -88,12 +132,7 @@ app.post('/push', async (c) => {
     } else if (change.table === 'folders' && change.op === 'put') {
       // Allow creating new folders — user won't have membership yet.
       // Existing folder modifications still require editor access.
-      const existing = await db
-        .select({ id: folders.id })
-        .from(folders)
-        .where(eq(folders.id, change.entityId))
-        .limit(1);
-      authorized.push(existing.length === 0);
+      authorized.push(!existingFolderIds.has(change.entityId));
     } else {
       authorized.push(false);
     }
@@ -135,7 +174,17 @@ app.post('/push', async (c) => {
     }
   }
 
-  // Broadcast accepted changes via WebSocket
+  // Broadcast accepted changes via WebSocket and collect activity log entries
+  const activityEntries: Array<{
+    userId: string;
+    category: string;
+    action: string;
+    detail: string;
+    itemId?: string;
+    itemTitle?: string;
+    folderId?: string;
+  }> = [];
+
   for (let i = 0; i < changes.length; i++) {
     const change = changes[i];
     const result = results[i];
@@ -155,8 +204,8 @@ app.post('/push', async (c) => {
         }, user.id);
       }
 
-      // Log activity
-      await logActivity({
+      // P13: Collect activity entries for batch insert instead of per-change INSERT
+      activityEntries.push({
         userId: user.id,
         category: change.table === 'timelineEvents' ? 'timeline' :
                   change.table === 'standaloneIOCs' ? 'ioc' :
@@ -171,6 +220,11 @@ app.post('/push', async (c) => {
     }
   }
 
+  // P13: Single batch INSERT for all activity log entries
+  if (activityEntries.length > 0) {
+    await logActivityBatch(activityEntries);
+  }
+
   return c.json({ results });
 });
 
@@ -183,6 +237,9 @@ app.get('/pull', async (c) => {
   }
 
   const folderId = c.req.query('folderId');
+  // P11: Support metadataOnly flag to exclude heavy columns (content, messages, elements, iocAnalysis)
+  const metadataOnly = c.req.query('metadataOnly') === 'true';
+  const pullOpts = metadataOnly ? { metadataOnly } : undefined;
 
   if (folderId) {
     // Specific folder: verify access
@@ -190,7 +247,7 @@ app.get('/pull', async (c) => {
     if (!hasAccess) {
       return c.json({ error: 'No access to this investigation' }, 403);
     }
-    const result = await pullChanges(since, [folderId]);
+    const result = await pullChanges(since, [folderId], pullOpts);
     return c.json(result);
   }
 
@@ -200,7 +257,7 @@ app.get('/pull', async (c) => {
     .from(investigationMembers)
     .where(eq(investigationMembers.userId, user.id));
   const folderIds = memberships.map((m) => m.folderId);
-  const result = await pullChanges(since, folderIds);
+  const result = await pullChanges(since, folderIds, pullOpts);
   return c.json(result);
 });
 

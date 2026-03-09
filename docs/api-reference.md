@@ -20,6 +20,8 @@
   - [Audit](#audit)
   - [Notifications](#notifications)
   - [Users](#users)
+  - [Saved Searches](#saved-searches)
+  - [Integrations](#integrations)
   - [Bots](#bots)
   - [Admin Panel](#admin-panel)
 
@@ -782,6 +784,159 @@ Admin-only. Update a user's `role`, `active` status, or `displayName`.
 #### `DELETE /api/users/:id`
 
 Admin-only. Deactivates the user, invalidates all sessions, and disconnects WebSocket connections. Cannot deactivate yourself.
+
+---
+
+### Saved Searches
+
+All endpoints require Bearer authentication.
+
+#### `GET /api/saved-searches`
+
+List saved searches visible to the current user (own searches + shared searches). Requires `admin`, `analyst`, or `viewer` role.
+
+**Response `200`:**
+```json
+{
+  "searches": [
+    {
+      "id": "search-1",
+      "userId": "user-1",
+      "name": "Suspicious IPs",
+      "query": "type:ip confidence:high",
+      "filters": {},
+      "isShared": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### `POST /api/saved-searches`
+
+Create a saved search. Requires `admin` or `analyst` role.
+
+**Request body:**
+```json
+{
+  "name": "My Search",
+  "query": "type:domain",
+  "filters": { "confidence": "high" },
+  "isShared": false
+}
+```
+
+- `name`: 1-200 characters, required
+- `query`: 1-5000 characters, required
+- `filters`: optional object, defaults to `{}`
+- `isShared`: optional boolean, defaults to `false`
+
+**Response `201`:** Returns `{ "search": { ... } }` with the created search.
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Validation error |
+
+---
+
+#### `PUT /api/saved-searches/:id`
+
+Update a saved search. Only the owner can update. Requires `admin` or `analyst` role.
+
+**Request body:** Same as POST.
+
+| Status | Condition |
+|--------|-----------|
+| `403` | Not the owner |
+| `404` | Search not found |
+
+---
+
+#### `DELETE /api/saved-searches/:id`
+
+Delete a saved search. Owner or admin can delete. Requires `admin` or `analyst` role.
+
+| Status | Condition |
+|--------|-----------|
+| `403` | Not authorized |
+| `404` | Search not found |
+
+---
+
+### Integrations
+
+All endpoints require Bearer authentication.
+
+#### `GET /api/integrations/templates`
+
+List all shared integration templates. Requires `admin`, `analyst`, or `viewer` role.
+
+**Response `200`:**
+```json
+{
+  "templates": [
+    {
+      "id": "tmpl-1",
+      "name": "VirusTotal Lookup",
+      "description": "Query VirusTotal for IOC enrichment",
+      "template": { "id": "tmpl-1", "name": "...", "steps": [...], "outputs": {...}, "triggers": [...] },
+      "sharedBy": "user-1",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /api/integrations/templates/:id`
+
+Get a single integration template by ID. Requires `admin`, `analyst`, or `viewer` role.
+
+| Status | Condition |
+|--------|-----------|
+| `404` | Template not found |
+
+---
+
+#### `POST /api/integrations/templates`
+
+Share an integration template with the team. Requires `admin` or `analyst` role.
+
+**Request body:**
+```json
+{
+  "template": {
+    "name": "My Integration",
+    "description": "Does something useful",
+    "steps": [{ "type": "http", "url": "https://api.example.com" }],
+    "outputs": {},
+    "triggers": []
+  }
+}
+```
+
+The `template` field must contain at minimum: `name` (1-200 chars), `steps` (array), and `outputs` (array or object).
+
+**Response `201`:** Returns `{ "template": { ... } }`.
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Missing or invalid template |
+
+---
+
+#### `DELETE /api/integrations/templates/:id`
+
+Delete a shared integration template. **Admin only.**
+
+| Status | Condition |
+|--------|-----------|
+| `404` | Template not found |
 
 ---
 

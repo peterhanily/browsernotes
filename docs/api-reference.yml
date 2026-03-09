@@ -43,6 +43,10 @@ tags:
     description: User notifications
   - name: Users
     description: User profiles, search, feeds, and admin user management
+  - name: Saved Searches
+    description: Saved search management -- list, create, update, delete
+  - name: Integrations
+    description: Integration template sharing and management
   - name: Bots
     description: Bot automation -- CRUD, webhook, trigger, run history
   - name: Admin
@@ -423,6 +427,50 @@ components:
           type: string
           enum: [accessible, inaccessible]
         timestamp:
+          type: string
+          format: date-time
+
+    SavedSearch:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        query:
+          type: string
+        filters:
+          type: object
+        isShared:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    IntegrationTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        template:
+          type: object
+          description: Full integration template definition (steps, outputs, triggers)
+        sharedBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -2091,6 +2139,269 @@ paths:
                     timestamp:
                       type: string
                       format: date-time
+
+  # ─── Saved Searches ─────────────────────────────────────────────
+  /api/saved-searches:
+    get:
+      tags: [Saved Searches]
+      summary: List saved searches
+      description: Returns the current user's saved searches plus shared searches.
+      responses:
+        '200':
+          description: List of saved searches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  searches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SavedSearch'
+    post:
+      tags: [Saved Searches]
+      summary: Create saved search
+      description: Create a new saved search. Requires admin or analyst role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, query]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                filters:
+                  type: object
+                  default: {}
+                isShared:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Saved search created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  search:
+                    $ref: '#/components/schemas/SavedSearch'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/saved-searches/{id}:
+    put:
+      tags: [Saved Searches]
+      summary: Update saved search
+      description: Update a saved search. Only the owner can update.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, query]
+              properties:
+                name:
+                  type: string
+                query:
+                  type: string
+                filters:
+                  type: object
+                isShared:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated saved search
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  search:
+                    $ref: '#/components/schemas/SavedSearch'
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Saved Searches]
+      summary: Delete saved search
+      description: Delete a saved search. Owner or admin can delete.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '403':
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ─── Integrations ──────────────────────────────────────────────
+  /api/integrations/templates:
+    get:
+      tags: [Integrations]
+      summary: List integration templates
+      description: List all shared integration templates.
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templates:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IntegrationTemplate'
+    post:
+      tags: [Integrations]
+      summary: Share integration template
+      description: Share an integration template with the team. Requires admin or analyst role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template]
+              properties:
+                template:
+                  type: object
+                  required: [name, steps, outputs]
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 200
+                    description:
+                      type: string
+                      maxLength: 2000
+                    steps:
+                      type: array
+                      items:
+                        type: object
+                    outputs:
+                      oneOf:
+                        - type: array
+                          items:
+                            type: object
+                        - type: object
+                    triggers:
+                      type: array
+                      items:
+                        type: object
+      responses:
+        '201':
+          description: Template shared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  template:
+                    $ref: '#/components/schemas/IntegrationTemplate'
+        '400':
+          description: Invalid template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/integrations/templates/{id}:
+    get:
+      tags: [Integrations]
+      summary: Get integration template
+      description: Get a single integration template by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  template:
+                    $ref: '#/components/schemas/IntegrationTemplate'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Integrations]
+      summary: Delete integration template
+      description: Delete a shared integration template. Admin only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ─── Bots ───────────────────────────────────────────────────────
   /api/bots:

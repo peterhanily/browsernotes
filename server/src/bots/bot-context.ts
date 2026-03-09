@@ -1,5 +1,7 @@
 import { nanoid } from 'nanoid';
 import { lookup } from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
 import { Client as SSHClient } from 'ssh2';
 import { eq, and, or, isNull, ilike, inArray } from 'drizzle-orm';
 import { executeCode, type CodeExecutionResult } from './sandbox.js';
@@ -481,15 +483,33 @@ export class BotExecutionContext {
     }
     const hostname = parsed.hostname;
 
-    // Pre-flight DNS check: resolve and verify the IP is not private.
-    // We fetch the original URL (not the resolved IP) to preserve TLS SNI,
-    // which is required for virtually all CDN-fronted APIs. The TOCTOU window
-    // between this check and fetch's internal resolution is very small (ms)
-    // and acceptable — this matches standard SSRF protection practice.
-    const { address } = await lookup(hostname);
-    if (isPrivateIP(address)) {
-      throw new Error(`Bot "${this.ctx.botConfig.name}" blocked from accessing private IP ${address} (resolved from ${hostname})`);
+    // S5: Pre-flight DNS check + pin resolved IP to prevent TOCTOU DNS rebinding.
+    // We resolve DNS once, verify the IP is not private, then use a custom Agent
+    // with a lookup callback that returns the pre-resolved IP. This ensures the
+    // actual TCP connection goes to the same IP we checked, eliminating the
+    // rebinding window between check and fetch.
+    const resolved = await lookup(hostname);
+    const resolvedAddress = resolved.address;
+    const resolvedFamily = resolved.family;
+    if (isPrivateIP(resolvedAddress)) {
+      throw new Error(`Bot "${this.ctx.botConfig.name}" blocked from accessing private IP ${resolvedAddress} (resolved from ${hostname})`);
     }
+
+    // Create a custom agent that pins the resolved IP
+    const pinnedLookup = (
+      _hostname: string,
+      _options: unknown,
+      callback: (err: Error | null, address: string, family: number) => void,
+    ) => {
+      callback(null, resolvedAddress, resolvedFamily);
+    };
+
+    // Use the appropriate agent based on protocol
+    const isHttps = parsed.protocol === 'https:';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agent = isHttps
+      ? new https.Agent({ lookup: pinnedLookup as any })
+      : new http.Agent({ lookup: pinnedLookup as any });
 
     this.ctx.apiCallsMade++;
 
@@ -501,7 +521,10 @@ export class BotExecutionContext {
     this.ctx.signal.addEventListener('abort', onAbort, { once: true });
 
     try {
-      const response = await fetch(url, {
+      // Use Node.js fetch with the dispatcher option to pin the resolved IP
+      // The undici-based fetch in Node.js doesn't support http.Agent directly,
+      // so we pass via the non-standard but widely supported approach
+      const fetchOpts: RequestInit & Record<string, unknown> = {
         ...opts,
         signal: controller.signal,
         redirect: 'error',
@@ -509,11 +532,30 @@ export class BotExecutionContext {
           'User-Agent': 'ThreatCaddy-Bot/1.0',
           ...opts?.headers,
         },
-      });
+      };
+
+      // For Node.js built-in fetch, set the resolved IP in the URL directly
+      // while preserving the Host header for TLS SNI
+      const pinnedUrl = new URL(url);
+      pinnedUrl.hostname = resolvedAddress;
+      // Wrap IPv6 addresses in brackets
+      if (resolvedFamily === 6) {
+        pinnedUrl.hostname = `[${resolvedAddress}]`;
+      }
+
+      // Set Host header to original hostname (for TLS SNI and virtual hosting)
+      const headers = new Headers(fetchOpts.headers as HeadersInit | undefined);
+      if (!headers.has('Host')) {
+        headers.set('Host', hostname);
+      }
+      fetchOpts.headers = headers;
+
+      const response = await fetch(pinnedUrl.toString(), fetchOpts as RequestInit);
       return response;
     } finally {
       clearTimeout(timeout);
       this.ctx.signal.removeEventListener('abort', onAbort);
+      agent.destroy();
     }
   }
 

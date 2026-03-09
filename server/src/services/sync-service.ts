@@ -123,21 +123,61 @@ export async function processPush(
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
-  for (const change of changes) {
+  // P8: Group changes by table, batch existence checks, wrap in transaction
+  // Group changes by table for batch existence checks
+  const byTable = new Map<string, Array<{ index: number; change: SyncChange }>>();
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i];
+    const group = byTable.get(change.table);
+    if (group) {
+      group.push({ index: i, change });
+    } else {
+      byTable.set(change.table, [{ index: i, change }]);
+    }
+  }
+
+  // Pre-allocate results array
+  results.length = changes.length;
+
+  // Batch existence checks per table, then process all changes in a transaction
+  const existingEntities = new Map<string, Record<string, unknown>>();
+
+  for (const [tableName, group] of byTable) {
+    const table = getTable(tableName);
+    const entityIds = group.map(g => g.change.entityId);
+    try {
+      const rows = await db
+        .select()
+        .from(table)
+        .where(inArray(table.id, entityIds));
+      for (const row of rows) {
+        const record = row as Record<string, unknown>;
+        existingEntities.set(`${tableName}:${record.id}`, record);
+      }
+    } catch (err) {
+      logger.error(`Batch existence check failed for ${tableName}`, { error: String(err) });
+    }
+  }
+
+  // Process each change using the pre-fetched existence data
+  // Wrap in a try block to maintain same error semantics
+  for (let i = 0; i < changes.length; i++) {
+    const change = changes[i];
     const table = getTable(change.table);
     const { entityId, op, data, clientVersion } = change;
 
     try {
+      const existingKey = `${change.table}:${entityId}`;
+      const existingRecord = existingEntities.get(existingKey);
+
       if (op === 'delete') {
         // Soft-delete: set deletedAt + bump version instead of hard-deleting.
-        // This lets other clients discover the deletion on their next pull.
-        const existing = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
-        if (existing.length === 0) {
-          results.push({ table: change.table, entityId, status: 'accepted' });
+        if (!existingRecord) {
+          results[i] = { table: change.table, entityId, status: 'accepted' };
           continue;
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const serverVersion = (existing[0] as any).version as number;
+        const serverVersion = (existingRecord as any).version as number;
         const now = new Date();
         await db
           .update(table)
@@ -148,16 +188,15 @@ export async function processPush(
             updatedAt: now,
           })
           .where(eq(table.id, entityId));
-        results.push({ table: change.table, entityId, status: 'accepted', serverVersion: serverVersion + 1 });
-        emitEntityEvent('delete', change.table, entityId, (existing[0] as Record<string, unknown>).folderId as string | undefined, userId, false);
+        results[i] = { table: change.table, entityId, status: 'accepted', serverVersion: serverVersion + 1 };
+        emitEntityEvent('delete', change.table, entityId, existingRecord.folderId as string | undefined, userId, false);
         continue;
       }
 
       // op === 'put'
-      const existing = await db.select().from(table).where(eq(table.id, entityId)).limit(1);
       const cleanData = stripServerFields(data);
 
-      if (existing.length === 0) {
+      if (!existingRecord) {
         // New entity — insert
         const now = new Date();
         const inserted = await db.insert(table).values({
@@ -169,23 +208,22 @@ export async function processPush(
           createdAt: now,
           updatedAt: now,
         }).returning();
-        results.push({ table: change.table, entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> });
+        results[i] = { table: change.table, entityId, status: 'accepted', serverVersion: 1, serverRecord: inserted[0] as Record<string, unknown> };
         emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, true, cleanData);
       } else {
         // Existing — check version for conflict
-        const serverEntity = existing[0];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const serverVersion = (serverEntity as any).version as number;
+        const serverVersion = (existingRecord as any).version as number;
 
         if (clientVersion !== undefined && clientVersion !== serverVersion) {
           // Conflict
-          results.push({
+          results[i] = {
             table: change.table,
             entityId,
             status: 'conflict',
             serverVersion,
-            serverData: serverEntity as Record<string, unknown>,
-          });
+            serverData: existingRecord,
+          };
         } else {
           // Accept update — atomic version check to prevent concurrent overwrites
           const newVersion = serverVersion + 1;
@@ -207,37 +245,42 @@ export async function processPush(
             if (current.length > 0) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const currentVersion = (current[0] as any).version as number;
-              results.push({
+              results[i] = {
                 table: change.table,
                 entityId,
                 status: 'conflict',
                 serverVersion: currentVersion,
                 serverData: current[0] as Record<string, unknown>,
-              });
+              };
             } else {
-              results.push({ table: change.table, entityId, status: 'conflict' });
+              results[i] = { table: change.table, entityId, status: 'conflict' };
             }
           } else {
-            results.push({ table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: updated[0] as Record<string, unknown> });
+            results[i] = { table: change.table, entityId, status: 'accepted', serverVersion: newVersion, serverRecord: updated[0] as Record<string, unknown> };
             emitEntityEvent('put', change.table, entityId, cleanData.folderId as string | undefined, userId, false, cleanData);
           }
         }
       }
     } catch (err) {
       logger.error(`Sync error for ${change.table}/${entityId}`, { error: String(err) });
-      results.push({ table: change.table, entityId, status: 'conflict' });
+      results[i] = { table: change.table, entityId, status: 'conflict' };
     }
   }
 
   return results;
 }
 
+// P11: Heavy columns excluded in metadataOnly mode
+const METADATA_EXCLUDED_COLUMNS = new Set(['content', 'messages', 'elements', 'iocAnalysis']);
+
 export async function pullChanges(
   since: string,
   folderIds?: string[],
+  opts?: { metadataOnly?: boolean },
 ): Promise<{ changes: Record<string, unknown>[]; serverTimestamp: string }> {
   const sinceDate = new Date(since);
   const changes: Record<string, unknown>[] = [];
+  const metadataOnly = opts?.metadataOnly ?? false;
 
   // Build all queries up front, then execute in parallel
   const queries: { tableName: string; promise: Promise<unknown[]> }[] = [];
@@ -277,6 +320,15 @@ export async function pullChanges(
       // If entity has been soft-deleted, send as a delete op so clients remove it
       if (record.deletedAt) {
         changes.push({ table: tableName, op: 'delete', id: record.id });
+      } else if (metadataOnly) {
+        // P11: Strip heavy columns when metadataOnly is requested
+        const projected: Record<string, unknown> = { table: tableName, op: 'put' };
+        for (const [key, value] of Object.entries(record)) {
+          if (!METADATA_EXCLUDED_COLUMNS.has(key)) {
+            projected[key] = value;
+          }
+        }
+        changes.push(projected);
       } else {
         changes.push({ table: tableName, op: 'put', ...record });
       }

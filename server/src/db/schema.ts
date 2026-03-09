@@ -73,6 +73,7 @@ export const notes = pgTable('notes', {
   idxNotesCreatedBy: index('idx_notes_created_by').on(t.createdBy),
   idxNotesArchived: index('idx_notes_archived').on(t.archived),
   idxNotesPinned: index('idx_notes_pinned').on(t.pinned),
+  idxNotesFolderIdUpdatedAt: index('idx_notes_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 export const tasks = pgTable('tasks', {
@@ -110,6 +111,7 @@ export const tasks = pgTable('tasks', {
   idxTasksAssigneeId: index('idx_tasks_assignee_id').on(t.assigneeId),
   idxTasksCreatedBy: index('idx_tasks_created_by').on(t.createdBy),
   idxTasksStatus: index('idx_tasks_status').on(t.status),
+  idxTasksFolderIdUpdatedAt: index('idx_tasks_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 export const folders = pgTable('folders', {
@@ -193,6 +195,7 @@ export const timelineEvents = pgTable('timeline_events', {
   idxTimelineEventsUpdatedAt: index('idx_timeline_events_updated_at').on(t.updatedAt),
   idxTimelineEventsTimelineId: index('idx_timeline_events_timeline_id').on(t.timelineId),
   idxTimelineEventsCreatedBy: index('idx_timeline_events_created_by').on(t.createdBy),
+  idxTimelineEventsFolderIdUpdatedAt: index('idx_timeline_events_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 export const timelines = pgTable('timelines', {
@@ -233,6 +236,7 @@ export const whiteboards = pgTable('whiteboards', {
   idxWhiteboardsFolderId: index('idx_whiteboards_folder_id').on(t.folderId),
   idxWhiteboardsUpdatedAt: index('idx_whiteboards_updated_at').on(t.updatedAt),
   idxWhiteboardsCreatedBy: index('idx_whiteboards_created_by').on(t.createdBy),
+  idxWhiteboardsFolderIdUpdatedAt: index('idx_whiteboards_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 export const standaloneIOCs = pgTable('standalone_iocs', {
@@ -268,6 +272,7 @@ export const standaloneIOCs = pgTable('standalone_iocs', {
   idxStandaloneIOCsUpdatedAt: index('idx_standalone_iocs_updated_at').on(t.updatedAt),
   idxStandaloneIOCsCreatedBy: index('idx_standalone_iocs_created_by').on(t.createdBy),
   idxStandaloneIOCsAssigneeId: index('idx_standalone_iocs_assignee_id').on(t.assigneeId),
+  idxStandaloneIOCsFolderIdUpdatedAt: index('idx_standalone_iocs_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 export const chatThreads = pgTable('chat_threads', {
@@ -291,6 +296,7 @@ export const chatThreads = pgTable('chat_threads', {
   idxChatThreadsFolderId: index('idx_chat_threads_folder_id').on(t.folderId),
   idxChatThreadsUpdatedAt: index('idx_chat_threads_updated_at').on(t.updatedAt),
   idxChatThreadsCreatedBy: index('idx_chat_threads_created_by').on(t.createdBy),
+  idxChatThreadsFolderIdUpdatedAt: index('idx_chat_threads_folder_id_updated_at').on(t.folderId, t.updatedAt),
 }));
 
 // ─── Server Settings ────────────────────────────────────────────

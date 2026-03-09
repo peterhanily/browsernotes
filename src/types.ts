@@ -62,6 +62,12 @@ export interface EntityComment {
 export type Priority = 'none' | 'low' | 'medium' | 'high';
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -77,6 +83,7 @@ export interface Task {
   iocAnalysis?: IOCAnalysis;
   iocTypes?: IOCType[];
   comments?: TaskComment[];
+  checklist?: ChecklistItem[];
   linkedNoteIds?: string[];
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
@@ -213,6 +220,7 @@ export interface Settings {
   llmDefaultModel?: string;
   llmDefaultProvider?: LLMProvider;
   llmSystemPrompt?: string;
+  llmMaxContextMessages?: number;
   tiAutoExtractEnabled?: boolean;        // default true
   tiAutoExtractDebounceMs?: number;      // default 2000
   tiEnabledIOCTypes?: string[];          // IOC type strings; undefined = all enabled

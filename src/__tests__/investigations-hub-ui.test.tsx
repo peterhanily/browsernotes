@@ -366,7 +366,7 @@ describe('CreateInvestigationModal', () => {
     expect(createBtn).not.toBeDisabled();
   });
 
-  it('Name Generator tab: calls onOpenNameGenerator when button clicked', async () => {
+  it('Name Generator tab: calls onOpenNameGenerator when button clicked without closing modal', async () => {
     const onOpenNameGen = vi.fn();
     const onClose = vi.fn();
     render(
@@ -379,11 +379,12 @@ describe('CreateInvestigationModal', () => {
     // Switch to Name Generator tab
     fireEvent.click(screen.getByText('Name Generator'));
     fireEvent.click(screen.getByText('Open Name Generator'));
-    expect(onClose).toHaveBeenCalled();
     expect(onOpenNameGen).toHaveBeenCalled();
+    // Modal should NOT close (U1 fix: keep modal open)
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('Playbook tab: calls onOpenPlaybookPicker when button clicked', async () => {
+  it('Playbook tab: calls onOpenPlaybookPicker when button clicked without closing modal', async () => {
     const onOpenPlaybook = vi.fn();
     const onClose = vi.fn();
     render(
@@ -396,8 +397,9 @@ describe('CreateInvestigationModal', () => {
     // Switch to Playbook tab
     fireEvent.click(screen.getByText('From Playbook'));
     fireEvent.click(screen.getByText('Browse Playbooks'));
-    expect(onClose).toHaveBeenCalled();
     expect(onOpenPlaybook).toHaveBeenCalled();
+    // Modal should NOT close (U1 fix: keep modal open)
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('renders nothing when open is false', () => {

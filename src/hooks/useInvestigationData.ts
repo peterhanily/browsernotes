@@ -92,12 +92,15 @@ export function useInvestigationData(
 
     if (activeFolderRef.current !== id) return;
 
-    setNotes(snapshot.notes ?? []);
-    setTasks(snapshot.tasks ?? []);
-    setEvents(snapshot.timelineEvents ?? []);
-    setWhiteboards(snapshot.whiteboards ?? []);
-    setIOCs(snapshot.standaloneIOCs ?? []);
-    setChats(snapshot.chatThreads ?? []);
+    const filterActive = <T extends { trashed?: boolean; archived?: boolean }>(arr: T[]): T[] =>
+      arr.filter((item) => !item.trashed && !item.archived);
+
+    setNotes(filterActive(snapshot.notes ?? []));
+    setTasks(filterActive(snapshot.tasks ?? []));
+    setEvents(filterActive(snapshot.timelineEvents ?? []));
+    setWhiteboards(filterActive(snapshot.whiteboards ?? []));
+    setIOCs(filterActive(snapshot.standaloneIOCs ?? []));
+    setChats(filterActive(snapshot.chatThreads ?? []));
   }, []);
 
   const load = useCallback(async () => {

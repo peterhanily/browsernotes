@@ -28,9 +28,9 @@ const mockSyncStop = vi.fn();
 const mockSetWSClient = vi.fn();
 const mockSetConflictHandler = vi.fn();
 const mockSetRemoteChangeHandler = vi.fn();
-const mockResolveConflicts = vi.fn(async () => {});
+const mockResolveConflicts = vi.fn();
 const mockSync = vi.fn();
-const mockApplyRemoteChange = vi.fn(async () => {});
+const mockApplyRemoteChange = vi.fn();
 
 vi.mock('../lib/sync-engine', () => ({
   syncEngine: {

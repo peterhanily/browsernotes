@@ -22,11 +22,11 @@ vi.mock('../lib/export', () => ({
   exportJSON: () => mockExportJSON(),
 }));
 
-const mockMultiCloudPut = vi.fn(async () => []);
-const mockBuildFullBackupEnvelope = vi.fn(() => ({ type: 'full-backup', data: {} }));
-const mockBuildNoteEnvelope = vi.fn(() => ({ type: 'note', data: {} }));
-const mockBuildIOCReportEnvelope = vi.fn(() => ({ type: 'ioc-report', data: {} }));
-const mockBuildObjectKey = vi.fn(() => 'threatcaddy/full-backup.json');
+const mockMultiCloudPut = vi.fn();
+const mockBuildFullBackupEnvelope = vi.fn().mockReturnValue({ type: 'full-backup', data: {} });
+const mockBuildNoteEnvelope = vi.fn().mockReturnValue({ type: 'note', data: {} });
+const mockBuildIOCReportEnvelope = vi.fn().mockReturnValue({ type: 'ioc-report', data: {} });
+const mockBuildObjectKey = vi.fn().mockReturnValue('threatcaddy/full-backup.json');
 
 vi.mock('../lib/cloud-sync', () => ({
   multiCloudPut: (...args: unknown[]) => mockMultiCloudPut(...args),

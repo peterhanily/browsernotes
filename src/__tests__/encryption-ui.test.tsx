@@ -18,7 +18,8 @@ vi.mock('../lib/crypto', () => ({
 }));
 
 const mockIsEncryptionEnabled = vi.fn(() => false);
-const mockGetEncryptionMeta = vi.fn(() => null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetEncryptionMeta = vi.fn((): any => null);
 const mockGetSessionDuration = vi.fn(() => 'tab-close' as const);
 
 vi.mock('../lib/encryptionStore', () => ({

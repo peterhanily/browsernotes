@@ -900,8 +900,8 @@ export async function mergeImportJSON(json: string): Promise<{ added: number; sk
   let skipped = 0;
   let updated = 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function mergeTable(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     table: { get: (id: string) => Promise<any>; add: (item: any) => Promise<unknown>; update: (id: string, changes: any) => Promise<number> },
     items: { id: string; updatedAt?: number }[],
   ) {

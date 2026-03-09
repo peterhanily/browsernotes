@@ -1599,7 +1599,12 @@ function AppInner() {
             onEditInvestigation={(id) => setEditingFolderId(id)}
             onArchiveInvestigation={(id) => loggedArchiveFolder(id)}
             onUnarchiveInvestigation={(id) => loggedUnarchiveFolder(id)}
-            onDeleteInvestigation={(id) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } }}
+            onDeleteInvestigation={(id) => {
+              const folder = folders.find(f => f.id === id);
+              if (!confirm(`Delete "${folder?.name || 'this investigation'}" and all its contents? This cannot be undone.`)) return;
+              loggedDeleteFolder(id);
+              if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); }
+            }}
             allNotes={notes.notes}
             allTasks={tasks.tasks}
             allEvents={timeline.events}
@@ -1898,7 +1903,7 @@ function AppInner() {
             setSelectedTimelineId(timelineId);
             navigateTo('timeline', { selectedTimelineId: timelineId });
           }}
-          onExport={async (folderId) => {
+          onExport={editingFolderId === selectedFolderId && investigationMode === 'remote' ? undefined : async (folderId) => {
             const json = await exportInvestigationJSON(folderId);
             const folder = folders.find((f) => f.id === folderId);
             const slug = (folder?.name || 'investigation').toLowerCase().replace(/\s+/g, '-');
@@ -1974,9 +1979,12 @@ function AppInner() {
       <CreateInvestigationModal
         open={showCreateInvestigationModal}
         onClose={() => setShowCreateInvestigationModal(false)}
-        onCreate={(name) => {
-          loggedCreateFolder(name);
+        onCreate={async (name) => {
+          const folder = await loggedCreateFolder(name);
           setShowCreateInvestigationModal(false);
+          if (folder) {
+            handleOpenInvestigation(folder.id, 'local');
+          }
         }}
         onOpenNameGenerator={() => setShowNameGenerator(true)}
         onOpenPlaybookPicker={() => setShowPlaybookPicker(true)}
@@ -1988,9 +1996,12 @@ function AppInner() {
       <OperationNameGenerator
         open={showNameGenerator}
         onClose={() => setShowNameGenerator(false)}
-        onCreateInvestigation={(name) => {
-          loggedCreateFolder(name);
+        onCreateInvestigation={async (name) => {
+          const folder = await loggedCreateFolder(name);
           setShowNameGenerator(false);
+          if (folder) {
+            handleOpenInvestigation(folder.id, 'local');
+          }
         }}
       />
     </ActivityLogContext.Provider>

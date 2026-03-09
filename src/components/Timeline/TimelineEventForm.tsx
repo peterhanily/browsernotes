@@ -64,6 +64,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
   const [latitude, setLatitude] = useState(event?.latitude?.toString() ?? defaultLatitude?.toString() ?? '');
   const [longitude, setLongitude] = useState(event?.longitude?.toString() ?? defaultLongitude?.toString() ?? '');
   const [locationOpen, setLocationOpen] = useState(!!(event?.latitude != null || defaultLatitude != null));
+  const [titleError, setTitleError] = useState('');
 
   const isEditMode = !!event;
   const iocCount = event?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
@@ -107,7 +108,11 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setTitleError('Event title is required');
+      return;
+    }
+    setTitleError('');
 
     const parsedAssets = assets.split(',').map((s) => s.trim()).filter(Boolean);
     const parsedLat = latitude ? parseFloat(latitude) : undefined;
@@ -138,8 +143,8 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
     });
   };
 
-  const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
-  const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
+  const inputClass = 'w-full bg-bg-deep border border-border-medium rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent';
+  const labelClass = 'block text-xs font-medium text-text-muted mb-1';
 
   const iocTarget: IOCTarget | null = event ? {
     id: event.id,
@@ -158,14 +163,21 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
     <div className="flex gap-0">
     <form onSubmit={handleSubmit} className="space-y-4 flex-1 min-w-0">
       <div>
-        <label className={labelClass}>Title</label>
+        <label className={labelClass} htmlFor="event-title">Title</label>
         <input
+          id="event-title"
           autoFocus
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className={inputClass}
+          onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
+          className={cn(inputClass, titleError && 'border-red-500')}
           placeholder="Event title..."
+          aria-required="true"
+          aria-invalid={!!titleError}
+          aria-describedby={titleError ? 'event-title-error' : undefined}
         />
+        {titleError && (
+          <p id="event-title-error" className="text-xs text-red-400 mt-1">{titleError}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -258,7 +270,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
 
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <label className="text-xs font-medium text-gray-400">Description (markdown)</label>
+          <label className="text-xs font-medium text-text-muted">Description (markdown)</label>
           {isEditMode && onUpdateEvent && (
             <button
               type="button"
@@ -271,7 +283,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
                 }
                 setShowIOCPanel(!showIOCPanel);
               }}
-              className={cn('p-1 rounded flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+              className={cn('p-1 rounded flex items-center gap-1', showIOCPanel ? 'bg-bg-active text-accent' : 'text-text-muted hover:text-text-secondary')}
               title="IOC Analysis"
               aria-label="Toggle IOC analysis"
             >
@@ -316,9 +328,9 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
           id="timeline-starred"
           checked={starred}
           onChange={(e) => setStarred(e.target.checked)}
-          className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-accent"
+          className="rounded border-border-medium bg-bg-deep text-accent focus:ring-accent"
         />
-        <label htmlFor="timeline-starred" className="text-xs text-gray-400">Starred</label>
+        <label htmlFor="timeline-starred" className="text-xs text-text-muted">Starred</label>
       </div>
 
       {/* Location collapsible section */}
@@ -326,7 +338,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
         <button
           type="button"
           onClick={() => setLocationOpen(!locationOpen)}
-          className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-300"
+          className="flex items-center gap-1 text-xs font-medium text-text-muted hover:text-text-secondary"
         >
           {locationOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           Location
@@ -368,7 +380,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
         <button
           type="button"
           onClick={() => setRawDataOpen(!rawDataOpen)}
-          className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-300"
+          className="flex items-center gap-1 text-xs font-medium text-text-muted hover:text-text-secondary"
         >
           {rawDataOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           Raw Data
@@ -395,7 +407,7 @@ export function TimelineEventForm({ event, folders, allTags, onCreateTag, onSave
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm transition-colors"
+          className="px-4 py-2 rounded-lg bg-bg-active hover:bg-bg-hover text-text-primary text-sm transition-colors"
         >
           Cancel
         </button>

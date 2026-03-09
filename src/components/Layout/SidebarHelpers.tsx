@@ -14,6 +14,7 @@ export const NavItem = React.memo(function NavItem({
   onDoubleClick,
   actions,
   compact,
+  scopedColor,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -24,6 +25,8 @@ export const NavItem = React.memo(function NavItem({
   onDoubleClick?: () => void;
   actions?: React.ReactNode;
   compact?: boolean;
+  /** Show a small colored dot indicating this nav item is scoped to an investigation */
+  scopedColor?: string;
 }) {
   return (
     <div
@@ -48,6 +51,14 @@ export const NavItem = React.memo(function NavItem({
       )}
       {icon}
       <span className="truncate flex-1 text-left">{label}</span>
+      {scopedColor && (
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: scopedColor }}
+          title="Scoped to investigation"
+          aria-label="Scoped to investigation"
+        />
+      )}
       {badge !== undefined && badge > 0 && (
         <span className={cn(
           'font-mono text-[10px] px-1.5 py-0 rounded-full',

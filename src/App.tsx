@@ -30,7 +30,7 @@ import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import { isEncryptionEnabled } from './lib/encryptionStore';
 import { clipBuffer } from './lib/clipBuffer';
-import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread } from './types';
+import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread, InvestigationDataMode } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
 import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -51,6 +51,8 @@ const IOCStatsView = lazy(() => import('./components/Analysis/IOCStatsView').the
 const StandaloneIOCForm = lazy(() => import('./components/Analysis/StandaloneIOCForm').then(m => ({ default: m.StandaloneIOCForm })));
 
 const TrashArchiveView = lazy(() => import('./components/TrashArchive/TrashArchiveView').then(m => ({ default: m.TrashArchiveView })));
+const InvestigationsHub = lazy(() => import('./components/Investigations/InvestigationsHub').then(m => ({ default: m.InvestigationsHub })));
+const CreateInvestigationModal = lazy(() => import('./components/Investigations/CreateInvestigationModal').then(m => ({ default: m.CreateInvestigationModal })));
 import type { LayoutName } from './components/Graph/GraphCanvas';
 import { useNavigationHistory } from './hooks/useNavigationHistory';
 import type { NavState } from './hooks/useNavigationHistory';
@@ -80,6 +82,7 @@ installSyncHooks();
 initLocalOnlyFlags();
 import { useLoggedActions } from './hooks/useLoggedActions';
 import { useServerSync } from './hooks/useServerSync';
+import { useRemoteInvestigations } from './hooks/useRemoteInvestigations';
 
 // Parse share hash on initial load: #share=<encoded>
 function parseShareHash(): string | null {
@@ -147,6 +150,12 @@ function AppInner() {
 
   // ─── Team Server Integration ───────────────────────────────────
   const auth = useAuth();
+  const { remoteInvestigations, loading: remoteLoading, refresh: refreshRemote } = useRemoteInvestigations(auth.connected);
+
+  const handleFolderInvite = useCallback(() => {
+    refreshRemote();
+  }, [refreshRemote]);
+
   const { presenceUsers, syncConflicts, setSyncConflicts, handleResolveConflict, handleResolveAllConflicts } = useServerSync(auth, {
     notes: notes.reload,
     tasks: tasks.reload,
@@ -157,7 +166,12 @@ function AppInner() {
     chats: chatsHook.reload,
     folders: reloadFolders,
     tags: reloadTags,
-  });
+  }, handleFolderInvite);
+
+  const syncedFolderIds = useMemo(() => {
+    const localIds = new Set(folders.map(f => f.id));
+    return new Set(remoteInvestigations.filter(r => localIds.has(r.folderId)).map(r => r.folderId));
+  }, [folders, remoteInvestigations]);
 
   // Share receiver state — listen for hash changes to support re-navigation
   const [shareData, setShareData] = useState<string | null>(initialShareData);
@@ -226,7 +240,7 @@ function AppInner() {
   );
 
   // UI state — guard against stale 'clips' defaultView in localStorage
-  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' ? settings.defaultView : 'notes';
+  const safeDefaultView: ViewMode = settings.defaultView === 'dashboard' || settings.defaultView === 'notes' || settings.defaultView === 'tasks' || settings.defaultView === 'timeline' || settings.defaultView === 'whiteboard' || settings.defaultView === 'activity' || settings.defaultView === 'graph' || settings.defaultView === 'ioc-stats' || settings.defaultView === 'chat' || settings.defaultView === 'caddyshack' || settings.defaultView === 'investigations' ? settings.defaultView : 'notes';
   const deepLinkView: ViewMode | undefined = initialDeepLink
     ? initialDeepLink.type === 'note' ? 'notes' : initialDeepLink.type === 'task' ? 'tasks' : 'timeline'
     : undefined;
@@ -266,6 +280,7 @@ function AppInner() {
   const [editingFolderId, setEditingFolderId] = useState<string | undefined>();
   const [folderStatusFilter, setFolderStatusFilter] = useState<InvestigationStatus[]>(['active']);
   const [showDemoModal, setShowDemoModal] = useState(false);
+  const [showCreateInvestigationModal, setShowCreateInvestigationModal] = useState(false);
   const demoProcessedRef = useRef(false);
 
   // Fetch investigation members for task assignee support
@@ -331,6 +346,56 @@ function AppInner() {
     }
     navPush({ view, ...opts });
   }, [navPush, selectedFolderId, folders]);
+
+  // ─── Investigation Hub handlers ──────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleOpenInvestigation = useCallback((folderId: string, _mode: InvestigationDataMode) => {
+    setSelectedFolderId(folderId);
+    navigateTo('notes');
+  }, [navigateTo]);
+
+  const handleSyncLocally = useCallback(async (folderId: string) => {
+    try {
+      const { syncEngine } = await import('./lib/sync-engine');
+      await syncEngine.pullFolder(folderId);
+      reloadFolders();
+      notes.reload();
+      tasks.reload();
+      timeline.reload();
+      reloadWhiteboards();
+      standaloneIOCsHook.reload();
+      chatsHook.reload();
+      refreshRemote();
+    } catch (err) {
+      console.error('Failed to sync investigation locally:', err);
+    }
+  }, [reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook, refreshRemote]);
+
+  const handleUnsync = useCallback(async (folderId: string) => {
+    try {
+      await Promise.all([
+        db.notes.where('folderId').equals(folderId).delete(),
+        db.tasks.where('folderId').equals(folderId).delete(),
+        db.timelineEvents.where('folderId').equals(folderId).delete(),
+        db.whiteboards.where('folderId').equals(folderId).delete(),
+        db.standaloneIOCs.where('folderId').equals(folderId).delete(),
+        db.chatThreads.where('folderId').equals(folderId).delete(),
+      ]);
+      await db.folders.delete(folderId);
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(undefined);
+      }
+      reloadFolders();
+      notes.reload();
+      tasks.reload();
+      timeline.reload();
+      reloadWhiteboards();
+      standaloneIOCsHook.reload();
+      chatsHook.reload();
+    } catch (err) {
+      console.error('Failed to unsync investigation:', err);
+    }
+  }, [selectedFolderId, reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook]);
 
   // Resolve timeline deep-link once events are loaded
   const deepLinkTimelineResolved = useCallback(() => {
@@ -1456,6 +1521,19 @@ function AppInner() {
               else if (type === 'ioc') { navigateTo('graph'); }
             }}
           />
+        ) : activeView === 'investigations' ? (
+          <InvestigationsHub
+            localFolders={folders}
+            remoteInvestigations={remoteInvestigations}
+            syncedFolderIds={syncedFolderIds}
+            serverConnected={auth.connected}
+            localLoading={foldersLoading}
+            remoteLoading={remoteLoading}
+            onOpenInvestigation={handleOpenInvestigation}
+            onSyncLocally={handleSyncLocally}
+            onUnsync={handleUnsync}
+            onCreateInvestigation={() => setShowCreateInvestigationModal(true)}
+          />
         ) : activeView === 'caddyshack' ? (
           <CaddyShackView
             folderId={selectedFolderId}
@@ -1793,6 +1871,15 @@ function AppInner() {
           />
         </>
       )}
+
+      <CreateInvestigationModal
+        open={showCreateInvestigationModal}
+        onClose={() => setShowCreateInvestigationModal(false)}
+        onCreate={(name) => {
+          loggedCreateFolder(name);
+          setShowCreateInvestigationModal(false);
+        }}
+      />
     </ActivityLogContext.Provider>
     <ToastContainer />
 

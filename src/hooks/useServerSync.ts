@@ -30,7 +30,7 @@ interface ReloadFns {
  * Manages server sync engine, WebSocket connection, presence, and conflict state.
  * Extracted from App.tsx to isolate sync concerns.
  */
-export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
+export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInvite?: (folderId: string) => void) {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
   const [syncConflicts, setSyncConflicts] = useState<SyncResult[]>([]);
   const wsClientRef = useRef<WSClient | null>(null);
@@ -79,18 +79,10 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns) {
             window.dispatchEvent(new CustomEvent('ws-notification'));
           });
           ws.on('folder-invite', (msg) => {
-            // New investigation shared with us — pull the full folder snapshot
+            // New investigation shared with us — refresh the remote list so user can choose to sync
             const inviteFolderId = (msg as { folderId?: string }).folderId;
-            if (inviteFolderId) {
-              syncEngine.pullFolder(inviteFolderId).then(() => {
-                reloadFns.folders();
-                reloadFns.notes();
-                reloadFns.tasks();
-                reloadFns.timeline();
-                reloadFns.whiteboards();
-                reloadFns.standaloneIOCs();
-                reloadFns.chats();
-              });
+            if (inviteFolderId && onFolderInvite) {
+              onFolderInvite(inviteFolderId);
             }
           });
           ws.on('access-revoked', (msg) => {

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { requireAuth } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
@@ -8,6 +8,7 @@ import { investigationMembers, folders, users, notes, tasks, timelineEvents, whi
 import { createNotification } from '../services/notification-service.js';
 import { logActivity } from '../services/audit-service.js';
 import { revokeUserFolderAccess, broadcastToUser } from '../ws/handler.js';
+import { getEntityCounts, getEntityCountsBatch } from '../services/sync-service.js';
 import type { AuthUser } from '../types.js';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -39,6 +40,13 @@ app.get('/', async (c) => {
         folderStatus: folders.status,
         folderColor: folders.color,
         folderIcon: folders.icon,
+        folderDescription: folders.description,
+        folderClsLevel: folders.clsLevel,
+        folderPapLevel: folders.papLevel,
+        folderTags: folders.tags,
+        folderCreatedAt: folders.createdAt,
+        folderUpdatedAt: folders.updatedAt,
+        memberCount: sql<number>`(select count(*) from investigation_members where folder_id = ${investigationMembers.folderId})`.as('member_count'),
       })
       .from(investigationMembers)
       .innerJoin(folders, eq(folders.id, investigationMembers.folderId))
@@ -48,7 +56,112 @@ app.get('/', async (c) => {
   ]);
 
   const total = totalResult[0]?.count ?? 0;
-  return c.json({ data: memberships, total, limit, offset });
+  const folderIds = memberships.map((m) => m.folderId);
+
+  // Batch entity counts: one query per table with GROUP BY
+  const entityCountsMap = await getEntityCountsBatch(folderIds);
+
+  const data = memberships.map((m) => ({
+    folderId: m.folderId,
+    role: m.role,
+    joinedAt: m.joinedAt,
+    folder: {
+      name: m.folderName,
+      status: m.folderStatus,
+      color: m.folderColor,
+      icon: m.folderIcon,
+      description: m.folderDescription,
+      clsLevel: m.folderClsLevel,
+      papLevel: m.folderPapLevel,
+      tags: m.folderTags,
+      createdAt: m.folderCreatedAt,
+      updatedAt: m.folderUpdatedAt,
+    },
+    entityCounts: entityCountsMap.get(m.folderId) ?? { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 },
+    memberCount: m.memberCount,
+  }));
+
+  return c.json({ data, total, limit, offset });
+});
+
+// GET /api/investigations/:id/summary — detailed metadata without full entity data
+app.get('/:id/summary', async (c) => {
+  const user = c.get('user');
+  const folderId = c.req.param('id');
+
+  const hasAccess = await checkInvestigationAccess(user.id, folderId, 'viewer');
+  if (!hasAccess) {
+    return c.json({ error: 'No access to this investigation' }, 403);
+  }
+
+  const [folderResult, members, entityCounts, lastActivityResult] = await Promise.all([
+    // Folder metadata
+    db
+      .select({
+        name: folders.name,
+        status: folders.status,
+        color: folders.color,
+        icon: folders.icon,
+        description: folders.description,
+        clsLevel: folders.clsLevel,
+        papLevel: folders.papLevel,
+        tags: folders.tags,
+        createdAt: folders.createdAt,
+        updatedAt: folders.updatedAt,
+      })
+      .from(folders)
+      .where(eq(folders.id, folderId))
+      .limit(1),
+
+    // Members with user info
+    db
+      .select({
+        id: investigationMembers.id,
+        userId: investigationMembers.userId,
+        role: investigationMembers.role,
+        joinedAt: investigationMembers.joinedAt,
+        displayName: users.displayName,
+        email: users.email,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(investigationMembers)
+      .innerJoin(users, eq(users.id, investigationMembers.userId))
+      .where(eq(investigationMembers.folderId, folderId)),
+
+    // Entity counts (parallel internally)
+    getEntityCounts(folderId),
+
+    // Last activity: most recent updatedAt across all entity tables
+    Promise.all([
+      db.select({ latest: sql<string>`max(${notes.updatedAt})` }).from(notes).where(eq(notes.folderId, folderId)),
+      db.select({ latest: sql<string>`max(${tasks.updatedAt})` }).from(tasks).where(eq(tasks.folderId, folderId)),
+      db.select({ latest: sql<string>`max(${standaloneIOCs.updatedAt})` }).from(standaloneIOCs).where(eq(standaloneIOCs.folderId, folderId)),
+      db.select({ latest: sql<string>`max(${timelineEvents.updatedAt})` }).from(timelineEvents).where(eq(timelineEvents.folderId, folderId)),
+      db.select({ latest: sql<string>`max(${whiteboards.updatedAt})` }).from(whiteboards).where(eq(whiteboards.folderId, folderId)),
+      db.select({ latest: sql<string>`max(${chatThreads.updatedAt})` }).from(chatThreads).where(eq(chatThreads.folderId, folderId)),
+    ]),
+  ]);
+
+  const folder = folderResult[0];
+  if (!folder) {
+    return c.json({ error: 'Investigation not found' }, 404);
+  }
+
+  // Find the most recent updatedAt across all entity tables
+  const latestDates = lastActivityResult
+    .map((r) => r[0]?.latest)
+    .filter((d): d is string => d != null)
+    .map((d) => new Date(d).getTime());
+  const lastActivity = latestDates.length > 0
+    ? new Date(Math.max(...latestDates)).toISOString()
+    : undefined;
+
+  return c.json({
+    folder,
+    entityCounts,
+    members,
+    lastActivity,
+  });
 });
 
 // GET /api/investigations/:id/members

@@ -159,7 +159,7 @@ export interface BackupDestination {
   enabled: boolean;
 }
 
-export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyshack';
+export type ViewMode = 'dashboard' | 'notes' | 'tasks' | 'timeline' | 'whiteboard' | 'activity' | 'graph' | 'ioc-stats' | 'chat' | 'caddyshack' | 'investigations';
 export type EditorMode = 'edit' | 'preview' | 'split';
 export type TaskViewMode = 'list' | 'kanban';
 
@@ -817,6 +817,37 @@ export interface InvestigationMember {
   email: string;
   avatarUrl?: string | null;
 }
+
+/** Metadata returned by GET /api/investigations for hub cards */
+export interface InvestigationSummary {
+  folderId: string;
+  role: 'owner' | 'editor' | 'viewer';
+  joinedAt: string;
+  folder: {
+    name: string;
+    status: string;
+    color?: string;
+    icon?: string;
+    description?: string;
+    clsLevel?: string;
+    papLevel?: string;
+    tags?: string[];
+    createdAt: string;
+    updatedAt: string;
+  };
+  entityCounts: {
+    notes: number;
+    tasks: number;
+    iocs: number;
+    events: number;
+    whiteboards: number;
+    chats: number;
+  };
+  memberCount: number;
+}
+
+/** Data residency mode for an investigation */
+export type InvestigationDataMode = 'local' | 'remote' | 'synced';
 
 export interface PresenceUser {
   id: string;

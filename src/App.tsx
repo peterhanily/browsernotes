@@ -30,6 +30,7 @@ import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import { isEncryptionEnabled } from './lib/encryptionStore';
 import { clipBuffer } from './lib/clipBuffer';
+import { useInvestigationData } from './hooks/useInvestigationData';
 import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread, InvestigationDataMode } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
 const DashboardView = lazy(() => import('./components/Dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
@@ -250,7 +251,15 @@ function AppInner() {
   );
   // Grace period to prevent auto-deselect from racing with Dexie live query after note creation
   const noteNavGraceRef = useRef(false);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>(savedNavState?.selectedFolderId);
+  const [selectedFolderId, setSelectedFolderIdRaw] = useState<string | undefined>(savedNavState?.selectedFolderId);
+  const [investigationMode, setInvestigationMode] = useState<InvestigationDataMode>('local');
+
+  // Wrapper that resets investigationMode to 'local' when clearing folder selection
+  const setSelectedFolderId = useCallback((id: string | undefined) => {
+    setSelectedFolderIdRaw(id);
+    if (!id) setInvestigationMode('local');
+  }, []);
+
   const [selectedTag, setSelectedTag] = useState<string>();
   const [showTrash, setShowTrash] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -305,7 +314,7 @@ function AppInner() {
     if (state.selectedWhiteboardId !== undefined) setSelectedWhiteboardId(state.selectedWhiteboardId);
     if (state.selectedFolderId !== undefined) setSelectedFolderId(state.selectedFolderId);
     setShowSettings(false);
-  }, []);
+  }, [setSelectedFolderId]);
   const { navigate: navPush } = useNavigationHistory({ onViewChange: handleNavRestore });
 
   // Persist navigation state to sessionStorage for refresh restoration
@@ -348,11 +357,11 @@ function AppInner() {
   }, [navPush, selectedFolderId, folders]);
 
   // ─── Investigation Hub handlers ──────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleOpenInvestigation = useCallback((folderId: string, _mode: InvestigationDataMode) => {
+  const handleOpenInvestigation = useCallback((folderId: string, mode: InvestigationDataMode) => {
     setSelectedFolderId(folderId);
+    setInvestigationMode(mode);
     navigateTo('notes');
-  }, [navigateTo]);
+  }, [navigateTo, setSelectedFolderId]);
 
   const handleSyncLocally = useCallback(async (folderId: string) => {
     try {
@@ -366,6 +375,7 @@ function AppInner() {
       standaloneIOCsHook.reload();
       chatsHook.reload();
       refreshRemote();
+      setInvestigationMode('synced');
     } catch (err) {
       console.error('Failed to sync investigation locally:', err);
     }
@@ -395,7 +405,7 @@ function AppInner() {
     } catch (err) {
       console.error('Failed to unsync investigation:', err);
     }
-  }, [selectedFolderId, reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook]);
+  }, [selectedFolderId, setSelectedFolderId, reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook]);
 
   // Resolve timeline deep-link once events are loaded
   const deepLinkTimelineResolved = useCallback(() => {
@@ -421,7 +431,7 @@ function AppInner() {
     };
     window.addEventListener('notification-navigate', handler);
     return () => window.removeEventListener('notification-navigate', handler);
-  }, [navigateTo]);
+  }, [navigateTo, setSelectedFolderId]);
 
   // Listen for clip imports from the Chrome extension via postMessage
   useEffect(() => {
@@ -551,7 +561,8 @@ function AppInner() {
     // Replay any clips that arrived while the encryption lock screen was shown
     clipBuffer.flush();
     return () => window.removeEventListener('message', handler);
-  }, [findOrCreateFolder, loggedCreateNote, loggedCreateTask, loggedCreateEvent, timelines, navigateTo, addToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setSelectedFolderId is stable; settings deps intentionally omitted to avoid re-registering handler
+  }, [findOrCreateFolder, loggedCreateNote, loggedCreateTask, loggedCreateEvent, timelines, navigateTo, addToast, setSelectedFolderId]);
 
   // Track Clips folder ID for OCI envelope type detection
   const clipsFolderId = useMemo(
@@ -612,13 +623,6 @@ function AppInner() {
     [getFilteredWhiteboards, selectedFolderId, selectedTag]
   );
 
-  // Auto-deselect whiteboard when trashed/archived/filtered out
-  useEffect(() => {
-    if (selectedWhiteboardId && !filteredWhiteboards.find((w) => w.id === selectedWhiteboardId)) {
-      setSelectedWhiteboardId(undefined);
-    }
-  }, [selectedWhiteboardId, filteredWhiteboards]);
-
   // Filtered standalone IOCs
   const filteredStandaloneIOCs = useMemo(
     () => standaloneIOCsHook.getFilteredIOCs({
@@ -642,6 +646,27 @@ function AppInner() {
     [chatsHook.getFilteredThreads, selectedFolderId]
   );
 
+  // ─── Remote investigation data adapter ─────────────────────────
+  const remoteData = useInvestigationData(
+    investigationMode === 'remote' ? selectedFolderId ?? null : null,
+    'remote',
+  );
+
+  // Resolved entity arrays — pick remote data when in remote mode, local otherwise
+  const resolvedNotes = investigationMode === 'remote' ? remoteData.notes : filteredNotes;
+  const resolvedTasks = investigationMode === 'remote' ? remoteData.tasks : filteredTasks;
+  const resolvedTimelineEvents = investigationMode === 'remote' ? remoteData.events : filteredTimelineEvents;
+  const resolvedWhiteboards = investigationMode === 'remote' ? remoteData.whiteboards : filteredWhiteboards;
+  const resolvedStandaloneIOCs = investigationMode === 'remote' ? remoteData.iocs : filteredStandaloneIOCs;
+  const resolvedChatThreads = investigationMode === 'remote' ? remoteData.chats : filteredChatThreads;
+
+  // Auto-deselect whiteboard when trashed/archived/filtered out
+  useEffect(() => {
+    if (selectedWhiteboardId && !resolvedWhiteboards.find((w) => w.id === selectedWhiteboardId)) {
+      setSelectedWhiteboardId(undefined);
+    }
+  }, [selectedWhiteboardId, resolvedWhiteboards]);
+
   // Screenshare-safe: filter once on full arrays, derive folder-scoped and investigation-scoped from these
   const screensafeNotes = useMemo(
     () => screenshareMaxLevel ? notes.notes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : notes.notes,
@@ -657,40 +682,41 @@ function AppInner() {
   );
 
   // Folder-filtered + screenshare-safe (for NoteList, TaskList, TimelineView)
-  // Derive from screensafe arrays instead of re-filtering with isAboveClsThreshold
+  // Use resolved arrays (which pick remote vs local) instead of raw filtered arrays
   const ssFilteredNotes = useMemo(
-    () => screenshareMaxLevel ? filteredNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredNotes,
-    [filteredNotes, screenshareMaxLevel, effectiveClsLevels]
+    () => screenshareMaxLevel ? resolvedNotes.filter((n) => !isAboveClsThreshold(n.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedNotes,
+    [resolvedNotes, screenshareMaxLevel, effectiveClsLevels]
   );
   const ssFilteredTasks = useMemo(
-    () => screenshareMaxLevel ? filteredTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTasks,
-    [filteredTasks, screenshareMaxLevel, effectiveClsLevels]
+    () => screenshareMaxLevel ? resolvedTasks.filter((t) => !isAboveClsThreshold(t.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedTasks,
+    [resolvedTasks, screenshareMaxLevel, effectiveClsLevels]
   );
   const ssFilteredTimelineEvents = useMemo(
-    () => screenshareMaxLevel ? filteredTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : filteredTimelineEvents,
-    [filteredTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
+    () => screenshareMaxLevel ? resolvedTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedTimelineEvents,
+    [resolvedTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
   );
 
-  // Investigation-scoped arrays (for graph, IOC stats, search) — derive from screensafe
+  // Investigation-scoped arrays (for graph, IOC stats, search) — derive from screensafe,
+  // or use remote data directly when in remote mode
   const investigationNotes = useMemo(
-    () => selectedFolderId ? screensafeNotes.filter((n) => n.folderId === selectedFolderId) : screensafeNotes,
-    [screensafeNotes, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.notes : selectedFolderId ? screensafeNotes.filter((n) => n.folderId === selectedFolderId) : screensafeNotes,
+    [investigationMode, remoteData.notes, screensafeNotes, selectedFolderId]
   );
   const investigationTasks = useMemo(
-    () => selectedFolderId ? screensafeTasks.filter((t) => t.folderId === selectedFolderId) : screensafeTasks,
-    [screensafeTasks, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.tasks : selectedFolderId ? screensafeTasks.filter((t) => t.folderId === selectedFolderId) : screensafeTasks,
+    [investigationMode, remoteData.tasks, screensafeTasks, selectedFolderId]
   );
   const investigationTimelineEvents = useMemo(
-    () => selectedFolderId ? screensafeTimelineEvents.filter((e) => e.folderId === selectedFolderId) : screensafeTimelineEvents,
-    [screensafeTimelineEvents, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.events : selectedFolderId ? screensafeTimelineEvents.filter((e) => e.folderId === selectedFolderId) : screensafeTimelineEvents,
+    [investigationMode, remoteData.events, screensafeTimelineEvents, selectedFolderId]
   );
   const investigationWhiteboards = useMemo(
-    () => selectedFolderId ? whiteboards.filter((w) => w.folderId === selectedFolderId) : whiteboards,
-    [whiteboards, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.whiteboards : selectedFolderId ? whiteboards.filter((w) => w.folderId === selectedFolderId) : whiteboards,
+    [investigationMode, remoteData.whiteboards, whiteboards, selectedFolderId]
   );
   const investigationStandaloneIOCs = useMemo(
-    () => selectedFolderId ? standaloneIOCsHook.iocs.filter((i) => i.folderId === selectedFolderId) : standaloneIOCsHook.iocs,
-    [standaloneIOCsHook.iocs, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.iocs : selectedFolderId ? standaloneIOCsHook.iocs.filter((i) => i.folderId === selectedFolderId) : standaloneIOCsHook.iocs,
+    [investigationMode, remoteData.iocs, standaloneIOCsHook.iocs, selectedFolderId]
   );
 
   const investigationScopedCounts = useMemo(() => {
@@ -727,22 +753,24 @@ function AppInner() {
     return counts;
   }, [timeline.events]);
 
-  // Selected note
+  // Selected note — use resolved notes (local or remote) so remote notes can be selected
   const selectedNote = useMemo(
-    () => filteredNotes.find((n) => n.id === selectedNoteId),
-    [filteredNotes, selectedNoteId]
+    () => resolvedNotes.find((n) => n.id === selectedNoteId),
+    [resolvedNotes, selectedNoteId]
   );
 
   // Auto-deselect when selected note is no longer in filtered list
   // Fixes stale editor after trash, delete, archive, restore, tag change, etc.
   // Skip when notes list is empty (still loading after folder switch or sample import)
   // Skip during grace period (note was just created, live query hasn't picked it up yet)
+  // Skip during remote loading to avoid premature deselection
   useEffect(() => {
     if (noteNavGraceRef.current) return;
-    if (selectedNoteId && filteredNotes.length > 0 && !filteredNotes.find((n) => n.id === selectedNoteId)) {
+    if (investigationMode === 'remote' && remoteData.loading) return;
+    if (selectedNoteId && resolvedNotes.length > 0 && !resolvedNotes.find((n) => n.id === selectedNoteId)) {
       setSelectedNoteId(undefined);
     }
-  }, [selectedNoteId, filteredNotes]);
+  }, [selectedNoteId, resolvedNotes, investigationMode, remoteData.loading]);
 
   // Note counts (include all notes)
   const noteCounts = useMemo(() => ({
@@ -1004,7 +1032,7 @@ function AppInner() {
     navigateTo('notes');
     setSelectedNoteId(data.notes[0]?.id);
     activityLog.log('data', 'import', 'Loaded sample investigation "Operation DARK GLACIER"');
-  }, [handleImportComplete, navigateTo, activityLog]);
+  }, [handleImportComplete, navigateTo, activityLog, setSelectedFolderId]);
 
   const handleDeleteSample = useCallback(async () => {
     // Delete all entities with sample- prefix
@@ -1032,7 +1060,7 @@ function AppInner() {
       setSelectedFolderId(undefined);
     }
     activityLog.log('data', 'delete', 'Removed sample investigation "Operation DARK GLACIER"');
-  }, [handleImportComplete, selectedFolderId, activityLog]);
+  }, [handleImportComplete, selectedFolderId, activityLog, setSelectedFolderId]);
 
   // ?demo URL parameter handling
   useEffect(() => {
@@ -1052,7 +1080,7 @@ function AppInner() {
     } else {
       handleLoadSample().then(() => setShowDemoModal(true));
     }
-  }, [sampleLoaded, handleLoadSample, navigateTo]);
+  }, [sampleLoaded, handleLoadSample, navigateTo, setSelectedFolderId]);
 
   // Keyboard shortcuts
   // Search overlay navigation callbacks
@@ -1063,14 +1091,14 @@ function AppInner() {
     setShowTrash(false);
     setShowArchive(false);
     navigateTo('notes', { selectedNoteId: id });
-  }, [navigateTo]);
+  }, [navigateTo, setSelectedFolderId]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSearchNavigateToTask = useCallback((_id: string) => {
     setSelectedFolderId(undefined);
     setSelectedTag(undefined);
     navigateTo('tasks');
-  }, [navigateTo]);
+  }, [navigateTo, setSelectedFolderId]);
 
   const handleSearchNavigateToTimeline = useCallback((id: string) => {
     const ev = timeline.events.find((e) => e.id === id);
@@ -1166,7 +1194,7 @@ function AppInner() {
     chatCount: chatsHook.threadCounts.total,
     serverConnected: auth.connected,
     onNewFromPlaybook: () => setShowPlaybookPicker(true),
-  }), [activeView, folders, tags, auth.connected, selectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts, chatsHook.threadCounts.total]);
+  }), [activeView, folders, tags, auth.connected, selectedFolderId, setSelectedFolderId, selectedTag, showTrash, showArchive, loggedCreateFolder, loggedDeleteFolder, loggedTrashFolderContents, loggedArchiveFolder, loggedUnarchiveFolder, updateFolder, noteCounts, combinedTrashedCount, combinedArchivedCount, tasks.taskCounts, timeline.eventCounts, timelines, selectedTimelineId, loggedCreateTimeline, loggedDeleteTimeline, updateTimeline, timelineEventCounts, whiteboards, selectedWhiteboardId, loggedCreateWhiteboard, loggedDeleteWhiteboard, updateWhiteboard, whiteboardCounts, handleMoveNoteToFolder, updateTag, loggedDeleteTag, navigateTo, folderStatusFilter, investigationScopedCounts, chatsHook.threadCounts.total]);
 
   const selectedFolder = useMemo(() => folders.find((f) => f.id === selectedFolderId), [folders, selectedFolderId]);
   const selectedTagObj = useMemo(() => tags.find((t) => t.name === selectedTag), [tags, selectedTag]);
@@ -1328,6 +1356,17 @@ function AppInner() {
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <div className={activeView === 'graph' && !showSettings ? 'hidden' : 'flex flex-col flex-1 overflow-hidden'}>
         {filterBar}
+        {investigationMode === 'remote' && selectedFolderId && (
+          <div className="mx-4 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm flex items-center justify-between">
+            <span>Viewing remote investigation — data is not stored locally</span>
+            <button
+              onClick={() => handleSyncLocally(selectedFolderId)}
+              className="text-xs px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 transition-colors"
+            >
+              Sync locally
+            </button>
+          </div>
+        )}
         {showSettings ? (
           <SettingsPanel
             settings={settings}
@@ -1423,7 +1462,7 @@ function AppInner() {
             folders={folders}
             allTags={tags}
             allStandaloneIOCs={standaloneIOCsHook.iocs}
-            filteredStandaloneIOCs={filteredStandaloneIOCs}
+            filteredStandaloneIOCs={resolvedStandaloneIOCs}
             onCreateIOC={loggedCreateIOC}
             onUpdateIOC={standaloneIOCsHook.updateIOC}
             onDeleteIOC={loggedDeleteIOC}
@@ -1487,7 +1526,7 @@ function AppInner() {
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
-            whiteboards={filteredWhiteboards}
+            whiteboards={resolvedWhiteboards}
             folders={folders}
             allTags={tags}
             onCreateWhiteboard={(name?: string) => loggedCreateWhiteboard(name, selectedFolderId)}
@@ -1502,7 +1541,7 @@ function AppInner() {
           />
         ) : activeView === 'chat' ? (
           <ChatView
-            threads={filteredChatThreads}
+            threads={resolvedChatThreads}
             selectedThreadId={selectedChatThreadId}
             onSelectThread={setSelectedChatThreadId}
             onCreateThread={loggedCreateChatThread}

@@ -1,16 +1,12 @@
-import { useState } from 'react';
 import {
   FileText, ListChecks, Clock, Trash2, Briefcase,
-  Archive, ChevronDown, Plus, X, Settings as SettingsIcon,
-  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Dices, Search, Shield, BookOpen,
-  LayoutDashboard, MessageSquare, MessagesSquare, FolderOpen, FolderClosed,
+  Archive, Settings as SettingsIcon,
+  PanelLeftClose, PanelLeft, Github, Download, Chrome, PenTool, Activity, Network, Search, Shield,
+  LayoutDashboard, MessageSquare, MessagesSquare, ChevronLeft,
 } from 'lucide-react';
 import type { Folder, Tag as TagType, Timeline, Whiteboard, ViewMode, InvestigationStatus } from '../../types';
-import { Modal } from '../Common/Modal';
-import { OperationNameGenerator } from '../Common/OperationNameGenerator';
-import { InvestigationCard } from './InvestigationCard';
 import { cn } from '../../lib/utils';
-import { NavItem, InvestigationListItem, CollapsedIcon } from './SidebarHelpers';
+import { NavItem, CollapsedIcon } from './SidebarHelpers';
 import { WhiteboardSubList } from './WhiteboardSubList';
 import { TimelineSubList } from './TimelineSubList';
 import { TagSubList } from './TagSubList';
@@ -67,8 +63,6 @@ interface SidebarProps {
   onNewFromPlaybook?: () => void;
 }
 
-type SegmentedFilter = 'all' | InvestigationStatus;
-
 export function Sidebar({
   activeView,
   onViewChange,
@@ -82,12 +76,6 @@ export function Sidebar({
   onShowTrash,
   showArchive,
   onShowArchive,
-  onCreateFolder,
-  onDeleteFolder,
-  onTrashFolderContents,
-  onArchiveFolder,
-  onUnarchiveFolder,
-  onRenameFolder,
   onOpenSettings,
   collapsed,
   onToggleCollapsed,
@@ -109,45 +97,13 @@ export function Sidebar({
   onRenameWhiteboard,
   whiteboardCount,
   onNavigate,
-  onMoveNoteToFolder,
   onRenameTag,
   onDeleteTag,
-  onEditFolder,
-  // folderStatusFilter — managed internally via segmentedFilter state
-  onFolderStatusFilterChange,
   investigationScopedCounts,
   chatCount,
-  serverConnected,
-  onNewFromPlaybook,
 }: SidebarProps) {
-  const [investigationsListOpen, setInvestigationsListOpen] = useState(true);
-  const [editingFolder, setEditingFolder] = useState<string | null>(null);
-  const [editFolderName, setEditFolderName] = useState('');
-  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
-  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [showNewFolder, setShowNewFolder] = useState(false);
-  const [showNameGenerator, setShowNameGenerator] = useState(false);
-
-  const [segmentedFilter, setSegmentedFilter] = useState<SegmentedFilter>('all');
-
   // Derived state
   const selectedFolder = folders.find((f) => f.id === selectedFolderId);
-
-  const handleCreateFolder = () => {
-    if (newFolderName.trim()) {
-      onCreateFolder(newFolderName.trim());
-      setNewFolderName('');
-      setShowNewFolder(false);
-    }
-  };
-
-  const handleRenameFolder = (id: string) => {
-    if (editFolderName.trim()) {
-      onRenameFolder(id, editFolderName.trim());
-      setEditingFolder(null);
-    }
-  };
 
   const clearFilters = () => {
     onFolderSelect(undefined);
@@ -166,26 +122,13 @@ export function Sidebar({
     onNavigate?.();
   };
 
-  const handleSegmentedFilterChange = (filter: SegmentedFilter) => {
-    setSegmentedFilter(filter);
-    if (onFolderStatusFilterChange) {
-      if (filter === 'all') {
-        onFolderStatusFilterChange(['active', 'closed', 'archived']);
-      } else {
-        onFolderStatusFilterChange([filter]);
-      }
-    }
-  };
-
-  // Filtered folders for the investigation list
-  const filteredFolders = folders.filter((f) => {
-    if (segmentedFilter === 'all') return true;
-    return (f.status || 'active') === segmentedFilter;
-  });
-
-  // View items for collapsed icon rail
-  const collapsedViewItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
+  // View items for collapsed icon rail — top-level items always, investigation-scoped only when inside one
+  const collapsedTopItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
     { view: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { view: 'investigations', icon: Briefcase, label: 'Investigations' },
+  ];
+
+  const collapsedInvestigationItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
     { view: 'notes', icon: FileText, label: 'Notes', badge: investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total, badgeColor: 'bg-accent-blue' },
     { view: 'tasks', icon: ListChecks, label: 'Tasks', badge: investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total, badgeColor: 'bg-accent-amber', dataTour: 'tasks' },
     { view: 'timeline', icon: Clock, label: 'Timeline', badge: investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total, badgeColor: 'bg-accent-green', dataTour: 'timeline' },
@@ -193,8 +136,11 @@ export function Sidebar({
     { view: 'ioc-stats', icon: Search, label: 'IOCs', badge: investigationScopedCounts ? investigationScopedCounts.iocs : undefined, badgeColor: 'bg-accent-green' },
     { view: 'graph', icon: Network, label: 'Graph' },
     { view: 'activity', icon: Activity, label: 'Activity', dataTour: 'activity' },
-    { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
+  ];
+
+  const collapsedBottomItems: { view: ViewMode; icon: typeof FileText; label: string; badge?: number; badgeColor?: string; dataTour?: string }[] = [
     { view: 'chat', icon: MessageSquare, label: 'CaddyAI', badge: chatCount },
+    { view: 'caddyshack', icon: MessagesSquare, label: 'CaddyShack' },
   ];
 
   // --- Collapsed: icon-only rail ---
@@ -217,7 +163,38 @@ export function Sidebar({
 
         {/* Scrollable view icons */}
         <div className="flex-1 flex flex-col items-center py-2 gap-0.5 overflow-y-auto overflow-x-hidden w-full">
-          {collapsedViewItems.map((item) => (
+          {collapsedTopItems.map((item) => (
+            <CollapsedIcon
+              key={item.view}
+              icon={item.icon}
+              label={item.label}
+              active={activeView === item.view && !showTrash && !showArchive}
+              badge={item.badge}
+              onClick={() => nav(() => navToView(item.view))}
+              dataTour={item.dataTour}
+            />
+          ))}
+
+          {selectedFolderId && (
+            <>
+              <div className="w-6 h-px bg-border-subtle my-1" />
+              {collapsedInvestigationItems.map((item) => (
+                <CollapsedIcon
+                  key={item.view}
+                  icon={item.icon}
+                  label={item.label}
+                  active={activeView === item.view && !showTrash && !showArchive}
+                  badge={item.badge}
+                  onClick={() => nav(() => navToView(item.view))}
+                  dataTour={item.dataTour}
+                />
+              ))}
+            </>
+          )}
+
+          <div className="w-6 h-px bg-border-subtle my-1" />
+
+          {collapsedBottomItems.map((item) => (
             <CollapsedIcon
               key={item.view}
               icon={item.icon}
@@ -261,205 +238,57 @@ export function Sidebar({
     );
   }
 
+  // Status helpers for the investigation context header
+  const selectedStatus = selectedFolder ? (selectedFolder.status || 'active') : 'active';
+  const statusColor = selectedStatus === 'active'
+    ? 'bg-accent-green'
+    : selectedStatus === 'archived'
+      ? 'bg-accent-amber'
+      : 'bg-text-muted';
+  const statusTextColor = selectedStatus === 'active'
+    ? 'text-accent-green'
+    : selectedStatus === 'archived'
+      ? 'text-accent-amber'
+      : 'text-text-muted';
+
   // --- Expanded: full sidebar ---
   return (
     <aside className="w-[260px] border-r border-border-subtle sidebar-glass flex flex-col h-full shrink-0 overflow-hidden" role="navigation" aria-label="Main navigation">
       {/* 1. HEADER */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle">
-        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Investigations</span>
+        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">ThreatCaddy</span>
         <button onClick={onToggleCollapsed} className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors" aria-label="Collapse sidebar" title="Collapse sidebar">
           <PanelLeftClose size={16} />
         </button>
       </div>
 
-      {/* 2. ALL INVESTIGATIONS TOGGLE */}
-      <div className="px-2 pt-1.5">
-        <button
-          onClick={() => setInvestigationsListOpen(!investigationsListOpen)}
-          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
-          aria-expanded={investigationsListOpen}
-        >
-          {investigationsListOpen ? <FolderOpen size={14} className="text-purple/70 shrink-0" /> : <FolderClosed size={14} className="text-text-muted shrink-0" />}
-          <span>Investigations</span>
-          <span className="ml-auto flex items-center gap-1.5">
-            <span className="px-1.5 py-px rounded-full bg-bg-deep text-[9px] font-mono text-text-muted">{folders.length}</span>
-            <ChevronDown
-              size={12}
-              className="text-text-muted transition-transform duration-200"
-              style={{ transform: investigationsListOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            />
-          </span>
-        </button>
-
-        <div
-          className="overflow-hidden transition-all duration-250 ease-in-out"
-          style={{
-            maxHeight: investigationsListOpen ? '400px' : '0px',
-            opacity: investigationsListOpen ? 1 : 0,
-          }}
-        >
-          {/* Segmented filter */}
-          {onFolderStatusFilterChange && (
-            <div className="flex gap-0.5 p-0.5 bg-bg-deep rounded-lg mb-1.5 mt-1">
-              {(['all', 'active', 'closed', 'archived'] as SegmentedFilter[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleSegmentedFilterChange(s)}
-                  className={cn(
-                    'flex-1 px-1 py-0.5 rounded text-[10px] font-medium transition-colors',
-                    segmentedFilter === s
-                      ? 'bg-bg-active text-text-primary'
-                      : 'text-text-muted hover:text-text-secondary'
-                  )}
-                >
-                  {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Investigation list */}
-          <div className="space-y-0.5 max-h-[300px] overflow-y-auto" data-tour="tags-folders">
-            {/* "All Items" — click to deselect investigation */}
-            <NavItem
-              compact
-              icon={<Briefcase size={14} />}
-              label="View All"
-              active={!selectedFolderId}
-              onClick={() => nav(() => { onFolderSelect(undefined); onTagSelect(undefined); onShowTrash(false); onShowArchive(false); })}
-            />
-            {filteredFolders.map((folder) => (
-              <div
-                key={folder.id}
-                className={cn(
-                  'group relative rounded-lg transition-colors',
-                  dragOverFolderId === folder.id && 'bg-purple/15',
-                  (folder.status === 'closed' || folder.status === 'archived') && 'opacity-60'
-                )}
-                onDragOver={(e) => { e.preventDefault(); setDragOverFolderId(folder.id); }}
-                onDragLeave={() => setDragOverFolderId(null)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOverFolderId(null);
-                  const noteId = e.dataTransfer.getData('text/plain');
-                  if (noteId && onMoveNoteToFolder) onMoveNoteToFolder(noteId, folder.id);
-                }}
-              >
-                {editingFolder === folder.id ? (
-                  <div className="flex items-center gap-1 px-2">
-                    <input
-                      autoFocus
-                      value={editFolderName}
-                      onChange={(e) => setEditFolderName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') setEditingFolder(null); }}
-                      aria-label="Rename investigation"
-                      className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-purple"
-                    />
-                  </div>
-                ) : (
-                  <InvestigationListItem
-                    folder={folder}
-                    active={selectedFolderId === folder.id}
-                    synced={serverConnected && !folder.localOnly}
-                    onClick={() => nav(() => {
-                      if (selectedFolderId === folder.id) {
-                        onFolderSelect(undefined);
-                      } else {
-                        onFolderSelect(folder.id);
-                      }
-                      onTagSelect(undefined); onShowTrash(false); onShowArchive(false);
-                    })}
-                    onDoubleClick={() => { setEditingFolder(folder.id); setEditFolderName(folder.name); }}
-                    onInfo={onEditFolder ? () => onEditFolder(folder.id) : undefined}
-                    onArchive={(folder.status || 'active') !== 'archived' ? () => onArchiveFolder(folder.id) : undefined}
-                    onUnarchive={(folder.status || 'active') === 'archived' ? () => onUnarchiveFolder(folder.id) : undefined}
-                    onDelete={() => setDeletingFolderId(folder.id)}
-                  />
-                )}
-              </div>
-            ))}
-            {filteredFolders.length === 0 && (
-              <p className="px-2 py-1 text-[10px] text-text-muted font-mono">No investigations</p>
+      {/* 2. INVESTIGATION CONTEXT HEADER */}
+      {selectedFolder && (
+        <div className="px-3 py-2 border-b border-border-subtle">
+          <button
+            onClick={() => { onFolderSelect(undefined); onViewChange('investigations'); }}
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary mb-1 transition-colors"
+          >
+            <ChevronLeft size={14} />
+            All Investigations
+          </button>
+          <div className="flex items-center gap-2">
+            {selectedFolder.color ? (
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: selectedFolder.color }} />
+            ) : (
+              <div className={cn('w-2 h-2 rounded-full shrink-0', statusColor)} />
             )}
+            <span className="text-sm font-medium text-text-primary truncate flex-1">{selectedFolder.name}</span>
+            <span className={cn('text-[10px] font-medium uppercase tracking-wide', statusTextColor)}>
+              {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
+            </span>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 3. NEW INVESTIGATION ROW */}
-      <div className="px-2 pt-1.5">
-        {showNewFolder ? (
-          <div className="flex items-center gap-1">
-            <input
-              autoFocus
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
-              placeholder="Investigation name"
-              aria-label="New investigation name"
-              className="flex-1 bg-bg-deep border border-border-medium rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-purple"
-            />
-            <button onClick={handleCreateFolder} className="text-purple hover:text-accent-hover" aria-label="Create investigation" title="Create">
-              <Plus size={14} />
-            </button>
-            <button onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} className="text-text-muted hover:text-text-primary" aria-label="Cancel" title="Cancel">
-              <X size={14} />
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => setShowNewFolder(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-purple text-white text-xs font-medium hover:brightness-110 transition-all"
-            >
-              <Plus size={14} />
-              New
-            </button>
-            <button
-              onClick={() => setShowNameGenerator(true)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 transition-colors"
-              title="Generate investigation name"
-              aria-label="Generate investigation name"
-            >
-              <Dices size={14} />
-            </button>
-            {onNewFromPlaybook && (
-              <button
-                onClick={onNewFromPlaybook}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-                title="New from playbook"
-                aria-label="New investigation from playbook"
-              >
-                <BookOpen size={14} />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 4. ACTIVE INVESTIGATION CARD */}
-      <div className="px-2 pt-2">
-        {selectedFolder && onEditFolder ? (
-          <InvestigationCard
-            folder={selectedFolder}
-            counts={{
-              notes: investigationScopedCounts?.notes ?? 0,
-              tasks: investigationScopedCounts?.tasks ?? 0,
-              events: investigationScopedCounts?.events ?? 0,
-              whiteboards: investigationScopedCounts?.whiteboards ?? 0,
-              iocs: investigationScopedCounts?.iocs ?? 0,
-            }}
-            onEditFolder={onEditFolder}
-            synced={serverConnected && !selectedFolder.localOnly}
-          />
-        ) : (
-          <div className="font-mono text-[11px] text-text-muted px-1">
-            Viewing all
-          </div>
-        )}
-      </div>
-
-      {/* 5. NAVIGATION */}
+      {/* 3. NAVIGATION */}
       <nav data-tour="sidebar-nav" className="flex-1 overflow-y-auto px-2 pt-2 space-y-0.5" aria-label="Views">
+        {/* Top-level items — always visible */}
         <div data-tour="dashboard">
           <NavItem
             icon={<LayoutDashboard size={16} />}
@@ -469,76 +298,85 @@ export function Sidebar({
           />
         </div>
         <NavItem
-          icon={<FileText size={16} />}
-          label="Notes"
-          badge={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
-          badgeColor="bg-accent-blue/15 text-accent-blue"
-          active={activeView === 'notes' && !showTrash && !showArchive}
-          onClick={() => nav(() => navToView('notes'))}
+          icon={<Briefcase size={16} />}
+          label="Investigations"
+          active={activeView === 'investigations' && !showTrash && !showArchive}
+          onClick={() => nav(() => navToView('investigations'))}
         />
-        <div data-tour="tasks">
-          <NavItem
-            icon={<ListChecks size={16} />}
-            label="Tasks"
-            badge={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
-            badgeColor="bg-accent-amber/15 text-accent-amber"
-            active={activeView === 'tasks'}
-            onClick={() => nav(() => navToView('tasks'))}
-          />
-        </div>
-        <div data-tour="timeline">
-          <NavItem
-            icon={<Clock size={16} />}
-            label="Timeline"
-            badge={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
-            badgeColor="bg-accent-green/15 text-accent-green"
-            active={activeView === 'timeline'}
-            onClick={() => nav(() => navToView('timeline'))}
-          />
-        </div>
-        <div data-tour="whiteboards">
-          <NavItem
-            icon={<PenTool size={16} />}
-            label="Whiteboards"
-            badge={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
-            active={activeView === 'whiteboard'}
-            onClick={() => nav(() => navToView('whiteboard'))}
-          />
-        </div>
 
-        {/* 6px gap between Whiteboards and IOCs */}
-        <div className="h-1.5" />
+        {/* Investigation-scoped items — only when inside an investigation */}
+        {selectedFolderId && (
+          <>
+            <div className="h-px bg-border-subtle mx-1 my-1.5" />
 
-        <NavItem
-          icon={<Search size={16} />}
-          label="IOCs"
-          badge={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
-          badgeColor="bg-accent-green/15 text-accent-green"
-          active={activeView === 'ioc-stats'}
-          onClick={() => nav(() => navToView('ioc-stats'))}
-        />
-        <NavItem
-          icon={<Network size={16} />}
-          label="Graph"
-          active={activeView === 'graph'}
-          onClick={() => nav(() => navToView('graph'))}
-        />
-        <div data-tour="activity">
-          <NavItem
-            icon={<Activity size={16} />}
-            label="Activity"
-            active={activeView === 'activity'}
-            onClick={() => nav(() => navToView('activity'))}
-          />
-        </div>
-        <div data-tour="caddyshack">
-          <NavItem
-            icon={<MessagesSquare size={16} />}
-            label="CaddyShack"
-            active={activeView === 'caddyshack'}
-            onClick={() => nav(() => navToView('caddyshack'))}
-          />
-        </div>
+            <NavItem
+              icon={<FileText size={16} />}
+              label="Notes"
+              badge={investigationScopedCounts ? investigationScopedCounts.notes : noteCounts.total}
+              badgeColor="bg-accent-blue/15 text-accent-blue"
+              active={activeView === 'notes' && !showTrash && !showArchive}
+              onClick={() => nav(() => navToView('notes'))}
+            />
+            <div data-tour="tasks">
+              <NavItem
+                icon={<ListChecks size={16} />}
+                label="Tasks"
+                badge={investigationScopedCounts ? investigationScopedCounts.tasks : taskCounts.total}
+                badgeColor="bg-accent-amber/15 text-accent-amber"
+                active={activeView === 'tasks'}
+                onClick={() => nav(() => navToView('tasks'))}
+              />
+            </div>
+            <div data-tour="timeline">
+              <NavItem
+                icon={<Clock size={16} />}
+                label="Timeline"
+                badge={investigationScopedCounts ? investigationScopedCounts.events : timelineCounts?.total}
+                badgeColor="bg-accent-green/15 text-accent-green"
+                active={activeView === 'timeline'}
+                onClick={() => nav(() => navToView('timeline'))}
+              />
+            </div>
+            <div data-tour="whiteboards">
+              <NavItem
+                icon={<PenTool size={16} />}
+                label="Whiteboards"
+                badge={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
+                active={activeView === 'whiteboard'}
+                onClick={() => nav(() => navToView('whiteboard'))}
+              />
+            </div>
+
+            <div className="h-1.5" />
+
+            <NavItem
+              icon={<Search size={16} />}
+              label="IOCs"
+              badge={investigationScopedCounts ? investigationScopedCounts.iocs : undefined}
+              badgeColor="bg-accent-green/15 text-accent-green"
+              active={activeView === 'ioc-stats'}
+              onClick={() => nav(() => navToView('ioc-stats'))}
+            />
+            <NavItem
+              icon={<Network size={16} />}
+              label="Graph"
+              active={activeView === 'graph'}
+              onClick={() => nav(() => navToView('graph'))}
+            />
+            <div data-tour="activity">
+              <NavItem
+                icon={<Activity size={16} />}
+                label="Activity"
+                active={activeView === 'activity'}
+                onClick={() => nav(() => navToView('activity'))}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="h-px bg-border-subtle mx-1 my-1.5" />
+
+        {/* Bottom global items — always visible */}
         <div data-tour="chat">
           <NavItem
             icon={<MessageSquare size={16} />}
@@ -549,8 +387,16 @@ export function Sidebar({
             onClick={() => nav(() => navToView('chat'))}
           />
         </div>
+        <div data-tour="caddyshack">
+          <NavItem
+            icon={<MessagesSquare size={16} />}
+            label="CaddyShack"
+            active={activeView === 'caddyshack'}
+            onClick={() => nav(() => navToView('caddyshack'))}
+          />
+        </div>
 
-        {/* 6. CONTEXTUAL SUB-LISTS */}
+        {/* CONTEXTUAL SUB-LISTS */}
 
         {/* Whiteboards — only in whiteboard view */}
         {activeView === 'whiteboard' && (
@@ -580,21 +426,23 @@ export function Sidebar({
           />
         )}
 
-        {/* 7. TAGS */}
-        <TagSubList
-          tags={tags}
-          selectedTag={selectedTag}
-          onTagSelect={onTagSelect}
-          onFolderSelect={onFolderSelect}
-          onShowTrash={onShowTrash}
-          onShowArchive={onShowArchive}
-          onRenameTag={onRenameTag}
-          onDeleteTag={onDeleteTag}
-          onNavigate={onNavigate}
-        />
+        {/* TAGS — only when inside an investigation */}
+        {selectedFolderId && (
+          <TagSubList
+            tags={tags}
+            selectedTag={selectedTag}
+            onTagSelect={onTagSelect}
+            onFolderSelect={onFolderSelect}
+            onShowTrash={onShowTrash}
+            onShowArchive={onShowArchive}
+            onRenameTag={onRenameTag}
+            onDeleteTag={onDeleteTag}
+            onNavigate={onNavigate}
+          />
+        )}
       </nav>
 
-      {/* 8. FOOTER */}
+      {/* FOOTER */}
       <div className="border-t border-border-subtle px-2 py-2 flex items-center gap-1">
         <button
           onClick={() => nav(onOpenSettings)}
@@ -672,46 +520,6 @@ export function Sidebar({
           <span>Privacy</span>
         </a>
       </div>
-
-      {/* Dialogs */}
-      <Modal
-        open={deletingFolderId !== null}
-        onClose={() => setDeletingFolderId(null)}
-        title="Delete Investigation"
-      >
-        <p className="text-sm text-text-secondary mb-4">What should happen to the items inside this investigation?</p>
-        <div className="space-y-2">
-          <button
-            className="w-full text-left px-4 py-3 rounded-lg bg-bg-raised hover:bg-bg-hover transition-colors"
-            onClick={() => { if (deletingFolderId) { onDeleteFolder(deletingFolderId); setDeletingFolderId(null); } }}
-          >
-            <div className="text-sm font-medium text-text-primary">Remove folder only</div>
-            <div className="text-xs text-text-secondary mt-0.5">Items move back to All Items</div>
-          </button>
-          <button
-            className="w-full text-left px-4 py-3 rounded-lg bg-red-600/15 hover:bg-red-600/25 transition-colors"
-            onClick={() => { if (deletingFolderId) { onTrashFolderContents(deletingFolderId); setDeletingFolderId(null); } }}
-          >
-            <div className="text-sm font-medium text-red-400">Trash all items</div>
-            <div className="text-xs text-red-400/70 mt-0.5">Items go to trash (auto-deleted after 30 days)</div>
-          </button>
-        </div>
-        <div className="flex justify-end mt-4">
-          <button
-            className="text-xs text-text-muted hover:text-text-primary transition-colors"
-            onClick={() => setDeletingFolderId(null)}
-          >
-            Cancel
-          </button>
-        </div>
-      </Modal>
-
-      <OperationNameGenerator
-        open={showNameGenerator}
-        onClose={() => setShowNameGenerator(false)}
-        onCreateInvestigation={(name) => { onCreateFolder(name); setShowNameGenerator(false); }}
-      />
     </aside>
   );
 }
-

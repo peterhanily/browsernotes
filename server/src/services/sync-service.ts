@@ -1,4 +1,4 @@
-import { eq, and, gt, inArray, isNull } from 'drizzle-orm';
+import { eq, and, gt, inArray, isNull, count, sql } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import { db } from '../db/index.js';
 import * as schema from '../db/schema.js';
@@ -315,4 +315,85 @@ export async function getSnapshot(folderId: string): Promise<Record<string, unkn
   }
 
   return snapshot;
+}
+
+// ─── Entity Count Helpers ────────────────────────────────────────
+
+export interface EntityCounts {
+  notes: number;
+  tasks: number;
+  iocs: number;
+  events: number;
+  whiteboards: number;
+  chats: number;
+}
+
+const ENTITY_COUNT_TABLES = [
+  { key: 'notes' as const, table: schema.notes, folderId: schema.notes.folderId, deletedAt: schema.notes.deletedAt },
+  { key: 'tasks' as const, table: schema.tasks, folderId: schema.tasks.folderId, deletedAt: schema.tasks.deletedAt },
+  { key: 'iocs' as const, table: schema.standaloneIOCs, folderId: schema.standaloneIOCs.folderId, deletedAt: schema.standaloneIOCs.deletedAt },
+  { key: 'events' as const, table: schema.timelineEvents, folderId: schema.timelineEvents.folderId, deletedAt: schema.timelineEvents.deletedAt },
+  { key: 'whiteboards' as const, table: schema.whiteboards, folderId: schema.whiteboards.folderId, deletedAt: schema.whiteboards.deletedAt },
+  { key: 'chats' as const, table: schema.chatThreads, folderId: schema.chatThreads.folderId, deletedAt: schema.chatThreads.deletedAt },
+] as const;
+
+/**
+ * Get entity counts for a single investigation folder.
+ * Runs all count queries in parallel, only counting non-deleted entities.
+ */
+export async function getEntityCounts(folderId: string): Promise<EntityCounts> {
+  const results = await Promise.all(
+    ENTITY_COUNT_TABLES.map((entry) =>
+      db
+        .select({ count: count() })
+        .from(entry.table)
+        .where(and(eq(entry.folderId, folderId), isNull(entry.deletedAt)))
+    )
+  );
+
+  const counts: EntityCounts = { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 };
+  for (let i = 0; i < ENTITY_COUNT_TABLES.length; i++) {
+    counts[ENTITY_COUNT_TABLES[i].key] = results[i][0]?.count ?? 0;
+  }
+  return counts;
+}
+
+/**
+ * Get entity counts for multiple investigation folders in batch.
+ * Issues one query per entity table with GROUP BY folderId, rather than N queries per folder.
+ */
+export async function getEntityCountsBatch(folderIds: string[]): Promise<Map<string, EntityCounts>> {
+  const result = new Map<string, EntityCounts>();
+  if (folderIds.length === 0) return result;
+
+  // Initialize all folders with zero counts
+  for (const folderId of folderIds) {
+    result.set(folderId, { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 });
+  }
+
+  // Run one GROUP BY query per entity table in parallel
+  const batchResults = await Promise.all(
+    ENTITY_COUNT_TABLES.map((entry) =>
+      db
+        .select({
+          folderId: entry.folderId,
+          count: count(),
+        })
+        .from(entry.table)
+        .where(and(inArray(entry.folderId, folderIds), isNull(entry.deletedAt)))
+        .groupBy(entry.folderId)
+    )
+  );
+
+  for (let i = 0; i < ENTITY_COUNT_TABLES.length; i++) {
+    const key = ENTITY_COUNT_TABLES[i].key;
+    for (const row of batchResults[i]) {
+      const existing = result.get(row.folderId!);
+      if (existing) {
+        existing[key] = row.count;
+      }
+    }
+  }
+
+  return result;
 }

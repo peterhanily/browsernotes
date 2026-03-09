@@ -8,12 +8,17 @@ const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 
 // Chain builders for drizzle-style queries
+// The select chain must be thenable at any point (drizzle queries are awaitable
+// whether or not .limit() is called), so we add a .then() to the chain itself.
 function createSelectChain(rows: Record<string, unknown>[] = []) {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {
+    from: vi.fn(),
+    where: vi.fn(),
     limit: vi.fn().mockResolvedValue(rows),
+    then: vi.fn((resolve: (v: unknown) => void) => resolve(rows)),
   };
+  chain.from.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
   return chain;
 }
 
@@ -82,7 +87,7 @@ let pullChanges: (since: string, folderIds?: string[]) => Promise<{ changes: Rec
 let lookupEntityFolderId: (tableName: string, entityId: string) => Promise<string | undefined>;
 
 beforeEach(async () => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   const mod = await import('../services/sync-service.js');
   processPush = mod.processPush;
   pullChanges = mod.pullChanges;
@@ -295,19 +300,19 @@ describe('sync-service', () => {
     });
 
     it('should detect concurrent modification (optimistic lock failure)', async () => {
+      // Batch existence check returns the existing row (version 3)
       const existingRow = { id: 'note-1', version: 3 };
       const selectChain = createSelectChain([existingRow]);
       mockSelect.mockReturnValue(selectChain);
 
-      // Update returns empty (another writer bumped the version)
+      // Update returns empty (another writer bumped the version between batch check and update)
       const updateChain = createUpdateChain([]);
       mockUpdate.mockReturnValue(updateChain);
 
-      // Re-fetch shows new version
+      // Re-fetch after failed optimistic lock returns the new version
       const currentRow = { id: 'note-1', version: 4, title: 'Concurrent Edit' };
       selectChain.limit
-        .mockResolvedValueOnce([existingRow]) // first: check existence
-        .mockResolvedValueOnce([currentRow]); // second: after failed update, re-fetch
+        .mockResolvedValueOnce([currentRow]);
 
       const changes: SyncChange[] = [{
         table: 'notes',

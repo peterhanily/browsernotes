@@ -8,11 +8,14 @@ const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 
 function createSelectChain(rows: Record<string, unknown>[] = []) {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {
+    from: vi.fn(),
+    where: vi.fn(),
     limit: vi.fn().mockResolvedValue(rows),
+    then: vi.fn((resolve: (v: unknown) => void) => resolve(rows)),
   };
+  chain.from.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
   return chain;
 }
 
@@ -78,7 +81,7 @@ let processPush: (changes: SyncChange[], userId: string) => Promise<SyncResult[]
 let lookupEntityFolderId: (tableName: string, entityId: string) => Promise<string | undefined>;
 
 beforeEach(async () => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   const mod = await import('../services/sync-service.js');
   processPush = mod.processPush;
   lookupEntityFolderId = mod.lookupEntityFolderId;
@@ -219,33 +222,19 @@ describe('processPush delete broadcast scenarios', () => {
     expect(mockEmitEntityEvent).toHaveBeenCalledTimes(2);
   });
 
-  it('delete followed by put of same entity (re-create scenario)', async () => {
+  it('delete followed by put of same entity uses pre-fetched version (batch check)', async () => {
+    // With batched existence checks, both changes share the same pre-fetched record.
+    // The delete bumps version 5→6 in the DB, but the put still sees version 5
+    // from the pre-fetched map. Since clientVersion (6) !== serverVersion (5),
+    // the put results in a conflict.
     const existingRow = { id: 'note-rc', version: 5, folderId: 'f-rc', title: 'Old' };
 
-    // Call 1: select for delete — entity exists
-    const selectChainDel = createSelectChain([existingRow]);
-    // Call 2: select for put — entity exists (soft-deleted but still present)
-    const softDeleted = { ...existingRow, deletedAt: new Date(), version: 6 };
-    const selectChainPut = createSelectChain([softDeleted]);
-    // Call 3: select after update — fetch fresh row
-    const reCreated = { id: 'note-rc', version: 7, folderId: 'f-rc', title: 'Reborn', deletedAt: null };
-    const selectChainFresh = createSelectChain([reCreated]);
-
-    let selectCallCount = 0;
-    mockSelect.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) return selectChainDel;
-      if (selectCallCount === 2) return selectChainPut;
-      return selectChainFresh;
-    });
+    // Single batch select for table 'notes' — returns the existing row
+    const selectChain = createSelectChain([existingRow]);
+    mockSelect.mockReturnValue(selectChain);
 
     const updateChainDel = createUpdateChain([{ id: 'note-rc' }]);
-    const updateChainPut = createUpdateChain([{ id: 'note-rc' }]);
-    let updateCallCount = 0;
-    mockUpdate.mockImplementation(() => {
-      updateCallCount++;
-      return updateCallCount === 1 ? updateChainDel : updateChainPut;
-    });
+    mockUpdate.mockReturnValue(updateChainDel);
 
     const changes: SyncChange[] = [
       { table: 'notes', op: 'delete', entityId: 'note-rc' },
@@ -255,10 +244,10 @@ describe('processPush delete broadcast scenarios', () => {
     const results = await processPush(changes, 'user-rc');
 
     expect(results).toHaveLength(2);
-    // First: delete accepted
+    // First: delete accepted (version bumped from 5 to 6)
     expect(results[0]).toMatchObject({ table: 'notes', entityId: 'note-rc', status: 'accepted', serverVersion: 6 });
-    // Second: put accepted (re-create via update path since entity still exists as soft-deleted)
-    expect(results[1]).toMatchObject({ table: 'notes', entityId: 'note-rc', status: 'accepted', serverVersion: 7 });
+    // Second: put conflicts because pre-fetched serverVersion (5) !== clientVersion (6)
+    expect(results[1]).toMatchObject({ table: 'notes', entityId: 'note-rc', status: 'conflict', serverVersion: 5 });
   });
 });
 

@@ -15,6 +15,7 @@ const {
   mockLookupEntityFolderId,
   mockBulkLookupEntityFolderIds,
   mockLogActivity,
+  mockLogActivityBatch,
   mockBroadcastToFolder,
   mockLogger,
 } = vi.hoisted(() => {
@@ -72,6 +73,7 @@ const {
     mockLookupEntityFolderId: vi.fn(),
     mockBulkLookupEntityFolderIds: vi.fn(),
     mockLogActivity: vi.fn(),
+    mockLogActivityBatch: vi.fn(),
     mockBroadcastToFolder: vi.fn(),
     mockLogger: {
       info: vi.fn(),
@@ -104,6 +106,7 @@ vi.mock('../db/schema.js', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((_col: unknown, _val: unknown) => ({ _col, _val })),
+  inArray: vi.fn((_col: unknown, _vals: unknown) => ({ _col, _vals })),
 }));
 
 // ── Mock: requireAuth middleware ───────────────────────────────────────────────
@@ -159,6 +162,7 @@ vi.mock('../services/sync-service.js', () => ({
 
 vi.mock('../services/audit-service.js', () => ({
   logActivity: mockLogActivity,
+  logActivityBatch: mockLogActivityBatch,
 }));
 
 // ── Mock: ws/handler ──────────────────────────────────────────────────────────
@@ -248,6 +252,7 @@ describe('sync routes', () => {
       },
     );
     mockLogActivity.mockResolvedValue(undefined);
+    mockLogActivityBatch.mockResolvedValue(undefined);
     mockBroadcastToFolder.mockReturnValue(undefined);
   });
 
@@ -307,8 +312,14 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(true);
+      // bulkLookupEntityFolderIds returns folderId for the entity
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      // 1st membership query (all memberships)
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      // 2nd membership query (with roles)
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'threats', entityId: 'threat-1', status: 'accepted', serverVersion: 2 },
       ]);
@@ -332,8 +343,12 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(false);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      // User has no memberships → no access
+      selectQueue.push([]);
+      selectQueue.push([]);
 
       const res = await app.request(
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
@@ -354,9 +369,14 @@ describe('sync routes', () => {
         },
       ];
 
-      // existing folder found in DB
+      // bulkLookupEntityFolderIds not called for folders table
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // 1st membership query
+      selectQueue.push([{ folderId: 'folder-99' }]);
+      // 2nd membership query (with roles) — user has editor access to folder-99
+      selectQueue.push([{ folderId: 'folder-99', role: 'editor' }]);
+      // batch folder-existence check (folders table put) — folder exists
       selectQueue.push([{ id: 'folder-99' }]);
-      mockCheckAccess.mockResolvedValue(true);
       mockProcessPush.mockResolvedValue([
         { table: 'folders', entityId: 'folder-99', status: 'accepted', serverVersion: 2 },
       ]);
@@ -365,7 +385,7 @@ describe('sync routes', () => {
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
       );
       expect(res.status).toBe(200);
-      expect(mockCheckAccess).toHaveBeenCalledWith('user-1', 'folder-99', 'editor');
+      // The route uses in-memory Set for access (no checkInvestigationAccess call)
       expect(mockLookupEntityFolderId).not.toHaveBeenCalled();
     });
 
@@ -379,6 +399,11 @@ describe('sync routes', () => {
         },
       ];
 
+      // tags are global — no folder lookup needed
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // membership queries still run (route always fetches them)
+      selectQueue.push([]);
+      selectQueue.push([]);
       mockProcessPush.mockResolvedValue([
         { table: 'tags', entityId: 'tag-1', status: 'accepted', serverVersion: 1 },
       ]);
@@ -403,6 +428,11 @@ describe('sync routes', () => {
         },
       ];
 
+      // timelines are global — no folder lookup needed
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // membership queries still run
+      selectQueue.push([]);
+      selectQueue.push([]);
       mockProcessPush.mockResolvedValue([
         { table: 'timelines', entityId: 'tl-1', status: 'accepted', serverVersion: 1 },
       ]);
@@ -424,8 +454,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockCheckAccess.mockResolvedValue(false);
-      // No existing folder record
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // User has no memberships (no prior access)
+      selectQueue.push([]);
+      selectQueue.push([]);
+      // batch folder-existence check — folder does NOT exist (new create)
       selectQueue.push([]);
       mockProcessPush.mockResolvedValue([
         { table: 'folders', entityId: 'new-folder-1', status: 'accepted', serverVersion: 1 },
@@ -451,7 +484,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockCheckAccess.mockResolvedValue(false);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // No memberships (new folder, no prior access)
+      selectQueue.push([]);
+      selectQueue.push([]);
+      // batch folder-existence check — folder does NOT exist
       selectQueue.push([]);
       mockProcessPush.mockResolvedValue([
         { table: 'folders', entityId: 'brand-new-folder', status: 'accepted', serverVersion: 1 },
@@ -475,7 +512,12 @@ describe('sync routes', () => {
         },
       ];
 
-      mockCheckAccess.mockResolvedValue(true);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // User has editor access to existing-folder
+      selectQueue.push([{ folderId: 'existing-folder' }]);
+      selectQueue.push([{ folderId: 'existing-folder', role: 'editor' }]);
+      // batch folder-existence check — folder exists
+      selectQueue.push([{ id: 'existing-folder' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'folders', entityId: 'existing-folder', status: 'accepted', serverVersion: 3 },
       ]);
@@ -497,8 +539,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(true);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'threats', entityId: 'threat-1', status: 'accepted', serverVersion: 2 },
       ]);
@@ -530,8 +575,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(true);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'threats', entityId: 'threat-1', status: 'accepted', serverVersion: 2 },
       ]);
@@ -539,13 +587,15 @@ describe('sync routes', () => {
       await app.request(
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
       );
-      expect(mockLogActivity).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-1',
-          action: 'update',
-          itemId: 'threat-1',
-          folderId: 'folder-1',
-        }),
+      expect(mockLogActivityBatch).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            userId: 'user-1',
+            action: 'update',
+            itemId: 'threat-1',
+            folderId: 'folder-1',
+          }),
+        ]),
       );
     });
 
@@ -559,13 +609,18 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(false);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      // No memberships → no access
+      selectQueue.push([]);
+      selectQueue.push([]);
 
       await app.request(
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
       );
       expect(mockLogActivity).not.toHaveBeenCalled();
+      expect(mockLogActivityBatch).not.toHaveBeenCalled();
     });
 
     it('handles mixed authorized and unauthorized changes', async () => {
@@ -584,12 +639,15 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId
-        .mockResolvedValueOnce('folder-1')
-        .mockResolvedValueOnce('folder-2');
-      mockCheckAccess
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([
+          ['threats:threat-1', 'folder-1'],
+          ['threats:threat-2', 'folder-2'],
+        ]),
+      );
+      // User only has editor access to folder-1, not folder-2
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'threats', entityId: 'threat-1', status: 'accepted', serverVersion: 2 },
       ]);
@@ -604,7 +662,7 @@ describe('sync routes', () => {
       expect(body.results[1].status).toBe('rejected');
     });
 
-    it('calls checkAccess for each folder-scoped change', async () => {
+    it('authorizes each folder-scoped change via membership set', async () => {
       const changes = [
         {
           table: 'threats',
@@ -620,8 +678,14 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(true);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([
+          ['threats:threat-a', 'folder-1'],
+          ['threats:threat-b', 'folder-1'],
+        ]),
+      );
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         { table: 'threats', entityId: 'threat-a', status: 'accepted', serverVersion: 2 },
         { table: 'threats', entityId: 'threat-b', status: 'accepted', serverVersion: 2 },
@@ -631,7 +695,11 @@ describe('sync routes', () => {
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
       );
       expect(res.status).toBe(200);
-      expect(mockCheckAccess).toHaveBeenCalledTimes(2);
+      const body = await res.json();
+      // Both changes should be accepted since user has editor access to folder-1
+      expect(body.results).toHaveLength(2);
+      expect(body.results[0].status).toBe('accepted');
+      expect(body.results[1].status).toBe('accepted');
     });
 
     it('rejects folder-scoped entity with no folderId found', async () => {
@@ -643,7 +711,10 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue(null);
+      // bulkLookup returns empty map (entity not found)
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      selectQueue.push([]);
+      selectQueue.push([]);
 
       const res = await app.request(
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
@@ -663,8 +734,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockCheckAccess.mockResolvedValue(false);
-      // Folder exists in DB
+      mockBulkLookupEntityFolderIds.mockResolvedValue(new Map());
+      // User has no memberships → no editor access
+      selectQueue.push([]);
+      selectQueue.push([]);
+      // batch folder-existence check — folder exists (so it's not a create)
       selectQueue.push([{ id: 'existing-folder' }]);
 
       const res = await app.request(
@@ -684,8 +758,11 @@ describe('sync routes', () => {
         },
       ];
 
-      mockLookupEntityFolderId.mockResolvedValue('folder-1');
-      mockCheckAccess.mockResolvedValue(true);
+      mockBulkLookupEntityFolderIds.mockResolvedValue(
+        new Map([['threats:threat-1', 'folder-1']]),
+      );
+      selectQueue.push([{ folderId: 'folder-1' }]);
+      selectQueue.push([{ folderId: 'folder-1', role: 'editor' }]);
       mockProcessPush.mockResolvedValue([
         {
           table: 'threats',
@@ -699,10 +776,12 @@ describe('sync routes', () => {
       await app.request(
         jsonReq('POST', '/api/sync/push', { changes }, 'valid-token'),
       );
-      expect(mockLogActivity).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'delete',
-        }),
+      expect(mockLogActivityBatch).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'delete',
+          }),
+        ]),
       );
     });
   });
@@ -734,7 +813,7 @@ describe('sync routes', () => {
         getReq(`/api/sync/pull?since=${since}`, 'valid-token'),
       );
       expect(res.status).toBe(200);
-      expect(mockPullChanges).toHaveBeenCalledWith(since, ['folder-1', 'folder-2']);
+      expect(mockPullChanges).toHaveBeenCalledWith(since, ['folder-1', 'folder-2'], undefined);
     });
 
     it('pulls changes scoped to folderId when provided', async () => {
@@ -748,7 +827,7 @@ describe('sync routes', () => {
       );
       expect(res.status).toBe(200);
       expect(mockCheckAccess).toHaveBeenCalledWith('user-1', 'folder-1', 'viewer');
-      expect(mockPullChanges).toHaveBeenCalledWith(since, ['folder-1']);
+      expect(mockPullChanges).toHaveBeenCalledWith(since, ['folder-1'], undefined);
     });
 
     it('returns 403 when pulling with folderId the user has no access to', async () => {
@@ -772,7 +851,7 @@ describe('sync routes', () => {
         getReq(`/api/sync/pull?since=${since}`, 'valid-token'),
       );
       expect(res.status).toBe(200);
-      expect(mockPullChanges).toHaveBeenCalledWith(since, []);
+      expect(mockPullChanges).toHaveBeenCalledWith(since, [], undefined);
     });
   });
 

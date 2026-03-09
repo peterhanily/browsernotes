@@ -1571,6 +1571,12 @@ function AppInner() {
             onArchiveInvestigation={(id) => loggedArchiveFolder(id)}
             onUnarchiveInvestigation={(id) => loggedUnarchiveFolder(id)}
             onDeleteInvestigation={(id) => { loggedDeleteFolder(id); if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); } }}
+            allNotes={notes.notes}
+            allTasks={tasks.tasks}
+            allEvents={timeline.events}
+            allWhiteboards={whiteboards}
+            allIOCs={standaloneIOCsHook.iocs}
+            allChats={chatsHook.threads}
           />
         ) : activeView === 'caddyshack' ? (
           <CaddyShackView

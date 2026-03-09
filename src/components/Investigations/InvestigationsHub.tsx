@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { Plus, WifiOff, Loader2, Briefcase } from 'lucide-react';
-import type { Folder, InvestigationSummary, InvestigationDataMode } from '../../types';
+import type { Folder, InvestigationSummary, InvestigationDataMode, Note, Task, TimelineEvent, Whiteboard, StandaloneIOC, ChatThread } from '../../types';
 import { cn } from '../../lib/utils';
 import { InvestigationCard } from './InvestigationCard';
+
+const ZERO_COUNTS = { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 };
 
 export interface InvestigationsHubProps {
   localFolders: Folder[];
@@ -18,6 +21,12 @@ export interface InvestigationsHubProps {
   onArchiveInvestigation?: (folderId: string) => void;
   onUnarchiveInvestigation?: (folderId: string) => void;
   onDeleteInvestigation?: (folderId: string) => void;
+  allNotes?: Note[];
+  allTasks?: Task[];
+  allEvents?: TimelineEvent[];
+  allWhiteboards?: Whiteboard[];
+  allIOCs?: StandaloneIOC[];
+  allChats?: ChatThread[];
 }
 
 function SkeletonCard() {
@@ -92,10 +101,29 @@ export function InvestigationsHub({
   onArchiveInvestigation,
   onUnarchiveInvestigation,
   onDeleteInvestigation,
+  allNotes,
+  allTasks,
+  allEvents,
+  allWhiteboards,
+  allIOCs,
+  allChats,
 }: InvestigationsHubProps) {
   // Partition local folders
   const pureLocalFolders = localFolders.filter((f) => !syncedFolderIds.has(f.id));
   const syncedLocalFolders = localFolders.filter((f) => syncedFolderIds.has(f.id));
+
+  // Compute entity counts for local folders
+  const localCountsMap = useMemo(() => {
+    const map = new Map<string, { notes: number; tasks: number; iocs: number; events: number; whiteboards: number; chats: number }>();
+    for (const f of localFolders) map.set(f.id, { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 });
+    for (const n of (allNotes ?? [])) { if (!n.trashed && !n.archived && n.folderId) { const c = map.get(n.folderId); if (c) c.notes++; } }
+    for (const t of (allTasks ?? [])) { if (!t.trashed && !t.archived && t.folderId) { const c = map.get(t.folderId); if (c) c.tasks++; } }
+    for (const e of (allEvents ?? [])) { if (!e.trashed && !e.archived && e.folderId) { const c = map.get(e.folderId); if (c) c.events++; } }
+    for (const w of (allWhiteboards ?? [])) { if (!w.trashed && !w.archived && w.folderId) { const c = map.get(w.folderId); if (c) c.whiteboards++; } }
+    for (const i of (allIOCs ?? [])) { if (!i.trashed && !i.archived && i.folderId) { const c = map.get(i.folderId); if (c) c.iocs++; } }
+    for (const ch of (allChats ?? [])) { if (!ch.trashed && !ch.archived && ch.folderId) { const c = map.get(ch.folderId); if (c) c.chats++; } }
+    return map;
+  }, [localFolders, allNotes, allTasks, allEvents, allWhiteboards, allIOCs, allChats]);
 
   // Remote-only investigations (not synced locally)
   const remoteOnlyInvestigations = remoteInvestigations.filter((r) => !syncedFolderIds.has(r.folderId));
@@ -141,7 +169,7 @@ export function InvestigationsHub({
                   icon={f.icon}
                   description={f.description}
                   clsLevel={f.clsLevel}
-                  entityCounts={{ notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 }}
+                  entityCounts={localCountsMap.get(f.id) ?? ZERO_COUNTS}
                   dataMode="local"
                   updatedAt={f.updatedAt ?? f.createdAt}
                   onOpen={(id) => onOpenInvestigation(id, 'local')}
@@ -182,7 +210,7 @@ export function InvestigationsHub({
                     icon={f.icon}
                     description={f.description}
                     clsLevel={f.clsLevel}
-                    entityCounts={remote?.entityCounts ?? { notes: 0, tasks: 0, iocs: 0, events: 0, whiteboards: 0, chats: 0 }}
+                    entityCounts={remote?.entityCounts ?? localCountsMap.get(f.id) ?? ZERO_COUNTS}
                     memberCount={remote?.memberCount}
                     role={remote?.role}
                     dataMode="synced"

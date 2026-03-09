@@ -573,7 +573,7 @@ export function SearchOverlay({
         </div>
 
         {/* Results */}
-        <div ref={resultsRef} className="flex-1 overflow-y-auto min-h-0">
+        <div ref={resultsRef} className="flex-1 overflow-y-auto min-h-0" aria-live="polite">
           {debouncedQuery && results.length === 0 && !error && (
             <div className="p-8 text-center text-gray-500 text-sm">
               No results found for "{debouncedQuery}"

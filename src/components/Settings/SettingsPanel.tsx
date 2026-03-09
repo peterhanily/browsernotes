@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Github, Download, FlaskConical, Trash2, Bot, X, Shield, RefreshCw, RotateCcw } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import type { Settings, Note, NoteTemplate, PlaybookTemplate, PlaybookStep } from '../../types';
 import { TemplateManager } from './TemplateManager';
 import { PlaybookManager } from './PlaybookManager';
@@ -104,6 +105,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
 ];
 
 export function SettingsPanel({ settings, onUpdateSettings, notes, onImportComplete, sampleLoaded, onLoadSample, onDeleteSample, onClose, initialTab, templateProps, playbookProps }: SettingsPanelProps) {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'general');
   const selectClass = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
   const labelClass = 'text-sm text-gray-400';
@@ -277,7 +279,7 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                       a.click();
                       URL.revokeObjectURL(url);
                     } catch {
-                      alert('Failed to download update. Visit https://threatcaddy.com to get the latest version.');
+                      addToast('error', 'Failed to download update. Visit https://threatcaddy.com to get the latest version.');
                     }
                   }}
                   className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"

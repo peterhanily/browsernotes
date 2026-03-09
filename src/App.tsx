@@ -75,6 +75,7 @@ import type { SharePayload, InvestigationBundle } from './lib/share';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 const CaddyShackView = lazy(() => import('./components/CaddyShack/CaddyShackView').then(m => ({ default: m.CaddyShackView })));
 import { ConflictDialog } from './components/Common/ConflictDialog';
+import { KeyboardShortcutsPanel } from './components/Common/KeyboardShortcutsPanel';
 import type { InvestigationMember } from './types';
 import { fetchInvestigationMembers } from './lib/server-api';
 import { installSyncHooks, initLocalOnlyFlags } from './lib/sync-middleware';
@@ -292,6 +293,9 @@ function AppInner() {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [showCreateInvestigationModal, setShowCreateInvestigationModal] = useState(false);
   const [showNameGenerator, setShowNameGenerator] = useState(false);
+  const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
+  const [syncingFolderId, setSyncingFolderId] = useState<string | null>(null);
+  const [confirmUnsyncId, setConfirmUnsyncId] = useState<string | null>(null);
   const demoProcessedRef = useRef(false);
 
   // Fetch investigation members for task assignee support
@@ -366,6 +370,7 @@ function AppInner() {
   }, [navigateTo, setSelectedFolderId]);
 
   const handleSyncLocally = useCallback(async (folderId: string) => {
+    setSyncingFolderId(folderId);
     try {
       const { syncEngine } = await import('./lib/sync-engine');
       await syncEngine.pullFolder(folderId);
@@ -380,10 +385,13 @@ function AppInner() {
       setInvestigationMode('synced');
     } catch (err) {
       console.error('Failed to sync investigation locally:', err);
+    } finally {
+      setSyncingFolderId(null);
     }
   }, [reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook, refreshRemote]);
 
-  const handleUnsync = useCallback(async (folderId: string) => {
+  const handleUnsyncConfirmed = useCallback(async (folderId: string) => {
+    setSyncingFolderId(folderId);
     try {
       await Promise.all([
         db.notes.where('folderId').equals(folderId).delete(),
@@ -406,8 +414,14 @@ function AppInner() {
       chatsHook.reload();
     } catch (err) {
       console.error('Failed to unsync investigation:', err);
+    } finally {
+      setSyncingFolderId(null);
     }
   }, [selectedFolderId, setSelectedFolderId, reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook]);
+
+  const handleUnsync = useCallback((folderId: string) => {
+    setConfirmUnsyncId(folderId);
+  }, []);
 
   // Resolve timeline deep-link once events are loaded
   const deepLinkTimelineResolved = useCallback(() => {
@@ -1137,8 +1151,10 @@ function AppInner() {
       setSearchOverlayOpen(false);
       setShowQuickCapture(false);
       setShowSettings(false);
+      setShowShortcutsPanel(false);
       setMobileSidebarOpen(false);
     },
+    onShowShortcuts: () => setShowShortcutsPanel(true),
   });
 
   // Determine list title
@@ -1339,10 +1355,12 @@ function AppInner() {
             onQuickLoad={handleQuickLoad}
             onStartTour={() => tour.start(activeView)}
             selectedFolderName={selectedFolder?.name}
+            selectedFolderColor={selectedFolder?.color}
             screenshareMaxLevel={screenshareMaxLevel}
             onScreenshareChange={setScreenshareMaxLevel}
             effectiveClsLevels={effectiveClsLevels}
             presenceUsers={presenceUsers}
+            addToast={addToast}
           />
         }
         sidebar={
@@ -1554,6 +1572,7 @@ function AppInner() {
               else if (type === 'event') { const ev = timeline.events.find((e) => e.id === id); setSelectedTimelineId(ev?.timelineId); navigateTo('timeline', { selectedTimelineId: ev?.timelineId }); }
               else if (type === 'ioc') { navigateTo('graph'); }
             }}
+            onOpenSettings={(tab) => { setShowSettings(true); if (tab) setSettingsInitialTab(tab); }}
           />
         ) : activeView === 'investigations' ? (
           <InvestigationsHub
@@ -1566,6 +1585,7 @@ function AppInner() {
             onOpenInvestigation={handleOpenInvestigation}
             onSyncLocally={handleSyncLocally}
             onUnsync={handleUnsync}
+            syncingFolderId={syncingFolderId}
             onCreateInvestigation={() => setShowCreateInvestigationModal(true)}
             onEditInvestigation={(id) => setEditingFolderId(id)}
             onArchiveInvestigation={(id) => loggedArchiveFolder(id)}
@@ -1799,6 +1819,16 @@ function AppInner() {
         danger
       />
 
+      <ConfirmDialog
+        open={!!confirmUnsyncId}
+        onClose={() => setConfirmUnsyncId(null)}
+        onConfirm={() => { if (confirmUnsyncId) handleUnsyncConfirmed(confirmUnsyncId); setConfirmUnsyncId(null); }}
+        title="Unsync Investigation"
+        message="This will remove the local copy of this investigation. You can re-sync it later from the server."
+        confirmLabel="Unsync"
+        danger
+      />
+
       <ShareDialog
         open={shareLinkPayload !== null}
         onClose={() => setShareLinkPayload(null)}
@@ -1928,6 +1958,10 @@ function AppInner() {
         }}
         onOpenNameGenerator={() => setShowNameGenerator(true)}
         onOpenPlaybookPicker={() => setShowPlaybookPicker(true)}
+      />
+      <KeyboardShortcutsPanel
+        open={showShortcutsPanel}
+        onClose={() => setShowShortcutsPanel(false)}
       />
       <OperationNameGenerator
         open={showNameGenerator}

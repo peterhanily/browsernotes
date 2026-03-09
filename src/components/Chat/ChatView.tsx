@@ -24,6 +24,7 @@ interface ChatViewProps {
   selectedFolder?: Folder;
   onEntitiesChanged?: () => void;
   onNavigateToEntity?: (type: string, id: string) => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export function ChatView({
@@ -40,10 +41,12 @@ export function ChatView({
   selectedFolder,
   onEntitiesChanged,
   onNavigateToEntity,
+  onOpenSettings,
 }: ChatViewProps) {
   const { extensionAvailable, streamingContent, isStreaming, error, toolActivity, sendAgentRequest, abort } = useLLM();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [errorHasSettingsLink, setErrorHasSettingsLink] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('caddyai-onboarded');
   });
@@ -151,12 +154,14 @@ export function ChatView({
   const handleSend = useCallback(async (text: string) => {
     if (!activeThread) return;
     setLocalError(null);
+    setErrorHasSettingsLink(false);
 
     const provider = activeThread.provider;
 
     // Local provider: validate endpoint is set
     if (provider === 'local' && !settings.llmLocalEndpoint) {
-      setLocalError('No Local LLM endpoint configured. Add it in Settings → AI/LLM.');
+      setLocalError('No Local LLM endpoint configured. Add it in Settings \u2192 AI/LLM.');
+      setErrorHasSettingsLink(true);
       return;
     }
 
@@ -164,7 +169,8 @@ export function ChatView({
     const apiKey = getApiKeyForProvider(provider, settings);
 
     if (!apiKey) {
-      setLocalError(`No ${getProviderLabel(provider)} API key configured. Add an API key or local LLM endpoint in Settings → AI/LLM.`);
+      setLocalError(`No ${getProviderLabel(provider)} API key configured. Add an API key or local LLM endpoint in Settings \u2192 AI/LLM.`);
+      setErrorHasSettingsLink(true);
       return;
     }
 
@@ -486,7 +492,7 @@ export function ChatView({
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4" aria-live="polite">
               {activeThread.messages.length === 0 && !isStreaming && (
                 <div className="flex flex-col items-center justify-center h-full text-text-muted">
                   <MessageSquare size={40} className="mb-3 opacity-30" />
@@ -536,7 +542,19 @@ export function ChatView({
               )}
               {localError && (
                 <div className="mx-auto max-w-md my-3 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-                  {localError}
+                  {errorHasSettingsLink && onOpenSettings ? (
+                    <span>
+                      {localError.replace(/Settings \u2192 AI\/LLM\.?/, '')}{' '}
+                      <button
+                        onClick={() => onOpenSettings('ai')}
+                        className="underline hover:text-red-300 font-medium"
+                      >
+                        Settings &rarr; AI/LLM
+                      </button>
+                    </span>
+                  ) : (
+                    localError
+                  )}
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -552,6 +570,7 @@ export function ChatView({
               onModelChange={handleModelChange}
               localModelName={settings.llmLocalModelName}
               configuredProviders={configuredProviders}
+              onOpenSettings={onOpenSettings ? () => onOpenSettings('ai') : undefined}
             />
           </>
         ) : (

@@ -9,6 +9,7 @@ interface ShortcutHandlers {
   onTogglePreview?: () => void;
   onEscape?: () => void;
   onSwitchView?: (view: ViewMode) => void;
+  onShowShortcuts?: () => void;
 }
 
 /** Registers global keyboard shortcuts (Ctrl+N, Ctrl+K, Ctrl+S, etc.) and dispatches to the provided handler callbacks. */
@@ -58,6 +59,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if (ctrl && viewKeys[e.key]) {
         e.preventDefault();
         h.onSwitchView?.(viewKeys[e.key]);
+      }
+
+      if (ctrl && e.key === '/') {
+        e.preventDefault();
+        h.onShowShortcuts?.();
       }
 
       if (e.key === 'Escape') {

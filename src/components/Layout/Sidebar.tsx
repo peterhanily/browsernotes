@@ -330,6 +330,7 @@ export function Sidebar({
           badgeColor="bg-accent-blue/15 text-accent-blue"
           active={activeView === 'notes' && !showTrash && !showArchive}
           onClick={() => nav(() => navToView('notes'))}
+          scopedColor={selectedFolder?.color || undefined}
         />
         <div data-tour="tasks">
           <NavItem
@@ -339,6 +340,7 @@ export function Sidebar({
             badgeColor="bg-accent-amber/15 text-accent-amber"
             active={activeView === 'tasks'}
             onClick={() => nav(() => navToView('tasks'))}
+            scopedColor={selectedFolder?.color || undefined}
           />
         </div>
         <div data-tour="timeline">
@@ -349,6 +351,7 @@ export function Sidebar({
             badgeColor="bg-accent-green/15 text-accent-green"
             active={activeView === 'timeline'}
             onClick={() => nav(() => navToView('timeline'))}
+            scopedColor={selectedFolder?.color || undefined}
           />
         </div>
         <div data-tour="whiteboards">
@@ -358,6 +361,7 @@ export function Sidebar({
             badge={investigationScopedCounts ? investigationScopedCounts.whiteboards : whiteboardCount}
             active={activeView === 'whiteboard'}
             onClick={() => nav(() => navToView('whiteboard'))}
+            scopedColor={selectedFolder?.color || undefined}
           />
         </div>
 
@@ -370,6 +374,7 @@ export function Sidebar({
           badgeColor="bg-accent-green/15 text-accent-green"
           active={activeView === 'ioc-stats'}
           onClick={() => nav(() => navToView('ioc-stats'))}
+          scopedColor={selectedFolder?.color || undefined}
         />
         <NavItem
           icon={<Network size={16} />}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Square, Wifi, WifiOff, Globe, Search, FileText, CheckSquare, Shield, BarChart3, Clock, Network, ClipboardList, Zap, Link2 } from 'lucide-react';
+import { Send, Square, Wifi, WifiOff, Globe, Search, FileText, CheckSquare, Shield, BarChart3, Clock, Network, ClipboardList, Zap, Link2, AlertTriangle, Terminal } from 'lucide-react';
 import type { LLMProvider } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -50,9 +50,10 @@ interface ChatInputProps {
   localModelName?: string;
   /** Set of providers that have an API key configured */
   configuredProviders?: Set<string>;
+  onOpenSettings?: () => void;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, model, onModelChange, disabled, localModelName, configuredProviders }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, model, onModelChange, disabled, localModelName, configuredProviders, onOpenSettings }: ChatInputProps) {
   const MODELS = useMemo(() => {
     let models = [...STATIC_MODELS];
     if (localModelName) {
@@ -191,6 +192,24 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
         </div>
       </div>
 
+      {/* Extension required banner */}
+      {!extensionAvailable && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <p className="font-medium">Browser extension required</p>
+            <p className="text-amber-400/80">The ThreatCaddy browser extension is required for CaddyAI to make API calls. Install it from the{' '}
+              <a href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-300">Chrome Web Store or Firefox Add-ons</a>.
+            </p>
+            {onOpenSettings && (
+              <button onClick={onOpenSettings} className="text-accent hover:text-accent-hover underline">
+                Configure API keys in Settings
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Input area */}
       <div className="relative flex items-end gap-2">
         {/* Slash command menu */}
@@ -224,12 +243,21 @@ export function ChatInput({ onSend, onStop, isStreaming, extensionAvailable, mod
             })}
           </div>
         )}
+        <button
+          onClick={() => { setText('/'); textareaRef.current?.focus(); }}
+          disabled={!extensionAvailable || disabled}
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Type / for commands"
+          aria-label="Insert slash command"
+        >
+          <Terminal size={14} />
+        </button>
         <textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={extensionAvailable ? 'Send a message...' : 'Extension required for CaddyAI'}
+          placeholder={extensionAvailable ? 'Send a message... (type / for commands)' : 'Extension required for CaddyAI'}
           disabled={!extensionAvailable || disabled}
           rows={1}
           className="flex-1 bg-bg-deep border border-border-medium rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted resize-none focus:outline-none focus:border-purple disabled:opacity-50"

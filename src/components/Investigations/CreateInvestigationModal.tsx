@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Dices, BookOpen } from 'lucide-react';
 import { Modal } from '../Common/Modal';
 import { cn } from '../../lib/utils';
@@ -9,6 +9,7 @@ export interface CreateInvestigationModalProps {
   onCreate: (name: string, options?: { playbook?: string; color?: string; icon?: string }) => void;
   onOpenNameGenerator?: () => void;
   onOpenPlaybookPicker?: () => void;
+  generatedName?: string;
 }
 
 type TabId = 'quick' | 'name-gen' | 'playbook';
@@ -19,13 +20,27 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'playbook', label: 'From Playbook' },
 ];
 
-export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGenerator, onOpenPlaybookPicker }: CreateInvestigationModalProps) {
+export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGenerator, onOpenPlaybookPicker, generatedName }: CreateInvestigationModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('quick');
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
+
+  // When a generated name comes in, pre-fill and switch to Quick Create
+  useEffect(() => {
+    if (generatedName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: syncing generated name from parent
+      setName(generatedName);
+      setActiveTab('quick');
+    }
+  }, [generatedName]);
 
   const handleCreate = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setNameError('Investigation name is required');
+      return;
+    }
+    setNameError('');
     onCreate(trimmed);
     setName('');
     onClose();
@@ -33,6 +48,7 @@ export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGe
 
   const handleClose = () => {
     setName('');
+    setNameError('');
     setActiveTab('quick');
     onClose();
   };
@@ -67,11 +83,20 @@ export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGe
             id="inv-name"
             autoFocus
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); if (nameError) setNameError(''); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
             placeholder="e.g. Operation Midnight Storm"
-            className="w-full bg-bg-deep border border-border-medium rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-purple transition-colors"
+            aria-required="true"
+            aria-invalid={!!nameError}
+            aria-describedby={nameError ? 'inv-name-error' : undefined}
+            className={cn(
+              'w-full bg-bg-deep border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-purple transition-colors',
+              nameError ? 'border-red-500' : 'border-border-medium',
+            )}
           />
+          {nameError && (
+            <p id="inv-name-error" className="text-xs text-red-400 mt-1">{nameError}</p>
+          )}
           <button
             onClick={handleCreate}
             disabled={!name.trim()}
@@ -92,8 +117,9 @@ export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGe
         <div className="flex flex-col items-center justify-center py-8 rounded-lg border border-border-subtle bg-bg-deep/30 gap-3">
           <Dices size={32} className="text-text-muted" />
           <p className="text-sm text-text-secondary">Generate a random operation name with the slot machine</p>
+          <p className="text-xs text-text-muted">After generating a name, it will be pre-filled in the Quick Create tab</p>
           <button
-            onClick={() => { onClose(); onOpenNameGenerator?.(); }}
+            onClick={() => { onOpenNameGenerator?.(); }}
             className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:brightness-110 transition-all flex items-center gap-2"
           >
             <Dices size={16} />
@@ -107,7 +133,7 @@ export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGe
           <BookOpen size={32} className="text-text-muted" />
           <p className="text-sm text-text-secondary">Start from a playbook template with pre-configured tasks and notes</p>
           <button
-            onClick={() => { onClose(); onOpenPlaybookPicker?.(); }}
+            onClick={() => { onOpenPlaybookPicker?.(); }}
             className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:brightness-110 transition-all flex items-center gap-2"
           >
             <BookOpen size={16} />

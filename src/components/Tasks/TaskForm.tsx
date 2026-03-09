@@ -52,6 +52,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
   const [showIOCPanel, setShowIOCPanel] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [titleError, setTitleError] = useState('');
 
   const isEditMode = !!task;
   const iocCount = task?.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0;
@@ -86,7 +87,11 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setTitleError('Task title is required');
+      return;
+    }
+    setTitleError('');
     onSave({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -140,31 +145,38 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
     iocTypes: task.iocTypes,
   } : null;
 
-  const inputClass = 'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-accent';
-  const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
+  const inputClass = 'w-full bg-bg-deep border border-border-medium rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent';
+  const labelClass = 'block text-xs font-medium text-text-muted mb-1';
 
   return (
     <div className="flex gap-0">
       <form onSubmit={handleSubmit} className="space-y-4 flex-1 min-w-0">
         <div>
-          <label className={labelClass}>Title</label>
+          <label className={labelClass} htmlFor="task-title">Title</label>
           <input
+            id="task-title"
             autoFocus
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className={inputClass}
+            onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
+            className={cn(inputClass, titleError && 'border-red-500')}
             placeholder="Task title..."
+            aria-required="true"
+            aria-invalid={!!titleError}
+            aria-describedby={titleError ? 'task-title-error' : undefined}
           />
+          {titleError && (
+            <p id="task-title-error" className="text-xs text-red-400 mt-1">{titleError}</p>
+          )}
         </div>
 
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <label className="text-xs font-medium text-gray-400">Description (markdown)</label>
+            <label className="text-xs font-medium text-text-muted">Description (markdown)</label>
             {isEditMode && onUpdateTask && (
               <button
                 type="button"
                 onClick={handleShieldClick}
-                className={cn('p-1 rounded flex items-center gap-1', showIOCPanel ? 'bg-gray-700 text-accent' : 'text-gray-500 hover:text-gray-300')}
+                className={cn('p-1 rounded flex items-center gap-1', showIOCPanel ? 'bg-bg-active text-accent' : 'text-text-muted hover:text-text-secondary')}
                 title="IOC Analysis"
                 aria-label="Toggle IOC analysis"
               >
@@ -260,7 +272,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
         {/* Entity linking (edit mode only) */}
         {isEditMode && task && onUpdateTask && (
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-1">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-1">
               Linked Entities
             </label>
             <EntityLinker
@@ -279,7 +291,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
         {/* Comments section (edit mode only) */}
         {isEditMode && onUpdateTask && (
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-medium text-gray-400 mb-2">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-text-muted mb-2">
               <MessageSquare size={12} />
               Comments {comments.length > 0 && `(${comments.length})`}
             </label>
@@ -287,13 +299,13 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
             {comments.length > 0 && (
               <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                 {comments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-2 bg-gray-800/50 rounded-lg px-3 py-2">
-                    <p className="text-xs text-gray-300 flex-1 whitespace-pre-wrap break-words">{c.text}</p>
-                    <span className="text-[10px] text-gray-500 shrink-0">{formatRelativeTime(c.createdAt)}</span>
+                  <div key={c.id} className="flex items-start gap-2 bg-bg-deep/50 rounded-lg px-3 py-2">
+                    <p className="text-xs text-text-secondary flex-1 whitespace-pre-wrap break-words">{c.text}</p>
+                    <span className="text-[10px] text-text-muted shrink-0">{formatRelativeTime(c.createdAt)}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteComment(c.id)}
-                      className="p-0.5 rounded text-gray-600 hover:text-red-400 shrink-0"
+                      className="p-0.5 rounded text-text-muted hover:text-red-400 shrink-0"
                       title="Delete comment"
                       aria-label="Delete comment"
                     >
@@ -309,14 +321,14 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-accent"
+                className="flex-1 bg-bg-deep border border-border-medium rounded-lg px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
                 placeholder="Add a comment..."
               />
               <button
                 type="button"
                 onClick={handleAddComment}
                 disabled={!commentText.trim()}
-                className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 text-xs transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-bg-active hover:bg-bg-hover disabled:opacity-50 text-text-primary text-xs transition-colors"
               >
                 Add
               </button>
@@ -329,7 +341,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
             <button
               type="button"
               onClick={() => setShowConfirmDelete(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 hover:text-red-400 hover:bg-gray-800 text-sm"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-500 hover:text-red-400 hover:bg-bg-deep text-sm"
               title="Delete task"
               aria-label="Delete task"
             >
@@ -340,7 +352,7 @@ export function TaskForm({ task, folders, allTags, onCreateTag, onSave, onCancel
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm transition-colors"
+              className="px-4 py-2 rounded-lg bg-bg-active hover:bg-bg-hover text-text-primary text-sm transition-colors"
             >
               Cancel
             </button>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Task, TaskStatus } from '../../types';
 import { TaskItem } from './TaskItem';
 import { cn } from '../../lib/utils';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface KanbanBoardProps {
   getTasksByStatus: (status: TaskStatus) => Task[];
@@ -18,6 +19,7 @@ const COLUMNS: { status: TaskStatus; label: string; color: string }[] = [
 ];
 
 export function KanbanBoard({ getTasksByStatus, onToggleComplete, onSelect, onDelete, onUpdateTask }: KanbanBoardProps) {
+  const isMobile = useIsMobile();
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
 
@@ -71,18 +73,31 @@ export function KanbanBoard({ getTasksByStatus, onToggleComplete, onSelect, onDe
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
               {tasks.map((task) => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onToggleComplete={onToggleComplete}
-                  onSelect={onSelect}
-                  onDelete={onDelete}
-                  draggable
-                  onDragStart={handleDragStart(task.id)}
-                />
+                <div key={task.id}>
+                  <TaskItem
+                    task={task}
+                    onToggleComplete={onToggleComplete}
+                    onSelect={onSelect}
+                    onDelete={onDelete}
+                    draggable={!isMobile}
+                    onDragStart={!isMobile ? handleDragStart(task.id) : undefined}
+                  />
+                  {isMobile && (
+                    <select
+                      value={task.status}
+                      onChange={(e) => onUpdateTask(task.id, { status: e.target.value as TaskStatus })}
+                      className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-accent"
+                      aria-label={`Change status of ${task.title}`}
+                    >
+                      {COLUMNS.map((col) => (
+                        <option key={col.status} value={col.status}>{col.label}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               ))}
               {tasks.length === 0 && (
-                <p className="text-xs text-gray-600 text-center py-8">Drop tasks here</p>
+                <p className="text-xs text-gray-600 text-center py-8">{isMobile ? 'No tasks' : 'Drop tasks here'}</p>
               )}
             </div>
           </div>

@@ -27,6 +27,7 @@ export interface InvestigationsHubProps {
   allWhiteboards?: Whiteboard[];
   allIOCs?: StandaloneIOC[];
   allChats?: ChatThread[];
+  syncingFolderId?: string | null;
 }
 
 function SkeletonCard() {
@@ -107,6 +108,7 @@ export function InvestigationsHub({
   allWhiteboards,
   allIOCs,
   allChats,
+  syncingFolderId,
 }: InvestigationsHubProps) {
   // Partition local folders
   const pureLocalFolders = localFolders.filter((f) => !syncedFolderIds.has(f.id) && f.status !== 'archived');
@@ -250,6 +252,7 @@ export function InvestigationsHub({
                     onArchive={onArchiveInvestigation}
                     onUnarchive={onUnarchiveInvestigation}
                     onDelete={onDeleteInvestigation}
+                    syncing={syncingFolderId === f.id}
                   />
                 );
               })}
@@ -290,6 +293,7 @@ export function InvestigationsHub({
                   onOpen={(id) => onOpenInvestigation(id, 'remote')}
                   onSync={onSyncLocally}
                   onSettings={onEditInvestigation}
+                  syncing={syncingFolderId === r.folderId}
                 />
               ))}
             </div>

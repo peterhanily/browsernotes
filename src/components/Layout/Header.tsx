@@ -1,5 +1,5 @@
-import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield, RefreshCw } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Menu, Search, Github, Download, Chrome, HardDriveDownload, FolderUp, HelpCircle, Shield, RefreshCw, ChevronDown, Briefcase } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
 import { ThemeToggle } from '../Common/ThemeToggle';
 import { ScreenshareToggle } from '../Common/ScreenshareToggle';
 import { CreateDropdown } from '../Common/CreateDropdown';
@@ -31,7 +31,9 @@ interface HeaderProps {
   onScreenshareChange: (level: string | null) => void;
   effectiveClsLevels: string[];
   selectedFolderName?: string;
+  selectedFolderColor?: string;
   presenceUsers?: PresenceUser[];
+  addToast?: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
 }
 
 export function Header({
@@ -54,9 +56,26 @@ export function Header({
   onScreenshareChange,
   effectiveClsLevels,
   selectedFolderName,
+  selectedFolderColor,
   presenceUsers,
+  addToast,
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const helpMenuRef = useRef<HTMLDivElement>(null);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+
+  // Close help menu on outside click
+  useEffect(() => {
+    if (!helpMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (helpMenuRef.current && !helpMenuRef.current.contains(e.target as Node)) {
+        setHelpMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [helpMenuOpen]);
+
   const [buildAge] = useState(() => {
     if (typeof __BUILD_TIME__ !== 'number') return '';
     const d = Math.floor((Date.now() - __BUILD_TIME__) / 86_400_000);
@@ -103,6 +122,18 @@ export function Header({
         </a>
       )}
 
+      {/* Mobile investigation context badge (U6) */}
+      {selectedFolderName && (
+        <span
+          className="md:hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-text-primary bg-bg-active border border-border-subtle max-w-[120px] truncate shrink-0"
+          style={selectedFolderColor ? { borderColor: selectedFolderColor + '60', backgroundColor: selectedFolderColor + '15' } : undefined}
+          title={selectedFolderName}
+        >
+          <Briefcase size={10} className="shrink-0" />
+          <span className="truncate">{selectedFolderName}</span>
+        </span>
+      )}
+
       <button
         data-tour="search"
         onClick={onOpenSearch}
@@ -114,74 +145,106 @@ export function Header({
         <kbd className="hidden sm:inline ml-auto text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-500 border border-gray-600 font-mono shrink-0">Ctrl+K</kbd>
       </button>
 
-      {/* Links — hidden on mobile, shown on md+ */}
-      <div className="hidden md:flex items-center gap-1">
-        <a
-          href="https://github.com/peterhanily/threatcaddy"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-          title="View on GitHub"
+      {/* Help dropdown — hidden on mobile, shown on md+ (U13) */}
+      <div className="hidden md:block relative" ref={helpMenuRef}>
+        <button
+          onClick={() => setHelpMenuOpen(!helpMenuOpen)}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
+          title="Help & Links"
+          aria-label="Help menu"
+          aria-expanded={helpMenuOpen}
         >
-          <Github size={15} />
-          <span className="hidden lg:inline">GitHub</span>
-        </a>
-        {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
-          <button
-            onClick={async () => {
-              try {
-                const resp = await fetch('https://threatcaddy.com/threatcaddy-standalone.html');
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const blob = await resp.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'threatcaddy-standalone.html';
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch {
-                alert('Failed to download update. Visit https://threatcaddy.com to get the latest version.');
-              }
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-            title="Download latest standalone version"
-          >
-            <RefreshCw size={15} />
-            <span className="hidden lg:inline">Update</span>
-          </button>
-        ) : (
-          <a
-            data-tour="standalone"
-            href="./threatcaddy-standalone.html"
-            download
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-            title="Download standalone HTML"
-          >
-            <Download size={15} />
-            <span className="hidden lg:inline">Standalone</span>
-          </a>
+          <HelpCircle size={16} />
+          <ChevronDown size={12} className={cn('transition-transform', helpMenuOpen && 'rotate-180')} />
+        </button>
+        {helpMenuOpen && (
+          <div className="absolute right-0 top-full mt-1 w-52 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+            {onStartTour && (
+              <button
+                onClick={() => { onStartTour(); setHelpMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+              >
+                <HelpCircle size={14} />
+                Start Tour
+              </button>
+            )}
+            <a
+              href="?demo=1"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors no-underline"
+              onClick={() => setHelpMenuOpen(false)}
+            >
+              <Search size={14} />
+              Demo Investigation
+            </a>
+            <div className="h-px bg-gray-800 mx-2 my-1" />
+            <a
+              href="https://github.com/peterhanily/threatcaddy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors no-underline"
+              onClick={() => setHelpMenuOpen(false)}
+            >
+              <Github size={14} />
+              GitHub
+            </a>
+            {typeof __STANDALONE__ !== 'undefined' && __STANDALONE__ ? (
+              <button
+                onClick={async () => {
+                  setHelpMenuOpen(false);
+                  try {
+                    const resp = await fetch('https://threatcaddy.com/threatcaddy-standalone.html');
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const blob = await resp.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'threatcaddy-standalone.html';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    addToast?.('error', 'Failed to download update. Visit https://threatcaddy.com to get the latest version.');
+                  }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+              >
+                <RefreshCw size={14} />
+                Update
+              </button>
+            ) : (
+              <a
+                data-tour="standalone"
+                href="./threatcaddy-standalone.html"
+                download
+                className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors no-underline"
+                onClick={() => setHelpMenuOpen(false)}
+              >
+                <Download size={14} />
+                Standalone
+              </a>
+            )}
+            <a
+              data-tour="extension"
+              href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors no-underline"
+              onClick={() => setHelpMenuOpen(false)}
+            >
+              <Chrome size={14} />
+              Extension
+            </a>
+            <a
+              href="https://threatcaddy.com/privacy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors no-underline"
+              onClick={() => setHelpMenuOpen(false)}
+            >
+              <Shield size={14} />
+              Privacy
+            </a>
+          </div>
         )}
-        <a
-          data-tour="extension"
-          href="https://github.com/peterhanily/threatcaddy/tree/main/extension#readme"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-          title="Get Chrome Extension"
-        >
-          <Chrome size={15} />
-          <span className="hidden lg:inline">Extension</span>
-        </a>
-        <a
-          href="https://threatcaddy.com/privacy.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 text-xs font-medium transition-colors"
-          title="Privacy Policy"
-        >
-          <Shield size={15} />
-          <span className="hidden lg:inline">Privacy</span>
-        </a>
       </div>
 
       <div className="flex items-center gap-1 ml-auto">
@@ -236,23 +299,7 @@ export function Header({
         <span data-tour="theme-toggle">
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </span>
-        <a
-          href="?demo=1"
-          className="px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold tracking-wide uppercase text-accent hover:text-accent-hover hover:bg-gray-800 transition-colors"
-          title="Load sample investigation demo"
-        >
-          Demo
-        </a>
-        {onStartTour && (
-          <button
-            onClick={onStartTour}
-            className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
-            title="Start tour"
-            aria-label="Start tour"
-          >
-            <HelpCircle size={16} />
-          </button>
-        )}
+        {/* Tour and Demo moved to Help dropdown (U13) */}
       </div>
     </header>
   );

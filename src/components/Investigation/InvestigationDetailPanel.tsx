@@ -3,6 +3,7 @@ import { X, Briefcase, FileBarChart, Share2, Cloud, CloudOff, Archive, Trash2 } 
 import type { Folder, InvestigationStatus, ClosureResolution, PlaybookStep } from '../../types';
 import { NOTE_COLORS, CLOSURE_RESOLUTION_LABELS } from '../../types';
 import { TagInput } from '../Common/TagInput';
+import { ConfirmDialog } from '../Common/ConfirmDialog';
 import type { Tag } from '../../types';
 import { cn, formatFullDate } from '../../lib/utils';
 import { PlaybookProgress } from '../Playbooks/PlaybookProgress';
@@ -56,6 +57,7 @@ export function InvestigationDetailPanel({
 }: InvestigationDetailPanelProps) {
   const [name, setName] = useState(folder.name);
   const [description, setDescription] = useState(folder.description || '');
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -418,7 +420,7 @@ export function InvestigationDetailPanel({
               )}
               {onDelete && (
                 <button
-                  onClick={() => { if (confirm(`Delete "${folder.name}" and all its contents? This cannot be undone.`)) { onDelete(folder.id); onClose(); } }}
+                  onClick={() => setShowConfirmDelete(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-sm text-red-400 transition-colors ml-auto"
                 >
                   <Trash2 size={14} />
@@ -435,6 +437,18 @@ export function InvestigationDetailPanel({
           </div>
         </div>
       </div>
+
+      {onDelete && (
+        <ConfirmDialog
+          open={showConfirmDelete}
+          onClose={() => setShowConfirmDelete(false)}
+          onConfirm={() => { onDelete(folder.id); onClose(); }}
+          title="Delete Investigation"
+          message={`Delete "${folder.name}" and all its contents? This cannot be undone.`}
+          confirmLabel="Delete Investigation"
+          danger
+        />
+      )}
     </div>
   );
 }

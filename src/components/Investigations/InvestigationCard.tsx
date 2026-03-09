@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, CheckSquare, Search, Clock, Layout, MessageSquare,
-  Download, CloudOff, MoreVertical, Settings, Archive, Trash2,
+  Download, CloudOff, MoreVertical, Settings, Archive, Trash2, Loader2,
 } from 'lucide-react';
 import type { InvestigationDataMode } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
@@ -34,6 +34,7 @@ export interface InvestigationCardProps {
   onArchive?: (folderId: string) => void;
   onUnarchive?: (folderId: string) => void;
   onDelete?: (folderId: string) => void;
+  syncing?: boolean;
 }
 
 const STATUS_STYLES: Record<string, { dot: string; text: string }> = {
@@ -78,6 +79,7 @@ export function InvestigationCard({
   onArchive,
   onUnarchive,
   onDelete,
+  syncing,
 }: InvestigationCardProps) {
   const sty = STATUS_STYLES[status] ?? STATUS_STYLES.active;
   const modeBadge = DATA_MODE_BADGE[dataMode];
@@ -285,31 +287,40 @@ export function InvestigationCard({
           )}
 
           {/* Action button */}
-          {dataMode === 'remote' && onSync && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={handleActionClick}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActionClick(e as unknown as React.MouseEvent); } }}
-              className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors shrink-0"
-              title="Sync locally"
-            >
-              <Download size={10} />
-              Sync
+          {syncing ? (
+            <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple/15 text-purple shrink-0">
+              <Loader2 size={10} className="animate-spin" />
+              Syncing...
             </span>
-          )}
-          {dataMode === 'synced' && onUnsync && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={handleActionClick}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActionClick(e as unknown as React.MouseEvent); } }}
-              className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-text-muted/15 text-text-secondary hover:bg-text-muted/25 transition-colors shrink-0"
-              title="Remove local copy"
-            >
-              <CloudOff size={10} />
-              Unsync
-            </span>
+          ) : (
+            <>
+              {dataMode === 'remote' && onSync && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleActionClick}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActionClick(e as unknown as React.MouseEvent); } }}
+                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors shrink-0"
+                  title="Sync locally"
+                >
+                  <Download size={10} />
+                  Sync
+                </span>
+              )}
+              {dataMode === 'synced' && onUnsync && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleActionClick}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActionClick(e as unknown as React.MouseEvent); } }}
+                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-text-muted/15 text-text-secondary hover:bg-text-muted/25 transition-colors shrink-0"
+                  title="Remove local copy"
+                >
+                  <CloudOff size={10} />
+                  Unsync
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>

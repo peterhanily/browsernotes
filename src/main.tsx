@@ -13,25 +13,10 @@ clipBuffer.startListening();
 // Migrate legacy BrowserNotes data before React renders
 migrateStorageKeys();
 
-// Auto-reload when a new service worker takes control (after deploy).
-// Without this, the old HTML may reference JS bundles that no longer exist
-// in the new SW's precache, causing the app to hang at the loading spinner.
-//
-// BUT: skip reloads in the first 10 seconds after page load. On a manual
-// refresh the browser already fetches fresh HTML from the network, so a SW
-// update that fires immediately causes a jarring double-refresh that kicks
-// the user back. The chunk-reload-guard.js handles the rare case where
-// stale chunk references slip through during that window.
-if ('serviceWorker' in navigator) {
-  let reloading = false;
-  const bootTime = Date.now();
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!reloading && Date.now() - bootTime > 10_000) {
-      reloading = true;
-      window.location.reload();
-    }
-  });
-}
+// When a new service worker takes control after a deploy, stale chunk
+// references may fail to load. Rather than force-reloading the page
+// (which disrupts user flow), we rely on chunk-reload-guard.js to
+// detect actual chunk-load failures and reload only when necessary.
 
 // Run DB migration in the background — don't block first render
 migrateIndexedDB().catch(console.error);

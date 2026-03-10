@@ -24,6 +24,8 @@ interface ReloadFns {
   chats: () => void;
   folders: () => void;
   tags: () => void;
+  /** Called after any sync pull that wrote changes — used to refresh remote state */
+  onSyncPullComplete?: () => void;
 }
 
 /**
@@ -55,6 +57,7 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInv
           if (tables.has('chatThreads')) reloadFns.chats();
           if (tables.has('folders')) reloadFns.folders();
           if (tables.has('tags')) reloadFns.tags();
+          reloadFns.onSyncPullComplete?.();
         });
       });
       syncEngine.start();

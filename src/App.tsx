@@ -170,6 +170,7 @@ function AppInner() {
     chats: chatsHook.reload,
     folders: reloadFolders,
     tags: reloadTags,
+    onSyncPullComplete: refreshRemote,
   }, handleFolderInvite);
 
   const syncedFolderIds = useMemo(() => {

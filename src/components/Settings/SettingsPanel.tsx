@@ -5,6 +5,7 @@ import type { Settings, Note, NoteTemplate, PlaybookTemplate, PlaybookStep } fro
 import { TemplateManager } from './TemplateManager';
 import { PlaybookManager } from './PlaybookManager';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/llm-tools';
+import { MODELS, MODEL_PROVIDER_MAP } from '../../lib/models';
 import { ExportImport } from './ExportImport';
 import { ThreatIntelConfig } from './ThreatIntelConfig';
 import { CloudBackup } from './CloudBackup';
@@ -420,44 +421,18 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
                   value={settings.llmDefaultModel || 'claude-sonnet-4-6'}
                   onChange={(e) => {
                     const model = e.target.value;
-                    const providerMap: Record<string, string> = {
-                      'claude-opus-4-6': 'anthropic', 'claude-sonnet-4-6': 'anthropic', 'claude-3-5-haiku-latest': 'anthropic',
-                      'gpt-5.4': 'openai', 'gpt-5.4-pro': 'openai',
-                      'gpt-5.2': 'openai', 'gpt-5-mini': 'openai', 'o3': 'openai', 'o4-mini': 'openai',
-                      'gpt-4.1': 'openai', 'gpt-4.1-mini': 'openai', 'gpt-4o': 'openai',
-                      'gemini-2.5-pro-preview-06-05': 'gemini', 'gemini-2.5-flash-preview-05-20': 'gemini',
-                      'mistral-large-latest': 'mistral', 'mistral-small-latest': 'mistral', 'codestral-latest': 'mistral',
-                    };
-                    const provider = providerMap[model] || (model === settings.llmLocalModelName ? 'local' : 'anthropic');
+                    const provider = MODEL_PROVIDER_MAP[model] || (model === settings.llmLocalModelName ? 'local' : 'anthropic');
                     onUpdateSettings({ llmDefaultModel: model, llmDefaultProvider: provider as Settings['llmDefaultProvider'] });
                   }}
                   className={selectClass}
                 >
-                  <optgroup label="Anthropic">
-                    <option value="claude-opus-4-6">Claude Opus 4</option>
-                    <option value="claude-sonnet-4-6">Claude Sonnet 4</option>
-                    <option value="claude-3-5-haiku-latest">Claude Haiku 3.5</option>
-                  </optgroup>
-                  <optgroup label="OpenAI">
-                    <option value="gpt-5.4">GPT-5.4</option>
-                    <option value="gpt-5.4-pro">GPT-5.4 Pro</option>
-                    <option value="gpt-5.2">GPT-5.2</option>
-                    <option value="gpt-5-mini">GPT-5 Mini</option>
-                    <option value="o3">o3</option>
-                    <option value="o4-mini">o4-mini</option>
-                    <option value="gpt-4.1">GPT-4.1</option>
-                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                    <option value="gpt-4o">GPT-4o</option>
-                  </optgroup>
-                  <optgroup label="Google">
-                    <option value="gemini-2.5-pro-preview-06-05">Gemini 2.5 Pro</option>
-                    <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash</option>
-                  </optgroup>
-                  <optgroup label="Mistral">
-                    <option value="mistral-large-latest">Mistral Large</option>
-                    <option value="mistral-small-latest">Mistral Small</option>
-                    <option value="codestral-latest">Codestral</option>
-                  </optgroup>
+                  {Array.from(new Set(MODELS.map(m => m.group))).map(group => (
+                    <optgroup key={group} label={group}>
+                      {MODELS.filter(m => m.group === group).map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                   {settings.llmLocalModelName && (
                     <optgroup label="Local">
                       <option value={settings.llmLocalModelName}>Local: {settings.llmLocalModelName}</option>

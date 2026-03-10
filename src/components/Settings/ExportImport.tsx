@@ -32,11 +32,15 @@ export function ExportImport({ notes, onImportComplete }: ExportImportProps) {
   };
 
   const handleExportJSON = async () => {
-    const json = await exportJSON();
-    downloadFile(json, `threatcaddy-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
-    showMessage('Backup exported successfully');
-    addToast('success', 'Backup exported');
-    logActivity('data', 'export', 'Exported JSON backup');
+    try {
+      const json = await exportJSON();
+      downloadFile(json, `threatcaddy-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+      showMessage('Backup exported successfully');
+      addToast('success', 'Backup exported');
+      logActivity('data', 'export', 'Exported JSON backup');
+    } catch {
+      addToast('error', 'Failed to export backup');
+    }
   };
 
   const handleExportMarkdown = () => {

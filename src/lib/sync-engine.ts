@@ -71,7 +71,7 @@ export class SyncEngine {
     // potentially large initial push.
     this.sync()
       .then(() => this.initialSync())
-      .catch(() => {});
+      .catch((err) => console.warn('[sync-engine] Initial sync failed:', err));
 
     // Periodic full sync as safety net
     this.intervalId = setInterval(() => this.sync(), SYNC_INTERVAL);

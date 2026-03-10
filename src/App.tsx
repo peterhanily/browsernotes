@@ -1059,10 +1059,14 @@ function AppInner() {
   }, []);
 
   const handleQuickSave = useCallback(async () => {
-    const json = await exportJSON();
-    const date = new Date().toISOString().slice(0, 10);
-    downloadFile(json, `threatcaddy-backup-${date}.json`, 'application/json');
-    addToast('success', 'Backup exported');
+    try {
+      const json = await exportJSON();
+      const date = new Date().toISOString().slice(0, 10);
+      downloadFile(json, `threatcaddy-backup-${date}.json`, 'application/json');
+      addToast('success', 'Backup exported');
+    } catch {
+      addToast('error', 'Failed to export backup');
+    }
   }, [addToast]);
 
   const handleQuickLoad = useCallback((file: File) => {
@@ -1085,11 +1089,16 @@ function AppInner() {
 
   const handleMergeImport = useCallback(async () => {
     if (!pendingImportFile) return;
-    const text = await pendingImportFile.text();
-    const result = await mergeImportJSON(text);
-    setPendingImportFile(null);
-    handleImportComplete();
-    addToast('success', `Merge complete: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped`);
+    try {
+      const text = await pendingImportFile.text();
+      const result = await mergeImportJSON(text);
+      setPendingImportFile(null);
+      handleImportComplete();
+      addToast('success', `Merge complete: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped`);
+    } catch {
+      addToast('error', 'Failed to merge backup');
+      setPendingImportFile(null);
+    }
   }, [pendingImportFile, handleImportComplete, addToast]);
 
   // Sample investigation
@@ -1965,13 +1974,17 @@ function AppInner() {
             navigateTo('timeline', { selectedTimelineId: timelineId });
           }}
           onExport={editingFolderId === selectedFolderId && investigationMode === 'remote' ? undefined : async (folderId) => {
-            const json = await exportInvestigationJSON(folderId);
-            const folder = folders.find((f) => f.id === folderId);
-            const slug = (folder?.name || 'investigation').toLowerCase().replace(/\s+/g, '-');
-            const date = new Date().toISOString().slice(0, 10);
-            downloadFile(json, `threatcaddy-${slug}-${date}.json`, 'application/json');
-            activityLog.log('data', 'export', `Exported investigation "${folder?.name}"`, folderId, folder?.name);
-            addToast('success', `Exported investigation "${folder?.name}"`);
+            try {
+              const json = await exportInvestigationJSON(folderId);
+              const folder = folders.find((f) => f.id === folderId);
+              const slug = (folder?.name || 'investigation').toLowerCase().replace(/\s+/g, '-');
+              const date = new Date().toISOString().slice(0, 10);
+              downloadFile(json, `threatcaddy-${slug}-${date}.json`, 'application/json');
+              activityLog.log('data', 'export', `Exported investigation "${folder?.name}"`, folderId, folder?.name);
+              addToast('success', `Exported investigation "${folder?.name}"`);
+            } catch {
+              addToast('error', 'Failed to export investigation');
+            }
           }}
           onGenerateReport={(folderId) => {
             const folder = folders.find((f) => f.id === folderId);

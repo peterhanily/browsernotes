@@ -32,12 +32,18 @@ export function useAutoIOCExtraction({
   const entityIdRef = useRef(entityId);
   const onUpdateRef = useRef(onUpdate);
   const existingAnalysisRef = useRef(existingAnalysis);
+  const enabledTypesRef = useRef(enabledTypes);
+  const defaultConfidenceRef = useRef(defaultConfidence);
+  const debounceMsRef = useRef(debounceMs);
 
   // Keep refs in sync
   useEffect(() => {
     entityIdRef.current = entityId;
     onUpdateRef.current = onUpdate;
     existingAnalysisRef.current = existingAnalysis;
+    enabledTypesRef.current = enabledTypes;
+    defaultConfidenceRef.current = defaultConfidence;
+    debounceMsRef.current = debounceMs;
   });
 
   // Reset prev content when entity changes
@@ -62,12 +68,12 @@ export function useAutoIOCExtraction({
     timerRef.current = setTimeout(() => {
       const currentId = entityIdRef.current;
       if (!currentId) return;
-      const fresh = extractIOCs(content, { enabledTypes, defaultConfidence });
+      const fresh = extractIOCs(content, { enabledTypes: enabledTypesRef.current, defaultConfidence: defaultConfidenceRef.current });
       if (fresh.length === 0 && !existingAnalysisRef.current) return;
       const merged = mergeIOCAnalysis(existingAnalysisRef.current, fresh);
       const iocTypes = [...new Set(merged.iocs.filter((i) => !i.dismissed).map((i) => i.type))];
       onUpdateRef.current(currentId, { iocAnalysis: merged, iocTypes });
-    }, debounceMs ?? 2000);
+    }, debounceMsRef.current ?? 2000);
 
     return () => clearTimeout(timerRef.current);
   }, [content, entityId, enabled]);

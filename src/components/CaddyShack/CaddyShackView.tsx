@@ -75,7 +75,7 @@ export function CaddyShackView({ folderId, folderName, settings }: CaddyShackVie
     if (!connected) return;
     fetchServerInfo()
       .then((info) => setServerName(info.serverName))
-      .catch(() => {});
+      .catch((err) => console.warn('[CaddyShack] Failed to fetch server info:', err));
   }, [connected]);
 
   // Listen for notification-driven post selection

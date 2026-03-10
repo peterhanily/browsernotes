@@ -223,6 +223,14 @@ async function main() {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
+  if (process.env.NODE_ENV === 'production' && !process.env.BOT_MASTER_KEY) {
+    logger.warn(
+      'BOT_MASTER_KEY is not set in production. Bot secrets will use a random key that ' +
+      'will NOT survive server restarts — any previously encrypted secrets will become unreadable. ' +
+      'Set BOT_MASTER_KEY to a stable 64-char hex string.',
+    );
+  }
+
   // Run database migrations
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const migrationsFolder = resolve(__dirname, 'db/migrations');

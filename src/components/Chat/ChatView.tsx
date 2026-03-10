@@ -5,6 +5,7 @@ import { ClsSelect } from '../Common/ClsSelect';
 import { ChatMessageBubble } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { useLLM } from '../../hooks/useLLM';
+import { DEFAULT_MODEL_PER_PROVIDER } from '../../lib/models';
 import { cn, formatDate } from '../../lib/utils';
 import { nanoid } from 'nanoid';
 import { TOOL_DEFINITIONS, buildSystemPrompt, executeTool, isWriteTool, fetchViaExtensionBridge } from '../../lib/llm-tools';
@@ -113,11 +114,7 @@ export function ChatView({
         const first = configuredProviders.values().next().value!;
         defaultProvider = first as LLMProvider;
         // Pick a sensible model for that provider
-        const modelMap: Record<string, string> = {
-          anthropic: 'claude-sonnet-4-6', openai: 'gpt-4.1', gemini: 'gemini-2.5-flash-preview-05-20',
-          mistral: 'mistral-large-latest', local: settings.llmLocalModelName || 'local',
-        };
-        defaultModel = modelMap[defaultProvider] || defaultModel;
+        defaultModel = DEFAULT_MODEL_PER_PROVIDER[defaultProvider] || settings.llmLocalModelName || defaultModel;
       }
       const thread = await onCreateThread({
         model: defaultModel,

@@ -26,6 +26,11 @@ function getClientIp(c: Context): string {
   return remoteAddr || 'unknown';
 }
 
+/**
+ * In-memory sliding-window rate limiter. Suitable for single-instance deployments.
+ * State is lost on restart and not shared across instances — if horizontal scaling
+ * is needed, replace the Map store with Redis or a shared cache.
+ */
 export function rateLimiter(options: RateLimitOptions) {
   const { windowMs, max } = options;
   const store = new Map<string, RateLimitEntry>();

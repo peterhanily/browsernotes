@@ -53,17 +53,24 @@ export class SyncEngine {
     if (this.running) return;
     this.running = true;
     this.readyFired = false;
-    // Initial sync — push existing local data if this is the first sync
-    this.initialSync().then(() => {
-      return this.sync();
-    }).catch(() => {
-      return this.sync();
-    }).finally(() => {
+
+    // Fire onReady immediately so the UI renders local data without
+    // blocking on the network.  The background sync will trigger
+    // onRemoteChange for any server-side updates as they arrive.
+    queueMicrotask(() => {
       if (!this.readyFired) {
         this.readyFired = true;
         this.onReady?.();
       }
     });
+
+    // Background: push local data then pull server state.
+    // Errors are non-fatal — periodic sync will retry.
+    this.initialSync()
+      .then(() => this.sync())
+      .catch(() => this.sync())
+      .catch(() => {});
+
     // Periodic full sync as safety net
     this.intervalId = setInterval(() => this.sync(), SYNC_INTERVAL);
   }
@@ -136,6 +143,15 @@ export class SyncEngine {
       if (conflicts.length > 0 && this.onConflict) {
         this.onConflict(conflicts);
       }
+
+      // Seed the sync cursor so the subsequent pull() only fetches
+      // incremental changes instead of re-downloading everything we
+      // just pushed.  The periodic 30-second sync will catch anything
+      // from other clients that slipped through the small window.
+      await dynamicDb.table('_syncMeta').put({
+        key: META_KEY_LAST_SYNC,
+        value: new Date().toISOString(),
+      });
     } catch (err) {
       console.warn('SyncEngine: initial sync failed', err);
     }

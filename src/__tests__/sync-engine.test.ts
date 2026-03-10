@@ -931,15 +931,17 @@ describe('SyncEngine', () => {
   // ── initialSync ───────────────────────────────────────────────────
 
   describe('initialSync (via start)', () => {
-    it('skips initial sync when _syncMeta has a lastSyncTimestamp', async () => {
-      getTableData('_syncMeta').push({ key: 'lastSyncTimestamp', value: '2025-01-01T00:00:00.000Z' });
+    it('skips initial sync when initialPushDone flag is set', async () => {
+      getTableData('_syncMeta').push({ key: 'initialPushDone', value: true });
 
       engine.start();
-      await vi.advanceTimersByTimeAsync(100);
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 50));
+      vi.useFakeTimers();
 
-      // The folders table should NOT have been queried for initial sync
-      const foldersTable = getMockTable('folders');
-      expect(foldersTable.toArray).not.toHaveBeenCalled();
+      // syncPush should NOT have been called (only sync's push runs, which
+      // reads _syncQueue — not folders.toArray)
+      expect(mockSyncPush).not.toHaveBeenCalled();
     });
 
     it('pushes all non-trashed, non-localOnly folders on first sync', async () => {
@@ -952,7 +954,11 @@ describe('SyncEngine', () => {
       mockSyncPush.mockResolvedValue({ results: [] });
 
       engine.start();
-      await vi.advanceTimersByTimeAsync(200);
+      // sync() runs first, then initialSync chains via .then() —
+      // use real timers briefly to let the full promise chain settle
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 50));
+      vi.useFakeTimers();
 
       expect(mockSyncPush).toHaveBeenCalled();
     });
@@ -960,12 +966,14 @@ describe('SyncEngine', () => {
     it('handles initialSync errors gracefully and still proceeds to sync', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      // Make folders.toArray throw by overriding the cached mock
+      // Make folders.toArray throw during initialSync
       const foldersTable = getMockTable('folders');
       foldersTable.toArray.mockRejectedValueOnce(new Error('DB Error'));
 
       engine.start();
-      await vi.advanceTimersByTimeAsync(200);
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 50));
+      vi.useFakeTimers();
 
       // Should have warned about initial sync failure
       expect(consoleSpy).toHaveBeenCalled();

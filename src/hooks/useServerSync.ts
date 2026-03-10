@@ -45,19 +45,10 @@ export function useServerSync(auth: AuthState, reloadFns: ReloadFns, onFolderInv
       enableSync();
       syncEngine.setConflictHandler((conflicts) => setSyncConflicts(conflicts));
       syncEngine.setReadyHandler(() => {
-        // First sync cycle done — reload everything so the UI reflects server state
-        queueMicrotask(() => {
-          reloadFns.folders();
-          reloadFns.notes();
-          reloadFns.tasks();
-          reloadFns.timeline();
-          reloadFns.timelines();
-          reloadFns.whiteboards();
-          reloadFns.standaloneIOCs();
-          reloadFns.chats();
-          reloadFns.tags();
-          reloadFns.onSyncPullComplete?.();
-        });
+        // Hooks already loaded local data on mount — just signal that
+        // sync is active.  Actual server data triggers reloads via
+        // onRemoteChange as it arrives from the background pull.
+        reloadFns.onSyncPullComplete?.();
       });
       syncEngine.setRemoteChangeHandler((_changes, tables) => {
         // Batch all reloads in a single microtask to coalesce React renders

@@ -11,6 +11,7 @@ const SYNC_INTERVAL = 30_000; // 30 seconds — safety-net full sync
 const PUSH_DEBOUNCE = 50;     // 50ms — fast debounce for near real-time sync
 const PUSH_MAX_WAIT = 300;    // 300ms — max time before forcing a push during continuous typing
 const META_KEY_LAST_SYNC = 'lastSyncTimestamp';
+const META_KEY_INITIAL_PUSH_DONE = 'initialPushDone';
 
 interface SyncQueueEntry {
   seq?: number;
@@ -64,11 +65,12 @@ export class SyncEngine {
       }
     });
 
-    // Background: push local data then pull server state.
-    // Errors are non-fatal — periodic sync will retry.
-    this.initialSync()
-      .then(() => this.sync())
-      .catch(() => this.sync())
+    // Fast path: pull server state first (incremental or empty for clean server),
+    // then push any pre-existing local data in the background.
+    // This order ensures server data appears ASAP without waiting on a
+    // potentially large initial push.
+    this.sync()
+      .then(() => this.initialSync())
       .catch(() => {});
 
     // Periodic full sync as safety net
@@ -83,8 +85,8 @@ export class SyncEngine {
    * and sends a single syncPush call to minimise DB queries and network round-trips.
    */
   private async initialSync() {
-    const meta = await dynamicDb.table('_syncMeta').get(META_KEY_LAST_SYNC);
-    if (meta?.value) return; // Not first sync — skip
+    const done = await dynamicDb.table('_syncMeta').get(META_KEY_INITIAL_PUSH_DONE);
+    if (done?.value) return; // Already pushed local data once — skip
 
     const FOLDER_SCOPED_TABLES = ['notes', 'tasks', 'timelineEvents', 'whiteboards', 'standaloneIOCs', 'chatThreads'];
     const GLOBAL_TABLES = ['tags', 'timelines'];
@@ -96,8 +98,6 @@ export class SyncEngine {
         (folder) => !folder.trashed && !folder.localOnly
       );
       const syncableFolderIds = new Set(syncableFolders.map((f) => f.id as string));
-
-      if (syncableFolderIds.size === 0 && GLOBAL_TABLES.length === 0) return;
 
       const changes: SyncChange[] = [];
 
@@ -135,22 +135,19 @@ export class SyncEngine {
         changes.push(...batch);
       }
 
-      if (changes.length === 0) return;
-
-      // Single network call for all data
-      const { results } = await syncPush(changes);
-      const conflicts = results.filter((r) => r.status === 'conflict');
-      if (conflicts.length > 0 && this.onConflict) {
-        this.onConflict(conflicts);
+      if (changes.length > 0) {
+        const { results } = await syncPush(changes);
+        const conflicts = results.filter((r) => r.status === 'conflict');
+        if (conflicts.length > 0 && this.onConflict) {
+          this.onConflict(conflicts);
+        }
       }
 
-      // Seed the sync cursor so the subsequent pull() only fetches
-      // incremental changes instead of re-downloading everything we
-      // just pushed.  The periodic 30-second sync will catch anything
-      // from other clients that slipped through the small window.
+      // Mark initial push as done — uses a separate key from the pull
+      // cursor so reordering sync() vs initialSync() doesn't break.
       await dynamicDb.table('_syncMeta').put({
-        key: META_KEY_LAST_SYNC,
-        value: new Date().toISOString(),
+        key: META_KEY_INITIAL_PUSH_DONE,
+        value: true,
       });
     } catch (err) {
       console.warn('SyncEngine: initial sync failed', err);

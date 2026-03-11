@@ -2,6 +2,7 @@ import { db } from '../db';
 import type { Dexie as DexieType } from 'dexie';
 import { syncPush, syncPull, syncSnapshot, type SyncChange, type SyncResult } from './server-api';
 import { disableSync, enableSync } from './sync-middleware';
+import { sanitizeSyncEntity, sanitizeSyncBatch } from './sync-sanitize';
 import type { WSClient } from './ws-client';
 
 // Cast db for dynamic table access (sync tables aren't in the typed schema)
@@ -276,17 +277,12 @@ export class SyncEngine {
             arr.push(id);
             deletesByTable.set(tableName, arr);
           } else {
-            // Convert server timestamps to milliseconds for Dexie
-            const localData = { ...entityData };
-            if (localData.createdAt && typeof localData.createdAt === 'string') {
-              localData.createdAt = new Date(localData.createdAt as string).getTime();
-            }
-            if (localData.updatedAt && typeof localData.updatedAt === 'string') {
-              localData.updatedAt = new Date(localData.updatedAt as string).getTime();
-            }
+            // Sanitize server data through allowlisted field extractors
+            const sanitized = sanitizeSyncEntity(tableName, entityData as Record<string, unknown>);
+            if (!sanitized) continue; // skip invalid entities
 
             const arr = putsByTable.get(tableName) || [];
-            arr.push(localData);
+            arr.push(sanitized);
             putsByTable.set(tableName, arr);
           }
         }
@@ -335,14 +331,11 @@ export class SyncEngine {
       if (op === 'delete') {
         await dynamicDb.table(tableName).delete(entityId);
       } else if (data) {
-        // Normalize ISO timestamp strings to ms for Dexie
-        const localData = { ...data };
-        for (const key of ['createdAt', 'updatedAt', 'trashedAt', 'completedAt', 'closedAt'] as const) {
-          if (localData[key] && typeof localData[key] === 'string') {
-            localData[key] = new Date(localData[key] as string).getTime();
-          }
+        // Sanitize through allowlisted field extractors
+        const sanitized = sanitizeSyncEntity(tableName, data);
+        if (sanitized) {
+          await dynamicDb.table(tableName).put(sanitized);
         }
-        await dynamicDb.table(tableName).put(localData);
       }
       if (this.onRemoteChange) {
         this.onRemoteChange([{ table: tableName, op, id: entityId, ...data }], new Set([tableName]));
@@ -375,14 +368,11 @@ export class SyncEngine {
       try {
         for (const conflict of conflicts) {
           if (!conflict.table || !conflict.serverData) continue;
-          const localData = { ...conflict.serverData };
-          // Normalize ISO timestamps to ms for Dexie
-          for (const key of ['createdAt', 'updatedAt', 'trashedAt', 'completedAt', 'closedAt'] as const) {
-            if (localData[key] && typeof localData[key] === 'string') {
-              localData[key] = new Date(localData[key] as string).getTime();
-            }
+          // Sanitize through allowlisted field extractors
+          const sanitized = sanitizeSyncEntity(conflict.table, conflict.serverData);
+          if (sanitized) {
+            await dynamicDb.table(conflict.table).put(sanitized);
           }
-          await dynamicDb.table(conflict.table).put(localData);
         }
       } finally {
         enableSync();
@@ -420,17 +410,11 @@ export class SyncEngine {
         for (const [tableName, rows] of Object.entries(snapshot)) {
           if (!Array.isArray(rows) || rows.length === 0) continue;
           affectedTables.add(tableName);
-          // Normalize timestamps and batch all rows with bulkPut
-          const normalizedRows = rows.map((row) => {
-            const localData = { ...(row as Record<string, unknown>) };
-            for (const key of ['createdAt', 'updatedAt', 'trashedAt', 'completedAt', 'closedAt'] as const) {
-              if (localData[key] && typeof localData[key] === 'string') {
-                localData[key] = new Date(localData[key] as string).getTime();
-              }
-            }
-            return localData;
-          });
-          await dynamicDb.table(tableName).bulkPut(normalizedRows);
+          // Sanitize through allowlisted field extractors
+          const sanitized = sanitizeSyncBatch(tableName, rows as Record<string, unknown>[]);
+          if (sanitized.length > 0) {
+            await dynamicDb.table(tableName).bulkPut(sanitized);
+          }
         }
       } finally {
         enableSync();

@@ -165,7 +165,7 @@ export function sanitizeNote(raw: unknown): Note | null {
   };
 }
 
-function sanitizeTask(raw: unknown): Task | null {
+export function sanitizeTask(raw: unknown): Task | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -200,7 +200,7 @@ function sanitizeTask(raw: unknown): Task | null {
 const VALID_INVESTIGATION_STATUS = ['active', 'closed', 'archived'];
 const VALID_CLOSURE_RESOLUTIONS = ['resolved', 'false-positive', 'escalated', 'duplicate', 'inconclusive'];
 
-function sanitizeFolder(raw: unknown): Folder | null {
+export function sanitizeFolder(raw: unknown): Folder | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -227,7 +227,7 @@ function sanitizeFolder(raw: unknown): Folder | null {
   };
 }
 
-function sanitizeTag(raw: unknown): Tag | null {
+export function sanitizeTag(raw: unknown): Tag | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -240,7 +240,7 @@ function sanitizeTag(raw: unknown): Tag | null {
 const VALID_EVENT_TYPES = Object.keys(TIMELINE_EVENT_TYPE_LABELS) as string[];
 const VALID_CONFIDENCE = Object.keys(CONFIDENCE_LEVELS) as string[];
 
-function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
+export function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -276,7 +276,7 @@ function sanitizeTimelineEvent(raw: unknown): TimelineEvent | null {
   };
 }
 
-function sanitizeTimeline(raw: unknown): Timeline | null {
+export function sanitizeTimeline(raw: unknown): Timeline | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -290,7 +290,7 @@ function sanitizeTimeline(raw: unknown): Timeline | null {
   };
 }
 
-function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
+export function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   return {
@@ -310,7 +310,7 @@ function sanitizeWhiteboard(raw: unknown): Whiteboard | null {
 
 const VALID_LLM_PROVIDERS = ['anthropic', 'openai', 'gemini', 'mistral', 'local'];
 
-function sanitizeStandaloneIOC(raw: unknown): StandaloneIOC | null {
+export function sanitizeStandaloneIOC(raw: unknown): StandaloneIOC | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const type = str(r.type);
@@ -358,7 +358,7 @@ function sanitizeChatMessage(raw: unknown): ChatMessage | null {
   };
 }
 
-function sanitizeChatThread(raw: unknown): ChatThread | null {
+export function sanitizeChatThread(raw: unknown): ChatThread | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const provider = str(r.provider, 'anthropic');

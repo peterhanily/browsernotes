@@ -93,10 +93,12 @@ export function formatIOCsJSON(entries: IOCExportEntry[], _config?: ThreatIntelE
 }
 
 function escapeCSVField(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
-    return '"' + value.replace(/"/g, '""') + '"';
+  let s = value;
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
   }
-  return value;
+  return s;
 }
 
 const CSV_HEADERS = ['type', 'value', 'confidence', 'analystNotes', 'attribution', 'firstSeen', 'dismissed', 'clsLevel', 'clipTitle', 'sourceUrl'];

@@ -5,6 +5,7 @@ import { NOTE_COLORS } from '../../types';
 import { nanoid } from 'nanoid';
 import { extractIOCs, mergeIOCAnalysis } from '../../lib/ioc-extractor';
 import { mergeText, adjustCursor } from '../../lib/text-merge';
+import { markPending, clearPending } from '../../lib/pending-changes';
 import { ClsSelect } from '../Common/ClsSelect';
 import { MarkdownPreview } from './MarkdownPreview';
 import { TagInput } from '../Common/TagInput';
@@ -268,24 +269,28 @@ export function NoteEditor({
   // Cleanup pending timeouts on unmount
   useEffect(() => {
     return () => {
-      clearTimeout(saveTimeoutRef.current);
+      if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); clearPending(); }
       clearTimeout(savedTimeoutRef.current);
       clearTimeout(shareMsgTimeoutRef.current);
       clearTimeout(mergeTimeoutRef.current);
     };
   }, []);
 
+  const scheduleSave = useCallback((updates: Partial<Note>) => {
+    clearTimeout(saveTimeoutRef.current);
+    markPending();
+    saveTimeoutRef.current = setTimeout(() => { clearPending(); save(updates); }, 500);
+  }, [save]);
+
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => save({ title: value }), 500);
+    scheduleSave({ title: value });
   };
 
   const handleContentChange = useCallback((value: string) => {
     setContent(value);
-    clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => save({ content: value }), 500);
-  }, [save]);
+    scheduleSave({ content: value });
+  }, [scheduleSave]);
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Link autocomplete menu keyboard navigation

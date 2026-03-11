@@ -873,8 +873,10 @@ function AllIOCsTab({
       ext = 'txt';
     } else if (format === 'csv') {
       const escape = (v: string) => {
-        if (v.includes(',') || v.includes('"') || v.includes('\n')) return '"' + v.replace(/"/g, '""') + '"';
-        return v;
+        let s = v;
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
       };
       const headers = ['type', 'value', 'confidence', 'source', 'source_type', 'status', 'attribution', 'analyst_notes', 'updated_at'];
       const lines = [headers.join(',')];

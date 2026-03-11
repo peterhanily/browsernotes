@@ -31,6 +31,7 @@ import { ScreenshareContext } from './hooks/ScreenshareContext';
 import { getEffectiveClsLevels, isAboveClsThreshold } from './lib/classification';
 import { isEncryptionEnabled } from './lib/encryptionStore';
 import { clipBuffer } from './lib/clipBuffer';
+import { hasPendingChanges } from './lib/pending-changes';
 import { useInvestigationData } from './hooks/useInvestigationData';
 import type { ViewMode, SortOption, EditorMode, Note, Task, TimelineEvent, TaskViewMode, IOCType, ChatThread, InvestigationDataMode } from './types';
 import { DEFAULT_QUICK_LINKS } from './types';
@@ -339,6 +340,17 @@ function AppInner() {
       .then((data) => setInvestigationMembers(data.members || []))
       .catch(() => setInvestigationMembers([]));
   }, [auth.connected, selectedFolderId]);
+
+  // Warn before closing tab with unsaved editor changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasPendingChanges()) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
 
   const effectiveClsLevels = useMemo(() => getEffectiveClsLevels(settings.tiClsLevels), [settings.tiClsLevels]);
 

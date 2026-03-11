@@ -7,6 +7,7 @@ if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).EXCALIDRAW_ASSET_PATH = '/';
 }
 import { ArrowLeft, Briefcase, Trash2, Image } from 'lucide-react';
+import { markPending, clearPending } from '../../lib/pending-changes';
 import type { Whiteboard, Tag, Folder, Settings } from '../../types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { TagInput } from '../Common/TagInput';
@@ -47,9 +48,9 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
 
   useEffect(() => {
     return () => {
-      clearTimeout(saveTimeoutRef.current);
+      if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); clearPending(); }
+      if (excalidrawSaveRef.current) { clearTimeout(excalidrawSaveRef.current); clearPending(); }
       clearTimeout(savedTimeoutRef.current);
-      clearTimeout(excalidrawSaveRef.current);
     };
   }, []);
 
@@ -62,7 +63,9 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
   const handleNameChange = (value: string) => {
     setName(value);
     clearTimeout(saveTimeoutRef.current);
+    markPending();
     saveTimeoutRef.current = setTimeout(() => {
+      clearPending();
       onUpdate(whiteboard.id, { name: value });
       flashSaved();
     }, 500);
@@ -70,7 +73,9 @@ export default function WhiteboardEditor({ whiteboard, allTags, folders, onUpdat
 
   const handleExcalidrawChange = useCallback((elements: readonly unknown[], appState: Record<string, unknown>) => {
     clearTimeout(excalidrawSaveRef.current);
+    markPending();
     excalidrawSaveRef.current = setTimeout(() => {
+      clearPending();
       onUpdate(whiteboard.id, {
         elements: JSON.stringify(elements),
         appState: JSON.stringify(pickAppState(appState)),

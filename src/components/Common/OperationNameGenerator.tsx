@@ -33,6 +33,8 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
   const [copied, setCopied] = useState(false);
   const [leverPulled, setLeverPulled] = useState(false);
   const [landed, setLanded] = useState(false);
+  const [editedName, setEditedName] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const [reelAWords, setReelAWords] = useState<string[]>([]);
   const [reelBWords, setReelBWords] = useState<string[]>([]);
@@ -98,6 +100,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
     setLeverPulled(true);
     setCopied(false);
     setLanded(false);
+    setEditedName(null);
 
     // Store pending spin — animation starts after React renders new words
     pendingSpinRef.current = result;
@@ -132,15 +135,17 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
     }
   }, [open, spin]);
 
+  const effectiveName = editedName ?? currentName?.full ?? '';
+
   const handleCopy = async () => {
-    if (!currentName) return;
+    if (!effectiveName) return;
     try {
-      await navigator.clipboard.writeText(currentName.full);
+      await navigator.clipboard.writeText(effectiveName);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       const textarea = document.createElement('textarea');
-      textarea.value = currentName.full;
+      textarea.value = effectiveName;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand('copy');
@@ -151,9 +156,15 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
   };
 
   const handleCreate = () => {
-    if (!currentName) return;
-    onCreateInvestigation(currentName.full);
+    if (!effectiveName.trim()) return;
+    onCreateInvestigation(effectiveName.trim());
     onClose();
+  };
+
+  const startEditing = () => {
+    if (spinning || !currentName) return;
+    setEditedName(editedName ?? currentName.full);
+    requestAnimationFrame(() => nameInputRef.current?.focus());
   };
 
   const cycleLevel = () => {
@@ -325,18 +336,36 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
                 </button>
               </div>
 
-              {/* Result panel — recessed dark panel */}
-              <div className="rounded-lg border border-gray-700 px-4 py-3 text-center"
-                style={{ background: 'rgba(0,0,0,0.4)', boxShadow: 'inset 0 1px 6px rgba(0,0,0,0.5)' }}>
-                <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1 font-semibold">Operation</div>
-                <div
-                  className={`text-xl font-black tracking-wider font-mono transition-opacity duration-300 ${
-                    currentName && !spinning ? 'opacity-100 text-gray-100' : 'opacity-30 text-gray-500'
-                  }`}
-                  style={landed && currentName ? { animation: 'slotWinPulse 0.8s ease-in-out' } : undefined}
-                >
-                  {currentName ? currentName.full : 'SPIN TO GENERATE'}
+              {/* Result panel — recessed dark panel, click to edit */}
+              <div
+                className="rounded-lg border border-gray-700 px-4 py-3 text-center cursor-text"
+                style={{ background: 'rgba(0,0,0,0.4)', boxShadow: 'inset 0 1px 6px rgba(0,0,0,0.5)' }}
+                onClick={startEditing}
+              >
+                <div className="text-[10px] text-gray-500 uppercase tracking-[0.3em] mb-1 font-semibold">
+                  Operation {currentName && !spinning && editedName === null && <span className="normal-case tracking-normal text-gray-600">— click to edit</span>}
                 </div>
+                {editedName !== null ? (
+                  <input
+                    ref={nameInputRef}
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreate();
+                      if (e.key === 'Escape') { setEditedName(null); (e.target as HTMLInputElement).blur(); }
+                    }}
+                    className="w-full bg-transparent text-xl font-black tracking-wider font-mono text-gray-100 text-center focus:outline-none border-b border-accent/50 pb-0.5"
+                  />
+                ) : (
+                  <div
+                    className={`text-xl font-black tracking-wider font-mono transition-opacity duration-300 ${
+                      currentName && !spinning ? 'opacity-100 text-gray-100' : 'opacity-30 text-gray-500'
+                    }`}
+                    style={landed && currentName ? { animation: 'slotWinPulse 0.8s ease-in-out' } : undefined}
+                  >
+                    {currentName ? currentName.full : 'SPIN TO GENERATE'}
+                  </div>
+                )}
               </div>
 
               {/* Action buttons */}
@@ -359,7 +388,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
                 <div className="flex gap-2">
                   <button
                     onClick={handleCopy}
-                    disabled={!currentName || spinning}
+                    disabled={!effectiveName || spinning}
                     className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 border-b-2 border-gray-900 active:border-b-0 active:translate-y-0.5"
                   >
                     {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -367,7 +396,7 @@ export function OperationNameGenerator({ open, onClose, onCreateInvestigation }:
                   </button>
                   <button
                     onClick={handleCreate}
-                    disabled={!currentName || spinning}
+                    disabled={!effectiveName.trim() || spinning}
                     className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 border-b-2 border-gray-900 active:border-b-0 active:translate-y-0.5"
                   >
                     <FolderPlus size={14} />

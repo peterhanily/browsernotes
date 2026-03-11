@@ -121,21 +121,25 @@ export async function executeBulkCreateIOCs(input: Record<string, unknown>, fold
   const now = Date.now();
   const created: { id: string; type: string; value: string }[] = [];
 
-  for (const iocInput of iocInputs) {
-    const ioc = {
-      id: nanoid(),
-      type: (iocInput.type as IOCType) || 'domain',
-      value: String(iocInput.value || ''),
-      confidence: (iocInput.confidence as ConfidenceLevel) || 'medium',
-      analystNotes: iocInput.analystNotes ? String(iocInput.analystNotes) : undefined,
-      folderId: folderId || undefined,
-      tags: [],
-      trashed: false,
-      archived: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await db.standaloneIOCs.add(ioc);
+  const iocs = iocInputs.map((iocInput) => ({
+    id: nanoid(),
+    type: (iocInput.type as IOCType) || 'domain',
+    value: String(iocInput.value || ''),
+    confidence: (iocInput.confidence as ConfidenceLevel) || 'medium',
+    analystNotes: iocInput.analystNotes ? String(iocInput.analystNotes) : undefined,
+    folderId: folderId || undefined,
+    tags: [],
+    trashed: false,
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await db.transaction('rw', db.standaloneIOCs, async () => {
+    await db.standaloneIOCs.bulkAdd(iocs);
+  });
+
+  for (const ioc of iocs) {
     created.push({ id: ioc.id, type: ioc.type, value: ioc.value });
   }
 

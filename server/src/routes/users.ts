@@ -18,7 +18,8 @@ app.get('/', async (c) => {
 
   if (search) {
     // Allow any authenticated user to search (for @mentions, invite by email)
-    const pattern = `%${search}%`;
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
+    const pattern = `%${escaped}%`;
     const result = await db
       .select({
         id: users.id,

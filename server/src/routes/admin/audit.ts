@@ -28,9 +28,10 @@ app.get('/api/audit-log', requireAdminAuth, async (c) => {
   if (dateFrom) conditions.push(gte(activityLog.timestamp, new Date(dateFrom)));
   if (dateTo) conditions.push(lte(activityLog.timestamp, new Date(dateTo)));
   if (search) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
     conditions.push(or(
-      ilike(activityLog.detail, `%${search}%`),
-      ilike(activityLog.itemTitle, `%${search}%`),
+      ilike(activityLog.detail, `%${escaped}%`),
+      ilike(activityLog.itemTitle, `%${escaped}%`),
     )!);
   }
 
@@ -81,9 +82,10 @@ app.get('/api/audit-log/export', requireAdminAuth, async (c) => {
   if (dateFrom) conditions.push(gte(activityLog.timestamp, new Date(dateFrom)));
   if (dateTo) conditions.push(lte(activityLog.timestamp, new Date(dateTo)));
   if (search) {
+    const escaped = search.replace(/[%_\\]/g, '\\$&');
     conditions.push(or(
-      ilike(activityLog.detail, `%${search}%`),
-      ilike(activityLog.itemTitle, `%${search}%`),
+      ilike(activityLog.detail, `%${escaped}%`),
+      ilike(activityLog.itemTitle, `%${escaped}%`),
     )!);
   }
 

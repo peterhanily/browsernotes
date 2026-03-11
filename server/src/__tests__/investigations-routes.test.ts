@@ -42,6 +42,15 @@ vi.mock('../routes/admin/shared.js', async () => {
       insert: () => makeThenableChain(insertQueue),
       update: () => makeThenableChain(updateQueue),
       delete: () => makeThenableChain(deleteQueue),
+      transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+        const txDb = {
+          select: () => makeThenableChain(selectQueue),
+          insert: () => makeThenableChain(insertQueue),
+          update: () => makeThenableChain(updateQueue),
+          delete: () => makeThenableChain(deleteQueue),
+        };
+        return fn(txDb);
+      },
     },
     folders: { id: 'id', name: 'name', status: 'status', color: 'color', description: 'description', createdAt: 'created_at', updatedAt: 'updated_at', createdBy: 'created_by' },
     users: { id: 'id', email: 'email', displayName: 'display_name' },

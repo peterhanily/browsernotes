@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { Plus, Search, ArrowUpDown, Star, List, Grid3X3, BarChart3, GanttChart, MapPin, Download, Upload, Trash2, RotateCcw } from 'lucide-react';
 import type { TimelineEvent, TimelineEventType, Tag, Folder, Timeline } from '../../types';
 import { TimelineFeed } from './TimelineFeed';
@@ -9,7 +9,7 @@ import { MitreHeatmap } from './MitreHeatmap';
 import type { HeatmapColorMode } from './MitreHeatmap';
 import { MitreReport } from './MitreReport';
 import { TimelineGantt } from './TimelineGantt';
-import { TimelineMap } from './TimelineMap';
+const LazyTimelineMap = lazy(() => import('./TimelineMap').then(m => ({ default: m.TimelineMap })));
 import { TimelineEventCard } from './TimelineEventCard';
 import { Modal } from '../Common/Modal';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -390,16 +390,18 @@ export function TimelineView({
         </div>
       ) : viewMode === 'map' ? (
         <div className="flex-1 overflow-hidden">
-          <TimelineMap
-            events={filteredEvents}
-            onSelect={handleSelect}
-            onToggleStar={onToggleStar}
-            onDelete={(id) => setDeletingEventId(id)}
-            onCreateEventAtLocation={(lat, lng) => {
-              setNewEventCoords({ lat, lng });
-              setShowNewEvent(true);
-            }}
-          />
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Loading map...</div>}>
+            <LazyTimelineMap
+              events={filteredEvents}
+              onSelect={handleSelect}
+              onToggleStar={onToggleStar}
+              onDelete={(id) => setDeletingEventId(id)}
+              onCreateEventAtLocation={(lat, lng) => {
+                setNewEventCoords({ lat, lng });
+                setShowNewEvent(true);
+              }}
+            />
+          </Suspense>
         </div>
       ) : (
         <div className={viewMode === 'feed' ? 'flex-1 overflow-hidden p-4' : 'flex-1 overflow-y-auto p-4'}>

@@ -199,31 +199,33 @@ app.delete('/api/investigations/:id/content', requireAdminAuth, async (c) => {
     }
   }
 
-  // Hard delete all entities
-  const deleted: Record<string, number> = {};
-  const delNotes = await db.delete(notes).where(eq(notes.folderId, folderId)).returning({ id: notes.id });
-  deleted.notes = delNotes.length;
-  const delTasks = await db.delete(tasks).where(eq(tasks.folderId, folderId)).returning({ id: tasks.id });
-  deleted.tasks = delTasks.length;
-  const delEvents = await db.delete(timelineEvents).where(eq(timelineEvents.folderId, folderId)).returning({ id: timelineEvents.id });
-  deleted.timelineEvents = delEvents.length;
-  const delWb = await db.delete(whiteboards).where(eq(whiteboards.folderId, folderId)).returning({ id: whiteboards.id });
-  deleted.whiteboards = delWb.length;
-  const delIoc = await db.delete(standaloneIOCs).where(eq(standaloneIOCs.folderId, folderId)).returning({ id: standaloneIOCs.id });
-  deleted.standaloneIOCs = delIoc.length;
-  const delChat = await db.delete(chatThreads).where(eq(chatThreads.folderId, folderId)).returning({ id: chatThreads.id });
-  deleted.chatThreads = delChat.length;
-  const delPosts = await db.delete(posts).where(eq(posts.folderId, folderId)).returning({ id: posts.id });
-  deleted.posts = delPosts.length;
-  const delFiles = await db.delete(files).where(eq(files.folderId, folderId)).returning({ id: files.id });
-  deleted.files = delFiles.length;
-  const delNotif = await db.delete(notifications).where(eq(notifications.folderId, folderId)).returning({ id: notifications.id });
-  deleted.notifications = delNotif.length;
-  const delMembers = await db.delete(investigationMembers).where(eq(investigationMembers.folderId, folderId)).returning({ id: investigationMembers.id });
-  deleted.members = delMembers.length;
-
-  // Delete the folder itself
-  await db.delete(folders).where(eq(folders.id, folderId));
+  // Hard delete all entities atomically
+  const deleted = await db.transaction(async (tx) => {
+    const counts: Record<string, number> = {};
+    const delNotes = await tx.delete(notes).where(eq(notes.folderId, folderId)).returning({ id: notes.id });
+    counts.notes = delNotes.length;
+    const delTasks = await tx.delete(tasks).where(eq(tasks.folderId, folderId)).returning({ id: tasks.id });
+    counts.tasks = delTasks.length;
+    const delEvents = await tx.delete(timelineEvents).where(eq(timelineEvents.folderId, folderId)).returning({ id: timelineEvents.id });
+    counts.timelineEvents = delEvents.length;
+    const delWb = await tx.delete(whiteboards).where(eq(whiteboards.folderId, folderId)).returning({ id: whiteboards.id });
+    counts.whiteboards = delWb.length;
+    const delIoc = await tx.delete(standaloneIOCs).where(eq(standaloneIOCs.folderId, folderId)).returning({ id: standaloneIOCs.id });
+    counts.standaloneIOCs = delIoc.length;
+    const delChat = await tx.delete(chatThreads).where(eq(chatThreads.folderId, folderId)).returning({ id: chatThreads.id });
+    counts.chatThreads = delChat.length;
+    const delPosts = await tx.delete(posts).where(eq(posts.folderId, folderId)).returning({ id: posts.id });
+    counts.posts = delPosts.length;
+    const delFiles = await tx.delete(files).where(eq(files.folderId, folderId)).returning({ id: files.id });
+    counts.files = delFiles.length;
+    const delNotif = await tx.delete(notifications).where(eq(notifications.folderId, folderId)).returning({ id: notifications.id });
+    counts.notifications = delNotif.length;
+    const delMembers = await tx.delete(investigationMembers).where(eq(investigationMembers.folderId, folderId)).returning({ id: investigationMembers.id });
+    counts.members = delMembers.length;
+    // Delete the folder itself
+    await tx.delete(folders).where(eq(folders.id, folderId));
+    return counts;
+  });
 
   await logAdminAction(getAdminId(c), 'investigation.purge', `Purged and deleted investigation "${folder.name}"`, { folderId });
 

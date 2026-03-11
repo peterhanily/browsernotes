@@ -29,7 +29,7 @@ export const sessions = pgTable('sessions', {
 
 export const investigationMembers = pgTable('investigation_members', {
   id: text('id').primaryKey(),
-  folderId: text('folder_id').notNull(),
+  folderId: text('folder_id').notNull().references(() => folders.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: text('role', { enum: ['owner', 'editor', 'viewer'] }).notNull().default('editor'),
   joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),

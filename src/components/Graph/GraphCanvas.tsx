@@ -378,5 +378,48 @@ export default function GraphCanvas({ data, layout, onSelectNode, onDoubleClickN
     if (cy) cy.fit(undefined, 40);
   }, [fitTrigger]);
 
-  return <div ref={containerRef} className="w-full h-full" role="img" aria-label="Investigation graph visualization" tabIndex={0} />;
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const selected = cy.nodes(':selected');
+
+    if (e.key === 'Escape') {
+      cy.elements().removeClass('faded').removeClass('highlighted');
+      cy.elements().unselect();
+      onSelectNodeRef.current(null);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const allNodes = cy.nodes();
+      if (allNodes.length === 0) return;
+      const currentId = selected.length > 0 ? selected.last().id() : null;
+      let currentIdx = -1;
+      if (currentId) {
+        allNodes.forEach((n, i) => { if (n.id() === currentId) currentIdx = i; });
+      }
+      const nextIdx = e.shiftKey
+        ? (currentIdx <= 0 ? allNodes.length - 1 : currentIdx - 1)
+        : (currentIdx + 1) % allNodes.length;
+      cy.elements().unselect().removeClass('faded').removeClass('highlighted');
+      const nextNode = allNodes[nextIdx];
+      nextNode.select();
+      const neighborhood = nextNode.neighborhood().add(nextNode);
+      cy.elements().addClass('faded');
+      neighborhood.removeClass('faded').addClass('highlighted');
+      cy.animate({ center: { eles: nextNode }, duration: 200 });
+      onSelectNodeRef.current(nextNode.id());
+    } else if (e.key === 'Enter' && selected.length > 0) {
+      onDoubleClickNodeRef.current(selected.last().id());
+    } else if ((e.key === '+' || e.key === '=') && e.metaKey) {
+      e.preventDefault();
+      cy.zoom({ level: cy.zoom() * 1.2, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+    } else if (e.key === '-' && e.metaKey) {
+      e.preventDefault();
+      cy.zoom({ level: cy.zoom() / 1.2, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+    } else if (e.key === '0' && e.metaKey) {
+      e.preventDefault();
+      cy.fit(undefined, 40);
+    }
+  }, []);
+
+  return <div ref={containerRef} className="w-full h-full" role="img" aria-label="Investigation graph visualization" tabIndex={0} onKeyDown={handleKeyDown} />;
 }

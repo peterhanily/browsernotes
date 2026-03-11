@@ -43,6 +43,27 @@
   --color-purple: #6d5ce0;
 }
 
+/* ─── CaddyShack semantic tokens (dark) ─── */
+:root {
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+  --text-primary: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --border: #374151;
+}
+
+.light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
+  --border: #e5e7eb;
+}
+
 /* Text colors: remap grays for light backgrounds */
 .light .text-gray-100 { color: #111827; }
 .light .text-gray-200 { color: #1f2937; }

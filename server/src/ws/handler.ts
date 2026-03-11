@@ -1,7 +1,7 @@
 import type { WSContext } from 'hono/ws';
 import { verifyAccessToken } from '../middleware/auth.js';
 import { checkInvestigationAccess } from '../middleware/access.js';
-import { updatePresence, removePresence, removeUserFromAllFolders, getPresence } from './presence.js';
+import { updatePresence, removePresence, getPresence } from './presence.js';
 import { logger } from '../lib/logger.js';
 import type { AuthUser } from '../types.js';
 
@@ -240,8 +240,24 @@ export function handleWSClose(ws: WSContext) {
   if (client) {
     clearInterval(client.pingTimer);
 
-    // Remove from all subscribed folders' presence
-    removeUserFromAllFolders(client.user.id);
+    // Only remove presence from folders where no other connection from this user is subscribed
+    for (const folderId of client.subscribedFolders) {
+      let otherSubscribed = false;
+      const conns = userConnections.get(client.user.id);
+      if (conns) {
+        for (const otherWs of conns) {
+          if (otherWs === ws) continue;
+          const otherClient = clients.get(otherWs);
+          if (otherClient && otherClient.subscribedFolders.has(folderId)) {
+            otherSubscribed = true;
+            break;
+          }
+        }
+      }
+      if (!otherSubscribed) {
+        removePresence(folderId, client.user.id);
+      }
+    }
 
     // Remove from folder subscriber index
     for (const folderId of client.subscribedFolders) {

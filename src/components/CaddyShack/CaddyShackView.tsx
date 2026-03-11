@@ -286,7 +286,7 @@ export function CaddyShackView({ folderId, folderName, settings }: CaddyShackVie
       </div>
 
       {/* Feed tab filter */}
-      <div className="flex border-b border-[var(--border)]">
+      <div className="flex border-b border-[var(--border)]" role="tablist" aria-label="Feed filter">
         {([
           { key: 'all' as FeedTab, label: 'All', icon: Globe },
           { key: 'posts' as FeedTab, label: 'Posts', icon: MessageSquare },
@@ -294,6 +294,8 @@ export function CaddyShackView({ folderId, folderName, settings }: CaddyShackVie
         ]).map((t) => (
           <button
             key={t.key}
+            role="tab"
+            aria-selected={feedTab === t.key}
             onClick={() => setFeedTab(t.key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               feedTab === t.key

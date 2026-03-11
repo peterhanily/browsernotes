@@ -112,10 +112,12 @@ export function UserProfile({ userId, currentUserId, onBack, onUserClick }: User
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[var(--border)]">
+      <div className="flex border-b border-[var(--border)]" role="tablist" aria-label="User profile">
         {tabs.map((t) => (
           <button
             key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key

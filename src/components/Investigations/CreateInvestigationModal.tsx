@@ -56,10 +56,12 @@ export function CreateInvestigationModal({ open, onClose, onCreate, onOpenNameGe
   return (
     <Modal open={open} onClose={handleClose} title="New Investigation">
       {/* Tabs */}
-      <div className="flex gap-0.5 p-0.5 bg-bg-deep rounded-lg mb-4">
+      <div className="flex gap-0.5 p-0.5 bg-bg-deep rounded-lg mb-4" role="tablist" aria-label="Investigation creation method">
         {TABS.map((tab) => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
               'flex-1 px-3 py-1.5 rounded text-xs font-medium transition-colors',

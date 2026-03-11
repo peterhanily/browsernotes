@@ -109,14 +109,14 @@ export function useNotes() {
   }, [updateNote]);
 
   const togglePin = useCallback(async (id: string) => {
-    const note = notes.find((n) => n.id === id);
+    const note = await db.notes.get(id);
     if (note) await updateNote(id, { pinned: !note.pinned });
-  }, [notes, updateNote]);
+  }, [updateNote]);
 
   const toggleArchive = useCallback(async (id: string) => {
-    const note = notes.find((n) => n.id === id);
+    const note = await db.notes.get(id);
     if (note) await updateNote(id, { archived: !note.archived });
-  }, [notes, updateNote]);
+  }, [updateNote]);
 
   const getFilteredNotes = useCallback(
     (opts: {

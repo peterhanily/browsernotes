@@ -45,7 +45,7 @@ const defaultProps = {
 };
 
 function clickTab(label: string) {
-  fireEvent.click(screen.getByRole('button', { name: label }));
+  fireEvent.click(screen.getByRole('tab', { name: label }));
 }
 
 describe('SettingsPanel', () => {

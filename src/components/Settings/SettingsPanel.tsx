@@ -126,10 +126,14 @@ export function SettingsPanel({ settings, onUpdateSettings, notes, onImportCompl
       </div>
 
       {/* Tab Bar */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar">
+      <div className="flex gap-1 overflow-x-auto no-scrollbar" role="tablist" aria-label="Settings sections">
         {TABS.map((tab) => (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={`settings-panel-${tab.key}`}
+            id={`settings-tab-${tab.key}`}
             onClick={() => setActiveTab(tab.key)}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 ${
               activeTab === tab.key

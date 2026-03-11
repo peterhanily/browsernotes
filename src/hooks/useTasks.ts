@@ -104,9 +104,9 @@ export function useTasks() {
   }, [updateTask]);
 
   const toggleArchiveTask = useCallback(async (id: string) => {
-    const task = tasks.find((t) => t.id === id);
+    const task = await db.tasks.get(id);
     if (task) await updateTask(id, { archived: !task.archived });
-  }, [tasks, updateTask]);
+  }, [updateTask]);
 
   const emptyTrashTasks = useCallback(async () => {
     const trashedIds = tasks.filter((t) => t.trashed).map((t) => t.id);
@@ -141,7 +141,7 @@ export function useTasks() {
   }, [tasks]);
 
   const toggleComplete = useCallback(async (id: string) => {
-    const task = tasks.find((t) => t.id === id);
+    const task = await db.tasks.get(id);
     if (!task) return;
     const completed = !task.completed;
     await updateTask(id, {
@@ -149,7 +149,7 @@ export function useTasks() {
       status: completed ? 'done' : 'todo',
       completedAt: completed ? Date.now() : undefined,
     });
-  }, [tasks, updateTask]);
+  }, [updateTask]);
 
   const getFilteredTasks = useCallback(
     (opts: {

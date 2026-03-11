@@ -203,6 +203,8 @@ app.get('/:id', async (c) => {
     const safeName = sanitizeFilename(file.filename);
     const disposition = SAFE_INLINE_MIME.test(file.mimeType) ? 'inline' : 'attachment';
 
+    logger.info('File download', { fileId, userId: user.id, filename: file.filename, folderId: file.folderId });
+
     const stream = createReadStream(filePath);
     const webStream = Readable.toWeb(stream) as ReadableStream;
 

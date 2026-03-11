@@ -180,7 +180,7 @@ export function useLLM() {
           tools: state.opts.tools,
           endpoint: state.opts.endpoint,
         },
-      }, '*');
+      }, window.location.origin);
     } catch (err) {
       console.error('useLLM: handleDone error', err);
       // Ensure we always clean up on error so the UI doesn't freeze
@@ -251,7 +251,7 @@ export function useLLM() {
     };
 
     window.addEventListener('message', handler);
-    window.postMessage({ type: 'TC_EXTENSION_PING' }, '*');
+    window.postMessage({ type: 'TC_EXTENSION_PING' }, window.location.origin);
     return () => window.removeEventListener('message', handler);
   }, []);
 

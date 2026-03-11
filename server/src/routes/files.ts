@@ -6,8 +6,10 @@ import { checkInvestigationAccess } from '../middleware/access.js';
 import { db } from '../db/index.js';
 import { files } from '../db/schema.js';
 import type { AuthUser } from '../types.js';
-import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
+import { mkdir, writeFile, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { Readable } from 'node:stream';
 import { logger } from '../lib/logger.js';
 
 const STORAGE_PATH = process.env.FILE_STORAGE_PATH || '/data/files';
@@ -197,12 +199,14 @@ app.get('/:id', async (c) => {
   }
 
   try {
-    const data = await readFile(filePath);
     const fileStat = await stat(filePath);
     const safeName = sanitizeFilename(file.filename);
     const disposition = SAFE_INLINE_MIME.test(file.mimeType) ? 'inline' : 'attachment';
 
-    return new Response(data, {
+    const stream = createReadStream(filePath);
+    const webStream = Readable.toWeb(stream) as ReadableStream;
+
+    return new Response(webStream, {
       headers: {
         'Content-Type': file.mimeType,
         'Content-Length': fileStat.size.toString(),
@@ -247,8 +251,11 @@ app.get('/:id/thumbnail', async (c) => {
   }
 
   try {
-    const data = await readFile(thumbPath);
-    return new Response(data, {
+    await stat(thumbPath);
+    const stream = createReadStream(thumbPath);
+    const webStream = Readable.toWeb(stream) as ReadableStream;
+
+    return new Response(webStream, {
       headers: {
         'Content-Type': 'image/webp',
         'Cache-Control': 'private, max-age=31536000, immutable',

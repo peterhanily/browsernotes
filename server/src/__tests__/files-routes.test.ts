@@ -68,6 +68,16 @@ vi.mock('node:fs/promises', () => ({
   mkdir: (...args: unknown[]) => mockMkdir(...args),
 }));
 
+// Mock createReadStream and Readable.toWeb for streaming file downloads
+vi.mock('node:fs', () => ({
+  createReadStream: vi.fn(() => 'mock-stream'),
+}));
+vi.mock('node:stream', () => ({
+  Readable: {
+    toWeb: vi.fn(() => new ReadableStream({ start(c) { c.close(); } })),
+  },
+}));
+
 vi.mock('sharp', () => ({
   default: vi.fn(() => ({
     resize: vi.fn().mockReturnThis(),
@@ -401,7 +411,7 @@ describe('GET /api/files/:id', () => {
       mimeType: 'application/pdf', storagePath: 'file-5.pdf',
       folderId: null, thumbnailPath: null,
     }]);
-    mockReadFile.mockRejectedValueOnce(new Error('ENOENT'));
+    mockStat.mockRejectedValueOnce(new Error('ENOENT'));
 
     const res = await app.request('/api/files/file-5', {
       headers: authHeader(),
@@ -512,7 +522,7 @@ describe('GET /api/files/:id/thumbnail', () => {
       mimeType: 'image/png', storagePath: 'file-11.png',
       thumbnailPath: 'file-11_thumb.webp', folderId: null,
     }]);
-    mockReadFile.mockRejectedValueOnce(new Error('ENOENT'));
+    mockStat.mockRejectedValueOnce(new Error('ENOENT'));
 
     const res = await app.request('/api/files/file-11/thumbnail', {
       headers: authHeader(),

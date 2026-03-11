@@ -135,6 +135,15 @@ export function preprocessWikiLinks(content: string, notes: WikiLinkTarget[]): s
   }).join('');
 }
 
+/** Re-sanitize arbitrary HTML using the same DOMPurify config as renderMarkdown. */
+export function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ADD_TAGS: ['input'],
+    ADD_ATTR: ['type', 'checked', 'disabled', 'class', 'data-note-link', 'data-note-id', 'data-entity-type', 'data-entity-id'],
+    FORBID_ATTR: ['style', 'onerror', 'onload'],
+  });
+}
+
 export function renderMarkdown(content: string, wikiLinkTargets?: WikiLinkTarget[]): string {
   // Load highlight.js CSS on first use (lazy-loaded to avoid blocking initial render)
   ensureHljsCss();

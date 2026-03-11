@@ -37,7 +37,7 @@ export const clipBuffer = {
     window.removeEventListener('message', handler);
     // Re-post buffered clips so the existing App.tsx handler picks them up
     for (const { data } of buffer) {
-      window.postMessage(data, '*');
+      window.postMessage(data, window.location.origin);
     }
     buffer.length = 0;
   },

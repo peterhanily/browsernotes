@@ -292,6 +292,16 @@
   color: #9ca3af;
 }
 
+.tc-entity-link {
+  cursor: pointer;
+  font-weight: 500;
+  border-bottom: 1px dashed currentColor;
+}
+.tc-entity-note { color: #3b82f6; }
+.tc-entity-task { color: #22c55e; }
+.tc-entity-ioc { color: #f59e0b; }
+.tc-entity-event { color: #8b5cf6; }
+
 .markdown-preview hr {
   border-color: #374151;
   margin: 1rem 0;

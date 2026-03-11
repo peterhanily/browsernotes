@@ -121,6 +121,24 @@ export async function encodeSharePayload(payload: SharePayload, password?: strin
   return toBase64Url(blob);
 }
 
+const VALID_SCOPES: ShareScope[] = ['note', 'task', 'event', 'whiteboard', 'ioc', 'investigation', 'chat'];
+
+function validateSharePayload(obj: unknown): SharePayload {
+  if (!obj || typeof obj !== 'object') throw new Error('Invalid share payload: not an object');
+  const p = obj as Record<string, unknown>;
+  if (p.v !== 1) throw new Error('Invalid share payload: unsupported version');
+  if (typeof p.s !== 'string' || !VALID_SCOPES.includes(p.s as ShareScope)) {
+    throw new Error('Invalid share payload: invalid scope');
+  }
+  if (typeof p.t !== 'number' || !Number.isFinite(p.t)) {
+    throw new Error('Invalid share payload: invalid timestamp');
+  }
+  if (!p.d || typeof p.d !== 'object') {
+    throw new Error('Invalid share payload: missing data');
+  }
+  return p as unknown as SharePayload;
+}
+
 export async function decodeSharePayload(encoded: string, password?: string): Promise<SharePayload> {
   const blob = fromBase64Url(encoded);
   const flags = blob[0];
@@ -133,7 +151,7 @@ export async function decodeSharePayload(encoded: string, password?: string): Pr
 
   const dec = new TextDecoder();
   const json = dec.decode(pako.inflate(body));
-  return JSON.parse(json) as SharePayload;
+  return validateSharePayload(JSON.parse(json));
 }
 
 export function isEncryptedShare(encoded: string): boolean {

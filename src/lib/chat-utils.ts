@@ -101,6 +101,6 @@ export function generateChatTitle(
         systemPrompt: 'Generate a concise 3-6 word title for this conversation. Reply with ONLY the title, no quotes or punctuation.',
         endpoint,
       },
-    }, '*');
+    }, window.location.origin);
   });
 }

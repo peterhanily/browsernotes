@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger as honoLogger } from 'hono/logger';
 import { bodyLimit } from 'hono/body-limit';
+import { compress } from 'hono/compress';
 import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 import { sql as drizzleSql, lt } from 'drizzle-orm';
@@ -75,6 +76,7 @@ app.use('*', cors({
   maxAge: 86400,
 }));
 app.use('*', redactingLogger);
+app.use('*', compress());
 
 // Body limits — file/backup routes get larger limits, other API routes get 1 MB
 app.use('/api/files/*', bodyLimit({ maxSize: 50 * 1024 * 1024 }));
@@ -207,6 +209,7 @@ adminApp.use('*', cors({
   credentials: true,
 }));
 adminApp.use('*', redactingLogger);
+adminApp.use('*', compress());
 adminApp.use('/admin/api/*', bodyLimit({ maxSize: 1024 * 1024 }));
 adminApp.use('/admin/api/login', rateLimiter({ windowMs: 60_000, max: 5 }));
 adminApp.route('/admin', adminRoutes);

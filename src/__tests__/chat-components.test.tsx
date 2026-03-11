@@ -7,6 +7,7 @@ import type { ChatThread, Settings, ToolCallRecord } from '../types';
 
 vi.mock('../lib/markdown', () => ({
   renderMarkdown: vi.fn((text: string) => `<p>${text}</p>`),
+  sanitizeHtml: vi.fn((html: string) => html),
 }));
 
 vi.mock('../hooks/useLLM', () => ({

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronRight, FileText, ListChecks, Shield, Clock } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown, sanitizeHtml } from '../../lib/markdown';
 import type { ToolCallRecord } from '../../types';
 
 interface ChatMessageProps {
@@ -105,7 +105,6 @@ function processEntityLinks(html: string, onEntityClick?: (type: string, id: str
     const parts = rest.split(':');
     let id: string, label: string;
     const iconMap: Record<string, string> = { note: '📄', task: '☑️', ioc: '🛡️', event: '🕐' };
-    const colorMap: Record<string, string> = { note: '#3b82f6', task: '#22c55e', ioc: '#f59e0b', event: '#8b5cf6' };
     if (type === 'ioc') {
       id = `${parts[0]}:${parts.slice(1).join(':')}`;
       label = parts.slice(1).join(':');
@@ -113,8 +112,7 @@ function processEntityLinks(html: string, onEntityClick?: (type: string, id: str
       id = parts[0];
       label = parts.slice(1).join(':') || id;
     }
-    const color = colorMap[type] || '#6b7280';
-    return `<span class="tc-entity-link" data-entity-type="${escapeHtml(type)}" data-entity-id="${escapeHtml(id)}" style="color:${color};cursor:pointer;border-bottom:1px dashed ${color};font-weight:500">${iconMap[type] || ''} ${escapeHtml(label)}</span>`;
+    return `<span class="tc-entity-link tc-entity-${escapeHtml(type)}" data-entity-type="${escapeHtml(type)}" data-entity-id="${escapeHtml(id)}">${iconMap[type] || ''} ${escapeHtml(label)}</span>`;
   });
 }
 
@@ -259,7 +257,7 @@ export function ChatMessageBubble({ role, content, isStreaming, toolCalls, onEnt
             {displayContent && (
               <div
                 className="markdown-preview text-sm"
-                dangerouslySetInnerHTML={{ __html: processEntityLinks(renderMarkdown(displayContent), onEntityClick) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(processEntityLinks(renderMarkdown(displayContent), onEntityClick)) }}
                 onClick={(e) => {
                   const target = (e.target as HTMLElement).closest('.tc-entity-link') as HTMLElement;
                   if (target && onEntityClick) {

@@ -876,7 +876,7 @@ function AllIOCsTab({
         if (v.includes(',') || v.includes('"') || v.includes('\n')) return '"' + v.replace(/"/g, '""') + '"';
         return v;
       };
-      const headers = ['type', 'value', 'confidence', 'source', 'source_type', 'status', 'attribution', 'updated_at'];
+      const headers = ['type', 'value', 'confidence', 'source', 'source_type', 'status', 'attribution', 'analyst_notes', 'updated_at'];
       const lines = [headers.join(',')];
       for (const r of data) {
         lines.push([
@@ -887,6 +887,7 @@ function AllIOCsTab({
           escape(r.sourceType),
           escape(r.iocStatus || ''),
           escape(r.attribution || ''),
+          escape(r.standaloneIOC?.analystNotes || ''),
           escape(new Date(r.updatedAt).toISOString()),
         ].join(','));
       }
@@ -905,6 +906,7 @@ function AllIOCsTab({
           sourceType: r.sourceType,
           status: r.iocStatus || null,
           attribution: r.attribution || null,
+          analystNotes: r.standaloneIOC?.analystNotes || null,
           updatedAt: new Date(r.updatedAt).toISOString(),
         })),
       }, null, 2);
@@ -1455,6 +1457,7 @@ function AllIOCsTab({
                   {isColVisible('attribution') && <SortHeader field="attribution" label="Attribution" className="text-left text-gray-500 font-medium py-2 px-2" />}
                   {isColVisible('clsLevel') && <th className="text-left text-gray-500 font-medium py-2 px-2" title="Classification">CLS</th>}
                   {isColVisible('updatedAt') && <th className="text-left text-gray-500 font-medium py-2 px-2">Updated</th>}
+                  {isColVisible('analystNotes') && <th className="text-left text-gray-500 font-medium py-2 px-2">Notes</th>}
                   {isColVisible('tags') && <th className="text-left text-gray-500 font-medium py-2 px-2">Tags</th>}
                   {isColVisible('firstSeen') && <th className="text-left text-gray-500 font-medium py-2 px-2">First Seen</th>}
                   <th className="text-right text-gray-500 font-medium py-2 pl-2">Actions</th>
@@ -1531,6 +1534,11 @@ function AllIOCsTab({
                     )}
                     {isColVisible('updatedAt') && (
                       <td className="py-2 px-2 text-gray-500">{formatDate(row.updatedAt)}</td>
+                    )}
+                    {isColVisible('analystNotes') && (
+                      <td className="py-2 px-2 text-gray-400 max-w-[180px] truncate" title={si?.analystNotes || ''}>
+                        {si?.analystNotes || <span className="text-gray-600">--</span>}
+                      </td>
                     )}
                     {isColVisible('tags') && (
                       <td className="py-2 px-2">

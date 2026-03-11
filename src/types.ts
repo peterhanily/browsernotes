@@ -305,6 +305,7 @@ export const ALL_IOC_TABLE_COLUMNS: { key: string; label: string; alwaysVisible?
   { key: 'attribution', label: 'Attribution' },
   { key: 'clsLevel', label: 'CLS' },
   { key: 'updatedAt', label: 'Updated' },
+  { key: 'analystNotes', label: 'Notes', hiddenByDefault: true },
   { key: 'tags', label: 'Tags', hiddenByDefault: true },
   { key: 'firstSeen', label: 'First Seen', hiddenByDefault: true },
   { key: 'assignee', label: 'Assignee', hiddenByDefault: true, teamOnly: true },

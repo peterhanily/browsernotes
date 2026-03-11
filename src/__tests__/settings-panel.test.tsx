@@ -148,7 +148,7 @@ describe('SettingsPanel', () => {
 
   it('renders Threat Intel tab components', () => {
     render(<SettingsPanel {...defaultProps} />);
-    clickTab('Threat Intel');
+    clickTab('Intel');
     expect(screen.getByTestId('threat-intel-config')).toBeInTheDocument();
   });
 

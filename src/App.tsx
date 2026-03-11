@@ -743,6 +743,18 @@ function AppInner() {
     () => screenshareMaxLevel ? timeline.events.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : timeline.events,
     [timeline.events, screenshareMaxLevel, effectiveClsLevels]
   );
+  const screensafeWhiteboards = useMemo(
+    () => screenshareMaxLevel ? whiteboards.filter((w) => !isAboveClsThreshold(w.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : whiteboards,
+    [whiteboards, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const screensafeStandaloneIOCs = useMemo(
+    () => screenshareMaxLevel ? standaloneIOCsHook.iocs.filter((i) => !isAboveClsThreshold(i.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : standaloneIOCsHook.iocs,
+    [standaloneIOCsHook.iocs, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const screensafeChatThreads = useMemo(
+    () => screenshareMaxLevel ? chatsHook.threads.filter((t) => !isAboveClsThreshold(t.clsLevel ?? undefined, screenshareMaxLevel, effectiveClsLevels)) : chatsHook.threads,
+    [chatsHook.threads, screenshareMaxLevel, effectiveClsLevels]
+  );
 
   // Folder-filtered + screenshare-safe (for NoteList, TaskList, TimelineView)
   // Use resolved arrays (which pick remote vs local) instead of raw filtered arrays
@@ -757,6 +769,18 @@ function AppInner() {
   const ssFilteredTimelineEvents = useMemo(
     () => screenshareMaxLevel ? resolvedTimelineEvents.filter((e) => !isAboveClsThreshold(e.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedTimelineEvents,
     [resolvedTimelineEvents, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredWhiteboards = useMemo(
+    () => screenshareMaxLevel ? resolvedWhiteboards.filter((w) => !isAboveClsThreshold(w.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedWhiteboards,
+    [resolvedWhiteboards, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredStandaloneIOCs = useMemo(
+    () => screenshareMaxLevel ? resolvedStandaloneIOCs.filter((i) => !isAboveClsThreshold(i.clsLevel, screenshareMaxLevel, effectiveClsLevels)) : resolvedStandaloneIOCs,
+    [resolvedStandaloneIOCs, screenshareMaxLevel, effectiveClsLevels]
+  );
+  const ssFilteredChatThreads = useMemo(
+    () => screenshareMaxLevel ? resolvedChatThreads.filter((t) => !isAboveClsThreshold(t.clsLevel ?? undefined, screenshareMaxLevel, effectiveClsLevels)) : resolvedChatThreads,
+    [resolvedChatThreads, screenshareMaxLevel, effectiveClsLevels]
   );
 
   // Investigation-scoped arrays (for graph, IOC stats, search) — derive from screensafe,
@@ -774,12 +798,12 @@ function AppInner() {
     [investigationMode, remoteData.events, screensafeTimelineEvents, selectedFolderId]
   );
   const investigationWhiteboards = useMemo(
-    () => investigationMode === 'remote' ? remoteData.whiteboards : selectedFolderId ? whiteboards.filter((w) => w.folderId === selectedFolderId) : whiteboards,
-    [investigationMode, remoteData.whiteboards, whiteboards, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.whiteboards : selectedFolderId ? screensafeWhiteboards.filter((w) => w.folderId === selectedFolderId) : screensafeWhiteboards,
+    [investigationMode, remoteData.whiteboards, screensafeWhiteboards, selectedFolderId]
   );
   const investigationStandaloneIOCs = useMemo(
-    () => investigationMode === 'remote' ? remoteData.iocs : selectedFolderId ? standaloneIOCsHook.iocs.filter((i) => i.folderId === selectedFolderId) : standaloneIOCsHook.iocs,
-    [investigationMode, remoteData.iocs, standaloneIOCsHook.iocs, selectedFolderId]
+    () => investigationMode === 'remote' ? remoteData.iocs : selectedFolderId ? screensafeStandaloneIOCs.filter((i) => i.folderId === selectedFolderId) : screensafeStandaloneIOCs,
+    [investigationMode, remoteData.iocs, screensafeStandaloneIOCs, selectedFolderId]
   );
 
   const investigationScopedCounts = useMemo(() => {
@@ -1347,11 +1371,11 @@ function AppInner() {
         <Suspense fallback={<div className="flex-1 flex items-center justify-center text-gray-500">Loading…</div>}>
         <ExecDashboard
           folders={folders}
-          allNotes={notes.notes}
-          allTasks={tasks.tasks}
-          allEvents={timeline.events}
-          allWhiteboards={whiteboards}
-          allIOCs={standaloneIOCsHook.iocs}
+          allNotes={screensafeNotes}
+          allTasks={screensafeTasks}
+          allEvents={screensafeTimelineEvents}
+          allWhiteboards={screensafeWhiteboards}
+          allIOCs={screensafeStandaloneIOCs}
           allTimelines={timelines}
           allTags={tags}
           activityEntries={activityLog.entries}
@@ -1495,11 +1519,11 @@ function AppInner() {
         ) : showTrash || showArchive ? (
           <TrashArchiveView
             mode={showTrash ? 'trash' : 'archive'}
-            notes={notes.notes}
-            tasks={tasks.tasks}
-            timelineEvents={timeline.events}
-            whiteboards={whiteboards}
-            standaloneIOCs={standaloneIOCsHook.iocs}
+            notes={screensafeNotes}
+            tasks={screensafeTasks}
+            timelineEvents={screensafeTimelineEvents}
+            whiteboards={screensafeWhiteboards}
+            standaloneIOCs={screensafeStandaloneIOCs}
             folders={folders}
             onRestoreNote={loggedRestoreNote}
             onDeleteNotePermanently={(id) => { notes.deleteNote(id); activityLog.log('note', 'delete', 'Permanently deleted note', id); }}
@@ -1529,10 +1553,10 @@ function AppInner() {
             onUpdateLinks={(links) => updateSettings({ quickLinks: links })}
             onViewChange={navigateTo}
             folders={folders}
-            allNotes={notes.notes}
-            allTasks={tasks.tasks}
-            allEvents={timeline.events}
-            allIOCs={standaloneIOCsHook.iocs}
+            allNotes={screensafeNotes}
+            allTasks={screensafeTasks}
+            allEvents={screensafeTimelineEvents}
+            allIOCs={screensafeStandaloneIOCs}
             dashboardKPIs={settings.dashboardKPIs as import('./types').KPIMetricId[] | undefined}
             onUpdateKPIs={(kpis) => updateSettings({ dashboardKPIs: kpis })}
           />
@@ -1541,7 +1565,7 @@ function AppInner() {
             notes={screensafeNotes}
             tasks={screensafeTasks}
             timelineEvents={screensafeTimelineEvents}
-            standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
+            standaloneIOCs={screensafeStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
             settings={settings}
             scopedNotes={investigationNotes}
             scopedTasks={investigationTasks}
@@ -1551,8 +1575,8 @@ function AppInner() {
             selectedFolderName={selectedFolder?.name}
             folders={folders}
             allTags={tags}
-            allStandaloneIOCs={standaloneIOCsHook.iocs}
-            filteredStandaloneIOCs={resolvedStandaloneIOCs}
+            allStandaloneIOCs={screensafeStandaloneIOCs}
+            filteredStandaloneIOCs={ssFilteredStandaloneIOCs}
             onCreateIOC={loggedCreateIOC}
             onUpdateIOC={standaloneIOCsHook.updateIOC}
             onDeleteIOC={loggedDeleteIOC}
@@ -1616,7 +1640,7 @@ function AppInner() {
           />
         ) : activeView === 'whiteboard' ? (
           <WhiteboardView
-            whiteboards={resolvedWhiteboards}
+            whiteboards={ssFilteredWhiteboards}
             folders={folders}
             allTags={tags}
             onCreateWhiteboard={(name?: string) => loggedCreateWhiteboard(name, selectedFolderId)}
@@ -1632,7 +1656,7 @@ function AppInner() {
           />
         ) : activeView === 'chat' ? (
           <ChatView
-            threads={resolvedChatThreads}
+            threads={ssFilteredChatThreads}
             selectedThreadId={selectedChatThreadId}
             onSelectThread={setSelectedChatThreadId}
             onCreateThread={loggedCreateChatThread}
@@ -1674,12 +1698,12 @@ function AppInner() {
               loggedDeleteFolder(id);
               if (selectedFolderId === id) { setSelectedFolderId(undefined); setSelectedNoteId(undefined); }
             }}
-            allNotes={notes.notes}
-            allTasks={tasks.tasks}
-            allEvents={timeline.events}
-            allWhiteboards={whiteboards}
-            allIOCs={standaloneIOCsHook.iocs}
-            allChats={chatsHook.threads}
+            allNotes={screensafeNotes}
+            allTasks={screensafeTasks}
+            allEvents={screensafeTimelineEvents}
+            allWhiteboards={screensafeWhiteboards}
+            allIOCs={screensafeStandaloneIOCs}
+            allChats={screensafeChatThreads}
           />
         ) : activeView === 'caddyshack' ? (
           <CaddyShackView
@@ -1940,11 +1964,11 @@ function AppInner() {
         onNavigateToNote={handleSearchNavigateToNote}
         onNavigateToTask={handleSearchNavigateToTask}
         timelineEvents={screensafeTimelineEvents}
-        whiteboards={whiteboards}
+        whiteboards={screensafeWhiteboards}
         onNavigateToTimeline={handleSearchNavigateToTimeline}
         onNavigateToWhiteboard={handleSearchNavigateToWhiteboard}
-        standaloneIOCs={standaloneIOCsHook.iocs.filter((i) => !i.trashed && !i.archived)}
-        chatThreads={chatsHook.threads.filter((c) => !c.trashed && !c.archived)}
+        standaloneIOCs={screensafeStandaloneIOCs.filter((i) => !i.trashed && !i.archived)}
+        chatThreads={screensafeChatThreads.filter((c) => !c.trashed && !c.archived)}
         onNavigateToIOC={handleSearchNavigateToIOC}
         onNavigateToChat={handleSearchNavigateToChat}
         selectedFolderId={selectedFolderId}

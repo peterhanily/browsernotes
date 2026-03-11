@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Globe, FolderOpen, Server, Settings, UserPlus, MessageSquare, Activity } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useScreenshare } from '../../hooks/ScreenshareContext';
+import { isAboveClsThreshold } from '../../lib/classification';
 import { fetchFeed, fetchServerInfo, addReaction, removeReaction, deletePost, editPost, fetchTeamActivity } from '../../lib/server-api';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
@@ -133,8 +135,13 @@ export function CaddyShackView({ folderId, folderName, settings }: CaddyShackVie
     setShowOnboarding(false);
   }, []);
 
-  const pinnedPosts = useMemo(() => posts.filter(p => p.pinned), [posts]);
-  const unpinnedPosts = useMemo(() => posts.filter(p => !p.pinned), [posts]);
+  const { maxLevel: ssMaxLevel, effectiveLevels: ssLevels } = useScreenshare();
+  const visiblePosts = useMemo(
+    () => ssMaxLevel ? posts.filter(p => !isAboveClsThreshold(p.clsLevel ?? undefined, ssMaxLevel, ssLevels)) : posts,
+    [posts, ssMaxLevel, ssLevels]
+  );
+  const pinnedPosts = useMemo(() => visiblePosts.filter(p => p.pinned), [visiblePosts]);
+  const unpinnedPosts = useMemo(() => visiblePosts.filter(p => !p.pinned), [visiblePosts]);
   const allOrdered = useMemo(() => [...pinnedPosts, ...unpinnedPosts], [pinnedPosts, unpinnedPosts]);
 
   // Build a merged timeline for "All" tab: interleave posts and activity by timestamp

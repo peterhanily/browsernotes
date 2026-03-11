@@ -174,6 +174,22 @@ function AppInner() {
     onSyncPullComplete: refreshRemote,
   }, handleFolderInvite);
 
+  /** Reload every data hook — use after bulk operations that touch multiple tables. */
+  const reloadAll = useCallback(() => {
+    reloadFolders();
+    notes.reload();
+    tasks.reload();
+    timeline.reload();
+    reloadTimelines();
+    reloadWhiteboards();
+    standaloneIOCsHook.reload();
+    chatsHook.reload();
+    reloadTags();
+    noteTemplatesHook.reload();
+    playbooksHook.reload();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
+
   const syncedFolderIds = useMemo(() => {
     const localIds = new Set(folders.map(f => f.id));
     return new Set(remoteInvestigations.filter(r => localIds.has(r.folderId)).map(r => r.folderId));
@@ -416,13 +432,7 @@ function AppInner() {
     try {
       const { syncEngine } = await import('./lib/sync-engine');
       await syncEngine.pullFolder(folderId);
-      reloadFolders();
-      notes.reload();
-      tasks.reload();
-      timeline.reload();
-      reloadWhiteboards();
-      standaloneIOCsHook.reload();
-      chatsHook.reload();
+      reloadAll();
       refreshRemote();
       setInvestigationMode('synced');
     } catch (err) {
@@ -430,7 +440,7 @@ function AppInner() {
     } finally {
       setSyncingFolderId(null);
     }
-  }, [reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook, refreshRemote]);
+  }, [reloadAll, refreshRemote]);
 
   const handleUnsyncConfirmed = useCallback(async (folderId: string) => {
     setSyncingFolderId(folderId);
@@ -447,19 +457,13 @@ function AppInner() {
       if (selectedFolderId === folderId) {
         setSelectedFolderId(undefined);
       }
-      reloadFolders();
-      notes.reload();
-      tasks.reload();
-      timeline.reload();
-      reloadWhiteboards();
-      standaloneIOCsHook.reload();
-      chatsHook.reload();
+      reloadAll();
     } catch (err) {
       console.error('Failed to unsync investigation:', err);
     } finally {
       setSyncingFolderId(null);
     }
-  }, [selectedFolderId, setSelectedFolderId, reloadFolders, notes, tasks, timeline, reloadWhiteboards, standaloneIOCsHook, chatsHook]);
+  }, [selectedFolderId, setSelectedFolderId, reloadAll]);
 
   const handleUnsync = useCallback((folderId: string) => {
     setConfirmUnsyncId(folderId);
@@ -1008,15 +1012,7 @@ function AppInner() {
         await db.timelines.bulkPut(bundle.timelines);
         await db.tags.bulkPut(bundle.tags);
       });
-      reloadFolders();
-      notes.reload();
-      tasks.reload();
-      timeline.reload();
-      reloadTimelines();
-      reloadWhiteboards();
-      standaloneIOCsHook.reload();
-      chatsHook.reload();
-      reloadTags();
+      reloadAll();
       addToast('success', `Saved investigation "${bundle.folder.name}" with all entities`);
     } else if (payload.s === 'note') {
       await db.notes.put(payload.d as Note);
@@ -1035,7 +1031,7 @@ function AppInner() {
       chatsHook.reload();
       addToast('success', 'Chat saved to ThreatCaddy');
     }
-  }, [notes, tasks, timeline, chatsHook, reloadFolders, reloadTimelines, reloadWhiteboards, standaloneIOCsHook, reloadTags, addToast]);
+  }, [reloadAll, notes, tasks, timeline, chatsHook, addToast]);
 
   const [showDataImport, setShowDataImport] = useState(false);
 
@@ -1073,19 +1069,8 @@ function AppInner() {
   }, [loggedCreateNote, navigateTo, selectedFolderId, folders]);
 
   const handleImportComplete = useCallback(() => {
-    notes.reload();
-    tasks.reload();
-    timeline.reload();
-    reloadTimelines();
-    reloadWhiteboards();
-    standaloneIOCsHook.reload();
-    chatsHook.reload();
-    reloadFolders();
-    reloadTags();
-    noteTemplatesHook.reload();
-    playbooksHook.reload();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadFolders, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
+    reloadAll();
+  }, [reloadAll]);
 
   const handleToggleEditorMode = useCallback(() => {
     setEditorMode((prev) => {

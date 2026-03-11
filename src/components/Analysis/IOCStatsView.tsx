@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, forwardRef } from 'react';
-import { ChevronDown, ChevronRight, Search, BarChart3, List, Plus, ListPlus, Clipboard, X, ChevronUp, Pencil, Trash2, Archive, RotateCcw, ExternalLink, Columns, GitMerge, Tag as TagIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, BarChart3, List, Plus, ListPlus, Clipboard, X, ChevronUp, Pencil, Trash2, Archive, RotateCcw, ExternalLink, Columns, GitMerge, Tag as TagIcon, Download } from 'lucide-react';
 import type { Note, Task, TimelineEvent, StandaloneIOC, Settings, IOCEntry, IOCType, ConfidenceLevel, Folder, Tag, InvestigationMember } from '../../types';
 import { IOC_TYPE_LABELS, CONFIDENCE_LEVELS, ALL_IOC_TABLE_COLUMNS, DEFAULT_IOC_TABLE_COLUMNS, IOC_STATUS_VALUES, IOC_STATUS_LABELS, IOC_STATUS_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -774,6 +774,9 @@ function AllIOCsTab({
   const [showBulkTagInput, setShowBulkTagInput] = useState(false);
   const [bulkTagText, setBulkTagText] = useState('');
 
+  // Export
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
   // Column customization state
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const visibleColumns = useMemo(() => new Set(iocTableColumns ?? DEFAULT_IOC_TABLE_COLUMNS), [iocTableColumns]);
@@ -856,6 +859,69 @@ function AllIOCsTab({
     } else {
       setSelectedIds(new Set(filteredSortedRows.map(r => r.id)));
     }
+  };
+
+  const exportIOCs = (format: 'csv' | 'json' | 'txt') => {
+    const data = filteredSortedRows;
+    let content: string;
+    let mimeType: string;
+    let ext: string;
+
+    if (format === 'txt') {
+      content = data.map(r => r.value).join('\n');
+      mimeType = 'text/plain';
+      ext = 'txt';
+    } else if (format === 'csv') {
+      const escape = (v: string) => {
+        if (v.includes(',') || v.includes('"') || v.includes('\n')) return '"' + v.replace(/"/g, '""') + '"';
+        return v;
+      };
+      const headers = ['type', 'value', 'confidence', 'source', 'source_type', 'status', 'attribution', 'updated_at'];
+      const lines = [headers.join(',')];
+      for (const r of data) {
+        lines.push([
+          escape(r.type),
+          escape(r.value),
+          escape(r.confidence),
+          escape(r.source),
+          escape(r.sourceType),
+          escape(r.iocStatus || ''),
+          escape(r.attribution || ''),
+          escape(new Date(r.updatedAt).toISOString()),
+        ].join(','));
+      }
+      content = lines.join('\n');
+      mimeType = 'text/csv';
+      ext = 'csv';
+    } else {
+      content = JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        count: data.length,
+        iocs: data.map(r => ({
+          type: r.type,
+          value: r.value,
+          confidence: r.confidence,
+          source: r.source,
+          sourceType: r.sourceType,
+          status: r.iocStatus || null,
+          attribution: r.attribution || null,
+          updatedAt: new Date(r.updatedAt).toISOString(),
+        })),
+      }, null, 2);
+      mimeType = 'application/json';
+      ext = 'json';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `threatcaddy-iocs-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addToast('success', `Exported ${data.length} IOC${data.length !== 1 ? 's' : ''} as ${ext.toUpperCase()}`);
   };
 
   const selectedStandaloneCount = useMemo(() => {
@@ -994,22 +1060,58 @@ function AllIOCsTab({
           )}
 
           {filteredSortedRows.length > 0 && (
-            <button
-              onClick={async () => {
-                const text = filteredSortedRows.map(r => r.value).join('\n');
-                try {
-                  await navigator.clipboard.writeText(text);
-                  addToast('success', `Copied ${filteredSortedRows.length} IOC${filteredSortedRows.length !== 1 ? 's' : ''} to clipboard`);
-                } catch {
-                  addToast('error', 'Failed to copy to clipboard');
-                }
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs font-medium transition-colors"
-              title="Copy visible IOC values to clipboard"
-            >
-              <Clipboard size={14} />
-              Copy
-            </button>
+            <>
+              <button
+                onClick={async () => {
+                  const text = filteredSortedRows.map(r => r.value).join('\n');
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    addToast('success', `Copied ${filteredSortedRows.length} IOC${filteredSortedRows.length !== 1 ? 's' : ''} to clipboard`);
+                  } catch {
+                    addToast('error', 'Failed to copy to clipboard');
+                  }
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs font-medium transition-colors"
+                title="Copy visible IOC values to clipboard"
+              >
+                <Clipboard size={14} />
+                Copy
+              </button>
+
+              {/* Export dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 text-xs font-medium transition-colors"
+                  title="Export IOCs"
+                >
+                  <Download size={14} />
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 w-40">
+                    <button
+                      onClick={() => { exportIOCs('csv'); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
+                    >
+                      CSV (.csv)
+                    </button>
+                    <button
+                      onClick={() => { exportIOCs('json'); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
+                    >
+                      JSON (.json)
+                    </button>
+                    <button
+                      onClick={() => { exportIOCs('txt'); setShowExportMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
+                    >
+                      Plain text (.txt)
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
           {onCreateIOC && (
             <>

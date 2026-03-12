@@ -220,6 +220,7 @@ export function TaskListView({
                       onTrash={onTrashTask}
                       onRestore={onRestoreTask}
                       onToggleArchive={onToggleArchiveTask}
+                      onUpdateTask={onUpdateTask}
                       members={members}
                     />
                   </div>

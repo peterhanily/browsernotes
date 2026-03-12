@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, MessageSquare, Archive, RotateCcw, Search, CheckSquare, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Circle, CheckCircle2, Calendar, Trash2, GripVertical, MessageSquare, Archive, RotateCcw, Search, CheckSquare, Square, AlertTriangle, ChevronDown } from 'lucide-react';
 import type { Task, Priority, InvestigationMember } from '../../types';
 import { PRIORITY_COLORS } from '../../types';
 import { ConfirmDialog } from '../Common/ConfirmDialog';
@@ -15,6 +15,7 @@ interface TaskItemProps {
   onTrash?: (id: string) => void;
   onRestore?: (id: string) => void;
   onToggleArchive?: (id: string) => void;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   active?: boolean;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
@@ -28,19 +29,42 @@ const priorityLabels: Record<Priority, string> = {
   high: 'High',
 };
 
-export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, onTrash, onRestore, onToggleArchive, active, draggable, onDragStart, members }: TaskItemProps) {
+export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, onSelect, onDelete, onTrash, onRestore, onToggleArchive, onUpdateTask, active, draggable, onDragStart, members }: TaskItemProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const checklistRef = useRef<HTMLDivElement>(null);
   const overdue = isOverdue(task.dueDate) && !task.completed;
   const assignee = task.assigneeId && members ? members.find((m) => m.userId === task.assigneeId) : undefined;
+  const hasChecklist = (task.checklist?.length ?? 0) > 0;
+
+  // Close checklist dropdown on outside click
+  useEffect(() => {
+    if (!checklistOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (checklistRef.current && !checklistRef.current.contains(e.target as Node)) {
+        setChecklistOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [checklistOpen]);
+
+  const toggleChecklistItem = (itemId: string) => {
+    if (!task.checklist || !onUpdateTask) return;
+    const updated = task.checklist.map(c => c.id === itemId ? { ...c, done: !c.done } : c);
+    onUpdateTask(task.id, { checklist: updated });
+  };
 
   return (
+    <div className="relative" ref={checklistRef}>
     <div
       className={cn(
         'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors group',
         active
           ? 'bg-accent/10 border-accent/30'
           : 'bg-bg-raised border-border-subtle hover:bg-bg-hover hover:border-border-medium',
-        overdue && 'border-red-500/30'
+        overdue && 'border-red-500/30',
+        checklistOpen && 'rounded-b-none'
       )}
       draggable={draggable}
       onDragStart={onDragStart}
@@ -67,11 +91,21 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
       </button>
 
       <div className="flex items-center gap-2 shrink-0">
-        {(task.checklist?.length ?? 0) > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] text-gray-400 bg-gray-700/50 px-1.5 py-0.5 rounded">
+        {hasChecklist && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setChecklistOpen(!checklistOpen); }}
+            className={cn(
+              'flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded transition-colors',
+              checklistOpen
+                ? 'text-accent bg-accent/15'
+                : 'text-gray-400 bg-gray-700/50 hover:bg-gray-700 hover:text-gray-300'
+            )}
+            title="Toggle checklist"
+          >
             <CheckSquare size={10} />
             {task.checklist!.filter(c => c.done).length}/{task.checklist!.length}
-          </span>
+            <ChevronDown size={8} className={cn('ml-0.5 transition-transform', checklistOpen && 'rotate-180')} />
+          </button>
         )}
         {(task.iocAnalysis?.iocs.filter((i) => !i.dismissed).length ?? 0) > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
@@ -169,6 +203,28 @@ export const TaskItem = React.memo(function TaskItem({ task, onToggleComplete, o
         confirmLabel="Delete Task"
         danger
       />
+    </div>
+
+    {/* Checklist dropdown */}
+    {checklistOpen && hasChecklist && (
+      <div className="border border-t-0 border-border-subtle bg-bg-raised rounded-b-lg px-3 py-1.5 space-y-0.5">
+        {task.checklist!.map((item) => (
+          <button
+            key={item.id}
+            onClick={(e) => { e.stopPropagation(); toggleChecklistItem(item.id); }}
+            className="flex items-center gap-2 w-full text-left py-0.5 group/cl hover:bg-bg-hover rounded px-1 -mx-1 transition-colors"
+          >
+            {item.done
+              ? <CheckSquare size={13} className="text-green-400 shrink-0" />
+              : <Square size={13} className="text-gray-500 group-hover/cl:text-gray-300 shrink-0" />
+            }
+            <span className={cn('text-xs truncate', item.done ? 'text-gray-500 line-through' : 'text-gray-300')}>
+              {item.text}
+            </span>
+          </button>
+        ))}
+      </div>
+    )}
     </div>
   );
 });

@@ -880,11 +880,27 @@ async function streamMistral(send, payload, signal) {
 
 async function streamLocal(send, payload, signal) {
   const base = (payload.endpoint || 'http://localhost:11434/v1').replace(/\/+$/, '');
+  const endpoint = `${base}/chat/completions`;
+
+  // localhost/127.0.0.1 are in required host_permissions and don't need an extra check.
+  // Non-localhost local endpoints need the broad URL-fetching permission (*://*/*).
+  const parsed = new URL(endpoint);
+  const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  if (!isLocalhost) {
+    const origin = parsed.origin + '/*';
+    const has = await chrome.permissions.contains({ origins: [origin] });
+    if (!has) {
+      throw new Error(
+        'Host permission required for ' + parsed.hostname + '. Open the ThreatCaddy extension popup and enable "Allow URL fetching" under Permissions.'
+      );
+    }
+  }
+
   const headers = {};
   if (payload.apiKey) headers['Authorization'] = `Bearer ${payload.apiKey}`;
   await streamOpenAICompatible(
     send, payload, signal,
-    `${base}/chat/completions`,
+    endpoint,
     headers,
     'Local LLM'
   );

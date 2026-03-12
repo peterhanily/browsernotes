@@ -121,9 +121,11 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   }
 });
 
-// Open web app
-document.getElementById('open-app-btn').addEventListener('click', () => {
-  chrome.tabs.create({ url: 'https://threatcaddy.com' });
+// Open web app (uses configured target URL, not hardcoded)
+document.getElementById('open-app-btn').addEventListener('click', async () => {
+  const { settings = {} } = await chrome.storage.local.get(['settings']);
+  const targetUrl = settings.targetUrl || 'https://threatcaddy.com';
+  chrome.tabs.create({ url: targetUrl });
   window.close();
 });
 

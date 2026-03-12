@@ -35,9 +35,12 @@ export const clipBuffer = {
     flushed = true;
     // Stop intercepting — App's own listener will handle future messages
     window.removeEventListener('message', handler);
-    // Re-post buffered clips so the existing App.tsx handler picks them up
+    // Re-post buffered clips so the existing App.tsx handler picks them up.
+    // On file:// pages, origin is "null" — postMessage(data, "null") silently
+    // drops the message. Use '*' for file:// so standalone builds work.
+    const origin = window.location.protocol === 'file:' ? '*' : window.location.origin;
     for (const { data } of buffer) {
-      window.postMessage(data, window.location.origin);
+      window.postMessage(data, origin);
     }
     buffer.length = 0;
   },

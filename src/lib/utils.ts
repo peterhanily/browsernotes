@@ -62,3 +62,12 @@ export function isSafeUrl(url?: string): boolean {
     return false;
   }
 }
+
+/**
+ * Returns the correct targetOrigin for postMessage.
+ * On file:// pages, window.location.origin is the string "null" and
+ * postMessage(data, "null") silently drops the message. Use '*' instead.
+ */
+export function postMessageOrigin(): string {
+  return window.location.protocol === 'file:' ? '*' : window.location.origin;
+}

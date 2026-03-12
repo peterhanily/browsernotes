@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { LLMProvider, ContentBlock, ToolUseBlock, ToolCallRecord } from '../types';
 import { nanoid } from 'nanoid';
+import { postMessageOrigin } from '../lib/utils';
 
 interface ToolDef {
   name: string;
@@ -180,7 +181,7 @@ export function useLLM() {
           tools: state.opts.tools,
           endpoint: state.opts.endpoint,
         },
-      }, window.location.origin);
+      }, postMessageOrigin());
     } catch (err) {
       console.error('useLLM: handleDone error', err);
       // Ensure we always clean up on error so the UI doesn't freeze
@@ -251,7 +252,7 @@ export function useLLM() {
     };
 
     window.addEventListener('message', handler);
-    window.postMessage({ type: 'TC_EXTENSION_PING' }, window.location.origin);
+    window.postMessage({ type: 'TC_EXTENSION_PING' }, postMessageOrigin());
     return () => window.removeEventListener('message', handler);
   }, []);
 
@@ -291,7 +292,7 @@ export function useLLM() {
         tools: opts.tools,
         endpoint: opts.endpoint,
       },
-    }, window.location.origin);
+    }, postMessageOrigin());
 
     return requestId;
   }, []);
@@ -299,7 +300,7 @@ export function useLLM() {
   const abort = useCallback(() => {
     const rid = requestIdRef.current;
     if (rid) {
-      window.postMessage({ type: 'TC_LLM_ABORT', requestId: rid }, window.location.origin);
+      window.postMessage({ type: 'TC_LLM_ABORT', requestId: rid }, postMessageOrigin());
       if (agentStateRef.current) {
         agentStateRef.current.aborted = true;
       }

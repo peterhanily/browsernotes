@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { resolveVariables, evaluateCondition, resolveDeep } from './integration-expression';
+import { postMessageOrigin } from './utils';
 import type {
   IntegrationTemplate,
   InstalledIntegration,
@@ -208,7 +209,7 @@ function bridgeProxyFetch(
       method,
       headers,
       body,
-    }, window.location.origin);
+    }, postMessageOrigin());
   });
 }
 

@@ -5,6 +5,21 @@
 var TC_PROTOCOL_VERSION = 1;
 var TC_CAPABILITIES = ['llm_streaming', 'fetch_url', 'clip_import', 'proxy_fetch'];
 
+// On file:// pages, window.location.origin is the string "null".
+// postMessage(data, "null") silently drops the message. Use '*' instead.
+// This is the root cause of the extension not working on standalone (file://) builds.
+function postOrigin() {
+  return window.location.protocol === 'file:' ? '*' : window.location.origin;
+}
+
+// For incoming message origin checks: on file:// both event.origin and
+// window.location.origin are "null", so the comparison works. But we still
+// need to accept messages from the same window via event.source === window.
+function isOwnOrigin(event) {
+  if (window.location.protocol === 'file:') return event.source === window;
+  return event.origin === window.location.origin;
+}
+
 function readyPayload() {
   return {
     type: 'TC_EXTENSION_READY',
@@ -17,7 +32,7 @@ function readyPayload() {
 if (document.documentElement.dataset.tcBridgeLoaded) {
   // Already loaded — just re-signal readiness and bail out
   if (chrome && chrome.runtime && chrome.runtime.id) {
-    window.postMessage(readyPayload(), window.location.origin);
+    window.postMessage(readyPayload(), postOrigin());
   }
 } else {
 document.documentElement.dataset.tcBridgeLoaded = '1';
@@ -35,36 +50,36 @@ function isExtensionValid() {
 
 // Signal extension presence
 if (isExtensionValid()) {
-  window.postMessage(readyPayload(), window.location.origin);
+  window.postMessage(readyPayload(), postOrigin());
 }
 
 // Re-signal readiness when page is restored from BFCache (back/forward navigation)
 document.addEventListener('pageshow', function (event) {
   if (event.persisted && isExtensionValid()) {
-    window.postMessage(readyPayload(), window.location.origin);
+    window.postMessage(readyPayload(), postOrigin());
   }
 });
 
 // Re-signal when tab becomes visible again (covers additional edge cases)
 document.addEventListener('visibilitychange', function () {
   if (!document.hidden && isExtensionValid()) {
-    window.postMessage(readyPayload(), window.location.origin);
+    window.postMessage(readyPayload(), postOrigin());
   }
 });
 
 // Respond to ping requests from the web app (handles race condition)
 window.addEventListener('message', function (event) {
-  if (event.origin !== window.location.origin) return;
+  if (!isOwnOrigin(event)) return;
   if (event.source === window && event.data && event.data.type === 'TC_EXTENSION_PING') {
     if (isExtensionValid()) {
-      window.postMessage(readyPayload(), window.location.origin);
+      window.postMessage(readyPayload(), postOrigin());
     }
   }
 });
 
 // Listen for LLM requests from the web app
 window.addEventListener('message', function (event) {
-  if (event.origin !== window.location.origin) return;
+  if (!isOwnOrigin(event)) return;
   if (event.source !== window) return;
   if (!event.data) return;
 
@@ -77,7 +92,7 @@ window.addEventListener('message', function (event) {
         type: 'TC_LLM_ERROR',
         requestId: requestId,
         error: 'Extension context invalidated. Please reload this page.'
-      }, window.location.origin);
+      }, postOrigin());
       return;
     }
 
@@ -87,12 +102,12 @@ window.addEventListener('message', function (event) {
 
       port.onMessage.addListener(function (msg) {
         if (msg.type === 'chunk') {
-          window.postMessage({ type: 'TC_LLM_CHUNK', requestId: requestId, content: msg.content }, window.location.origin);
+          window.postMessage({ type: 'TC_LLM_CHUNK', requestId: requestId, content: msg.content }, postOrigin());
         } else if (msg.type === 'done') {
-          window.postMessage({ type: 'TC_LLM_DONE', requestId: requestId, stopReason: msg.stopReason, contentBlocks: msg.contentBlocks }, window.location.origin);
+          window.postMessage({ type: 'TC_LLM_DONE', requestId: requestId, stopReason: msg.stopReason, contentBlocks: msg.contentBlocks }, postOrigin());
           ports.delete(requestId);
         } else if (msg.type === 'error') {
-          window.postMessage({ type: 'TC_LLM_ERROR', requestId: requestId, error: msg.error }, window.location.origin);
+          window.postMessage({ type: 'TC_LLM_ERROR', requestId: requestId, error: msg.error }, postOrigin());
           ports.delete(requestId);
         }
       });
@@ -104,7 +119,7 @@ window.addEventListener('message', function (event) {
             type: 'TC_LLM_ERROR',
             requestId: requestId,
             error: lastError.message || 'Extension disconnected'
-          }, window.location.origin);
+          }, postOrigin());
         }
         ports.delete(requestId);
       });
@@ -115,7 +130,7 @@ window.addEventListener('message', function (event) {
         type: 'TC_LLM_ERROR',
         requestId: requestId,
         error: 'Extension error: ' + (err.message || 'unknown. Try reloading the page.')
-      }, window.location.origin);
+      }, postOrigin());
     }
   }
 
@@ -129,7 +144,7 @@ window.addEventListener('message', function (event) {
         requestId: fetchRequestId,
         success: false,
         error: 'Extension context invalidated. Please reload this page.'
-      }, window.location.origin);
+      }, postOrigin());
       return;
     }
 
@@ -142,14 +157,14 @@ window.addEventListener('message', function (event) {
             requestId: fetchRequestId,
             success: false,
             error: lastError.message || 'Extension error'
-          }, window.location.origin);
+          }, postOrigin());
         } else if (!response) {
           window.postMessage({
             type: 'TC_FETCH_URL_RESULT',
             requestId: fetchRequestId,
             success: false,
             error: 'No response from extension background'
-          }, window.location.origin);
+          }, postOrigin());
         } else {
           window.postMessage({
             type: 'TC_FETCH_URL_RESULT',
@@ -159,7 +174,7 @@ window.addEventListener('message', function (event) {
             content: response.content,
             url: response.url,
             error: response.error
-          }, window.location.origin);
+          }, postOrigin());
         }
       });
     } catch (err) {
@@ -168,7 +183,7 @@ window.addEventListener('message', function (event) {
         requestId: fetchRequestId,
         success: false,
         error: 'Extension error: ' + (err.message || 'unknown')
-      }, window.location.origin);
+      }, postOrigin());
     }
   }
 
@@ -188,7 +203,7 @@ window.addEventListener('message', function (event) {
         requestId: proxyId,
         success: false,
         error: 'Extension context invalidated. Please reload this page.'
-      }, window.location.origin);
+      }, postOrigin());
       return;
     }
 
@@ -201,14 +216,14 @@ window.addEventListener('message', function (event) {
             requestId: proxyId,
             success: false,
             error: lastError.message || 'Extension error'
-          }, window.location.origin);
+          }, postOrigin());
         } else if (!response) {
           window.postMessage({
             type: 'TC_PROXY_FETCH_RESULT',
             requestId: proxyId,
             success: false,
             error: 'No response from extension background'
-          }, window.location.origin);
+          }, postOrigin());
         } else {
           window.postMessage({
             type: 'TC_PROXY_FETCH_RESULT',
@@ -219,7 +234,7 @@ window.addEventListener('message', function (event) {
             data: response.data,
             headers: response.headers,
             error: response.error
-          }, window.location.origin);
+          }, postOrigin());
         }
       });
     } catch (err) {
@@ -228,7 +243,7 @@ window.addEventListener('message', function (event) {
         requestId: proxyId,
         success: false,
         error: 'Extension error: ' + (err.message || 'unknown')
-      }, window.location.origin);
+      }, postOrigin());
     }
   }
 
@@ -250,8 +265,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     return;
   }
   if (message.type === 'INJECT_CLIPS_TO_PAGE') {
-    var origin = window.location.protocol === 'file:' ? '*' : window.location.origin;
-    window.postMessage({ type: 'THREATCADDY_IMPORT_CLIPS', clips: message.clips }, origin);
+    window.postMessage({ type: 'THREATCADDY_IMPORT_CLIPS', clips: message.clips }, postOrigin());
     sendResponse({ success: true });
   }
 });

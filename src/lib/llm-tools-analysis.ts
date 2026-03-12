@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { extractIOCs } from './ioc-extractor';
 import { buildGraphData } from './graph-data';
+import { postMessageOrigin } from './utils';
 
 export async function executeAnalyzeGraph(input: Record<string, unknown>, folderId?: string): Promise<string> {
   if (!folderId) {
@@ -135,7 +136,7 @@ export function fetchViaExtensionBridge(url: string): Promise<{ success: boolean
     }
 
     window.addEventListener('message', handler);
-    window.postMessage({ type: 'TC_FETCH_URL', requestId, url }, window.location.origin);
+    window.postMessage({ type: 'TC_FETCH_URL', requestId, url }, postMessageOrigin());
   });
 }
 

@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { LLMProvider, ContentBlock } from '../types';
+import { postMessageOrigin } from './utils';
 
 export const MAX_CONTEXT_MESSAGES = 40;
 
@@ -101,6 +102,6 @@ export function generateChatTitle(
         systemPrompt: 'Generate a concise 3-6 word title for this conversation. Reply with ONLY the title, no quotes or punctuation.',
         endpoint,
       },
-    }, window.location.origin);
+    }, postMessageOrigin());
   });
 }

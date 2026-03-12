@@ -6,6 +6,7 @@ import { IntegrationExecutor } from '../../lib/integration-executor';
 import { IntegrationResultModal } from './IntegrationResultModal';
 import { db } from '../../db';
 import type { IntegrationRun, InstalledIntegration, IntegrationTemplate } from '../../types/integration-types';
+import type { StandaloneIOC } from '../../types';
 
 interface RunIntegrationMenuProps {
   ioc: { id: string; value: string; type: string; confidence: string };
@@ -158,6 +159,27 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
                 break;
             }
             return id;
+          },
+          onUpdateEntity: async (type, id, fields) => {
+            if (type === 'ioc') {
+              const existing = await db.standaloneIOCs.get(id);
+              if (!existing) return;
+              const updates: Partial<StandaloneIOC> = { updatedAt: Date.now() };
+              // Copy simple scalar fields
+              if (fields.iocStatus !== undefined) updates.iocStatus = fields.iocStatus as string;
+              if (fields.confidence !== undefined) updates.confidence = fields.confidence as StandaloneIOC['confidence'];
+              // Merge enrichment as timestamped snapshots
+              if (fields.enrichment) {
+                const existingEnrichment = existing.enrichment || {};
+                const newEnrichment = fields.enrichment as Record<string, Record<string, unknown>>;
+                const merged: Record<string, Array<Record<string, unknown>>> = { ...existingEnrichment };
+                for (const [provider, data] of Object.entries(newEnrichment)) {
+                  merged[provider] = [{ ...data, ts: Date.now() }, ...(merged[provider] || [])].slice(0, 20);
+                }
+                updates.enrichment = merged;
+              }
+              await db.standaloneIOCs.update(id, updates);
+            }
           },
           onNotify: (message) => {
             addToast('info', message);

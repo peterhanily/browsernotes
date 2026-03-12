@@ -63,8 +63,22 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { virusTotal: {
+            malicious: '{{steps.transform-vt.stats.malicious}}',
+            suspicious: '{{steps.transform-vt.stats.suspicious}}',
+            country: '{{steps.transform-vt.country}}',
+            asOwner: '{{steps.transform-vt.asOwner}}',
+            reputation: '{{steps.transform-vt.reputation}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-vt.stats.malicious}} > 5',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -156,8 +170,21 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { abuseIPDB: {
+            score: '{{steps.transform-abuseipdb.score}}',
+            totalReports: '{{steps.transform-abuseipdb.totalReports}}',
+            country: '{{steps.transform-abuseipdb.country}}',
+            isp: '{{steps.transform-abuseipdb.isp}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-abuseipdb.score}} > 50',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -234,6 +261,20 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
         template: {
           title: 'Shodan Report: {{ioc.value}}',
           body: '## Shodan Host Report\n\n**IP:** {{ioc.value}}\n**Organization:** {{steps.transform-shodan.org}}\n**ISP:** {{steps.transform-shodan.isp}}\n**OS:** {{steps.transform-shodan.os}}\n**Country:** {{steps.transform-shodan.country_name}}\n\n### Open Ports\n{{steps.transform-shodan.ports}}\n\n### Vulnerabilities\n{{steps.transform-shodan.vulns}}',
+        },
+      },
+      {
+        type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { shodan: {
+            org: '{{steps.transform-shodan.org}}',
+            isp: '{{steps.transform-shodan.isp}}',
+            os: '{{steps.transform-shodan.os}}',
+            country: '{{steps.transform-shodan.country_name}}',
+            ports: '{{steps.transform-shodan.ports}}',
+            vulns: '{{steps.transform-shodan.vulns}}',
+          }},
         },
       },
       {
@@ -405,8 +446,21 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { urlhaus: {
+            queryStatus: '{{steps.transform-urlhaus.query_status}}',
+            threat: '{{steps.transform-urlhaus.threat}}',
+            tags: '{{steps.transform-urlhaus.tags}}',
+            reference: '{{steps.transform-urlhaus.urlhaus_reference}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-urlhaus.threat}} != null',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -487,8 +541,20 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { urlhausDomain: {
+            queryStatus: '{{steps.transform-urlhaus.query_status}}',
+            urlCount: '{{steps.transform-urlhaus.url_count}}',
+            reference: '{{steps.transform-urlhaus.urlhaus_reference}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-urlhaus.url_count}} > 0',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -554,6 +620,19 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
         template: {
           title: 'Shodan InternetDB: {{ioc.value}}',
           body: '## Shodan InternetDB Report\n\n**IP:** {{ioc.value}}\n**Ports:** {{steps.transform-idb.ports}}\n**Hostnames:** {{steps.transform-idb.hostnames}}\n**Tags:** {{steps.transform-idb.tags}}\n\n### Vulnerabilities\n{{steps.transform-idb.vulns}}\n\n### CPEs\n{{steps.transform-idb.cpes}}',
+        },
+      },
+      {
+        type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { shodanInternetDB: {
+            ports: '{{steps.transform-idb.ports}}',
+            vulns: '{{steps.transform-idb.vulns}}',
+            hostnames: '{{steps.transform-idb.hostnames}}',
+            tags: '{{steps.transform-idb.tags}}',
+            cpes: '{{steps.transform-idb.cpes}}',
+          }},
         },
       },
       {
@@ -630,8 +709,21 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { virusTotal: {
+            malicious: '{{steps.transform-vt.stats.malicious}}',
+            suspicious: '{{steps.transform-vt.stats.suspicious}}',
+            registrar: '{{steps.transform-vt.registrar}}',
+            reputation: '{{steps.transform-vt.reputation}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-vt.stats.malicious}} > 5',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -712,8 +804,22 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { virusTotal: {
+            malicious: '{{steps.transform-vt.stats.malicious}}',
+            suspicious: '{{steps.transform-vt.stats.suspicious}}',
+            fileName: '{{steps.transform-vt.fileName}}',
+            fileType: '{{steps.transform-vt.fileType}}',
+            fileSize: '{{steps.transform-vt.fileSize}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-vt.stats.malicious}} > 3',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -790,8 +896,19 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { threatFox: {
+            queryStatus: '{{steps.transform-tf.query_status}}',
+            matches: '{{steps.transform-tf.matches}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-tf.query_status}} == ok',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -869,8 +986,19 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { malwareBazaar: {
+            queryStatus: '{{steps.transform-mb.query_status}}',
+            samples: '{{steps.transform-mb.samples}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-mb.query_status}} == ok',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },
@@ -950,8 +1078,22 @@ export const BUILTIN_INTEGRATIONS: IntegrationTemplate[] = [
       },
       {
         type: 'update-ioc',
+        template: {
+          id: '{{ioc.id}}',
+          enrichment: { greyNoise: {
+            classification: '{{steps.transform-gn.classification}}',
+            noise: '{{steps.transform-gn.noise}}',
+            riot: '{{steps.transform-gn.riot}}',
+            name: '{{steps.transform-gn.name}}',
+            lastSeen: '{{steps.transform-gn.lastSeen}}',
+          }},
+        },
+      },
+      {
+        type: 'update-ioc',
         condition: '{{steps.transform-gn.classification}} == malicious',
         template: {
+          id: '{{ioc.id}}',
           iocStatus: 'malicious',
           confidence: 'high',
         },

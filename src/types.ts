@@ -533,6 +533,7 @@ export interface StandaloneIOC {
   linkedTaskIds?: string[];
   linkedTimelineEventIds?: string[];
   comments?: EntityComment[];
+  enrichment?: Record<string, Array<Record<string, unknown>>>;
   assigneeId?: string;
   assigneeName?: string;
   trashed: boolean;

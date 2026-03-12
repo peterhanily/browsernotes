@@ -365,6 +365,51 @@ export function StandaloneIOCForm({ open, onClose, onSubmit, folders, defaultFol
           />
         </div>
 
+        {/* Enrichment History (edit mode only) */}
+        {isEditMode && editingIOC?.enrichment && Object.keys(editingIOC.enrichment).length > 0 && (
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Enrichment History</label>
+            <div className="space-y-2">
+              {Object.entries(editingIOC.enrichment).map(([provider, snapshots]) => (
+                <div key={provider} className="bg-gray-800/50 border border-gray-700 rounded p-2">
+                  <div className="text-xs font-medium text-gray-300 mb-1">{provider}</div>
+                  <div className="space-y-1">
+                    {(snapshots as Array<Record<string, unknown>>).map((snap, i, arr) => {
+                      const prev = arr[i + 1] as Record<string, unknown> | undefined;
+                      const ts = snap.ts as number | undefined;
+                      return (
+                        <div key={i} className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] border-l-2 border-gray-700 pl-2">
+                          {ts && (
+                            <span className="text-gray-500 w-full">
+                              {new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                          {Object.entries(snap)
+                            .filter(([k]) => k !== 'ts')
+                            .map(([key, val]) => {
+                              const display = val === null || val === undefined ? '--' : String(val);
+                              const prevVal = prev?.[key];
+                              const changed = prev !== undefined && prevVal !== undefined && String(prevVal) !== String(val);
+                              return (
+                                <span key={key} className="text-gray-400">
+                                  <span className="text-gray-500">{key}:</span>{' '}
+                                  <span className={changed ? 'text-amber-400' : ''}>{display}</span>
+                                  {changed && (
+                                    <span className="text-gray-600 ml-0.5">(was {String(prevVal)})</span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Comments section (edit mode only) */}
         {isEditMode && editingIOC && onUpdateIOC && (
           <EntityComments

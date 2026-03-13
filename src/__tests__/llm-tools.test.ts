@@ -9,7 +9,7 @@ function makeToolUse(name: string, input: Record<string, unknown> = {}): ToolUse
 
 describe('TOOL_DEFINITIONS', () => {
   it('has the expected number of tool definitions', () => {
-    expect(TOOL_DEFINITIONS.length).toBe(24);
+    expect(TOOL_DEFINITIONS.length).toBe(26);
   });
 
   it('each tool has name, description, and input_schema', () => {
@@ -59,8 +59,16 @@ describe('isWriteTool', () => {
     expect(isWriteTool('update_task')).toBe(true);
   });
 
+  it('returns true for update_ioc', () => {
+    expect(isWriteTool('update_ioc')).toBe(true);
+  });
+
   it('returns true for bulk_create_iocs', () => {
     expect(isWriteTool('bulk_create_iocs')).toBe(true);
+  });
+
+  it('returns true for update_timeline_event', () => {
+    expect(isWriteTool('update_timeline_event')).toBe(true);
   });
 
   it('returns true for link_entities', () => {

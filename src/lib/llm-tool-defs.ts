@@ -75,6 +75,42 @@ export const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'read_task',
+    description: 'Get the full details of a specific task by its ID or title, including description, comments, priority, status, and assignee.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Task ID' },
+        title: { type: 'string', description: 'Task title (exact or partial match). Used if id is not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'read_ioc',
+    description: 'Get the full details of a specific IOC by its ID or value, including analyst notes, attribution, relationships, subtype, and status.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'IOC ID' },
+        value: { type: 'string', description: 'IOC value (exact or partial match). Used if id is not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'read_timeline_event',
+    description: 'Get the full details of a specific timeline event by its ID or title, including description, MITRE ATT&CK mappings, actor, assets, and geolocation.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        id: { type: 'string', description: 'Timeline event ID' },
+        title: { type: 'string', description: 'Event title (exact or partial match). Used if id is not provided.' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_investigation_summary',
     description: 'Get entity counts and metadata for the current investigation.',
     input_schema: {

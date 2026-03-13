@@ -9,7 +9,7 @@ function makeToolUse(name: string, input: Record<string, unknown> = {}): ToolUse
 
 describe('TOOL_DEFINITIONS', () => {
   it('has the expected number of tool definitions', () => {
-    expect(TOOL_DEFINITIONS.length).toBe(26);
+    expect(TOOL_DEFINITIONS.length).toBe(29);
   });
 
   it('each tool has name, description, and input_schema', () => {
@@ -82,6 +82,9 @@ describe('isWriteTool', () => {
   it('returns false for read tools', () => {
     expect(isWriteTool('search_notes')).toBe(false);
     expect(isWriteTool('read_note')).toBe(false);
+    expect(isWriteTool('read_task')).toBe(false);
+    expect(isWriteTool('read_ioc')).toBe(false);
+    expect(isWriteTool('read_timeline_event')).toBe(false);
     expect(isWriteTool('list_tasks')).toBe(false);
     expect(isWriteTool('list_iocs')).toBe(false);
     expect(isWriteTool('list_timeline_events')).toBe(false);
@@ -331,6 +334,137 @@ describe('executeTool — write tools', () => {
   });
 });
 
+describe('executeTool — single-entity read tools', () => {
+  beforeEach(async () => {
+    await db.tasks.clear();
+    await db.standaloneIOCs.clear();
+    await db.timelineEvents.clear();
+  });
+
+  it('read_task finds by id', async () => {
+    await db.tasks.add({
+      id: 't1', title: 'Analyze payload', description: 'Check the binary', completed: false, priority: 'high', status: 'in-progress',
+      order: 0, folderId: 'f1', tags: ['malware'], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(makeToolUse('read_task', { id: 't1' }));
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.title).toBe('Analyze payload');
+    expect(parsed.description).toBe('Check the binary');
+    expect(parsed.status).toBe('in-progress');
+    expect(parsed.priority).toBe('high');
+  });
+
+  it('read_task finds by title (case-insensitive)', async () => {
+    await db.tasks.add({
+      id: 't1', title: 'Review EDR Logs', completed: false, priority: 'none', status: 'todo',
+      order: 0, folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('read_task', { title: 'review edr logs' }), 'f1');
+    expect(JSON.parse(result).title).toBe('Review EDR Logs');
+  });
+
+  it('read_task finds by partial title match', async () => {
+    await db.tasks.add({
+      id: 't1', title: 'Investigate lateral movement', completed: false, priority: 'none', status: 'todo',
+      order: 0, folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('read_task', { title: 'lateral' }), 'f1');
+    expect(JSON.parse(result).title).toBe('Investigate lateral movement');
+  });
+
+  it('read_task returns error for missing task', async () => {
+    const { result } = await executeTool(makeToolUse('read_task', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+
+  it('read_ioc finds by id', async () => {
+    await db.standaloneIOCs.add({
+      id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'high',
+      analystNotes: 'Known C2 server', attribution: 'APT29', iocSubtype: 'C2 Server', iocStatus: 'active',
+      folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(makeToolUse('read_ioc', { id: 'ioc1' }));
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('ipv4');
+    expect(parsed.value).toBe('10.0.0.1');
+    expect(parsed.analystNotes).toBe('Known C2 server');
+    expect(parsed.attribution).toBe('APT29');
+    expect(parsed.iocSubtype).toBe('C2 Server');
+    expect(parsed.iocStatus).toBe('active');
+  });
+
+  it('read_ioc finds by value (case-insensitive)', async () => {
+    await db.standaloneIOCs.add({
+      id: 'ioc1', type: 'domain', value: 'Evil.Com', confidence: 'medium',
+      folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('read_ioc', { value: 'evil.com' }), 'f1');
+    expect(JSON.parse(result).value).toBe('Evil.Com');
+  });
+
+  it('read_ioc finds by partial value match', async () => {
+    await db.standaloneIOCs.add({
+      id: 'ioc1', type: 'url', value: 'https://malware.evil.com/payload.exe', confidence: 'high',
+      folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('read_ioc', { value: 'evil.com' }), 'f1');
+    expect(JSON.parse(result).value).toBe('https://malware.evil.com/payload.exe');
+  });
+
+  it('read_ioc returns error for missing IOC', async () => {
+    const { result } = await executeTool(makeToolUse('read_ioc', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+
+  it('read_timeline_event finds by id', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: new Date('2025-06-15T14:30:00Z').getTime(), title: 'Phishing Email Received',
+      description: 'Employee clicked link', eventType: 'initial-access', source: 'Email Gateway',
+      confidence: 'high', actor: 'APT29', linkedIOCIds: ['ioc1'], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: ['T1566.001'], assets: ['workstation-01'], tags: [], starred: false,
+      folderId: 'f1', timelineId: 'tl1', trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(makeToolUse('read_timeline_event', { id: 'e1' }));
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.title).toBe('Phishing Email Received');
+    expect(parsed.description).toBe('Employee clicked link');
+    expect(parsed.eventType).toBe('initial-access');
+    expect(parsed.source).toBe('Email Gateway');
+    expect(parsed.actor).toBe('APT29');
+    expect(parsed.mitreAttackIds).toContain('T1566.001');
+    expect(parsed.linkedIOCIds).toContain('ioc1');
+    expect(parsed.assets).toContain('workstation-01');
+    expect(parsed.timestamp).toBe('2025-06-15T14:30:00.000Z');
+  });
+
+  it('read_timeline_event finds by title (case-insensitive)', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: Date.now(), title: 'C2 Beacon Detected', eventType: 'command-and-control',
+      source: 'NDR', confidence: 'high', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: 'f1', timelineId: 'tl1',
+      trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(makeToolUse('read_timeline_event', { title: 'c2 beacon detected' }), 'f1');
+    expect(JSON.parse(result).title).toBe('C2 Beacon Detected');
+  });
+
+  it('read_timeline_event returns error for missing event', async () => {
+    const { result } = await executeTool(makeToolUse('read_timeline_event', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+});
+
 describe('executeTool — update tools', () => {
   beforeEach(async () => {
     await db.notes.clear();
@@ -391,6 +525,145 @@ describe('executeTool — update tools', () => {
 
   it('update_task returns error for missing task', async () => {
     const { result } = await executeTool(makeToolUse('update_task', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+});
+
+describe('executeTool — update_ioc', () => {
+  beforeEach(async () => {
+    await db.standaloneIOCs.clear();
+  });
+
+  it('updates IOC fields', async () => {
+    await db.standaloneIOCs.add({
+      id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'medium',
+      folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('update_ioc', { id: 'ioc1', confidence: 'high', analystNotes: 'Confirmed C2', attribution: 'APT29', iocSubtype: 'C2 Server', iocStatus: 'active' }),
+    );
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+
+    const stored = await db.standaloneIOCs.get('ioc1');
+    expect(stored!.confidence).toBe('high');
+    expect(stored!.analystNotes).toBe('Confirmed C2');
+    expect(stored!.attribution).toBe('APT29');
+    expect(stored!.iocSubtype).toBe('C2 Server');
+    expect(stored!.iocStatus).toBe('active');
+  });
+
+  it('updates IOC value and type', async () => {
+    await db.standaloneIOCs.add({
+      id: 'ioc1', type: 'ipv4', value: '10.0.0.1', confidence: 'low',
+      folderId: 'f1', tags: [], trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result } = await executeTool(
+      makeToolUse('update_ioc', { id: 'ioc1', type: 'domain', value: 'evil.com' }),
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.type).toBe('domain');
+    expect(parsed.value).toBe('evil.com');
+
+    const stored = await db.standaloneIOCs.get('ioc1');
+    expect(stored!.type).toBe('domain');
+    expect(stored!.value).toBe('evil.com');
+  });
+
+  it('returns error for missing id', async () => {
+    const { result } = await executeTool(makeToolUse('update_ioc', {}));
+    expect(JSON.parse(result).error).toContain('id');
+  });
+
+  it('returns error for missing IOC', async () => {
+    const { result } = await executeTool(makeToolUse('update_ioc', { id: 'nonexistent' }));
+    expect(JSON.parse(result).error).toContain('not found');
+  });
+});
+
+describe('executeTool — update_timeline_event', () => {
+  beforeEach(async () => {
+    await db.timelineEvents.clear();
+  });
+
+  it('updates timeline event fields', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: Date.now(), title: 'Original', eventType: 'other',
+      source: 'Manual', confidence: 'low', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: 'f1', timelineId: 'tl1',
+      trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    const { result, isError } = await executeTool(
+      makeToolUse('update_timeline_event', {
+        id: 'e1', title: 'Updated Event', description: 'New details',
+        eventType: 'lateral-movement', source: 'EDR', actor: 'APT28', confidence: 'high',
+      }),
+    );
+    expect(isError).toBe(false);
+    expect(JSON.parse(result).success).toBe(true);
+
+    const stored = await db.timelineEvents.get('e1');
+    expect(stored!.title).toBe('Updated Event');
+    expect(stored!.description).toBe('New details');
+    expect(stored!.eventType).toBe('lateral-movement');
+    expect(stored!.source).toBe('EDR');
+    expect(stored!.actor).toBe('APT28');
+    expect(stored!.confidence).toBe('high');
+  });
+
+  it('updates timestamp', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: Date.now(), title: 'Event', eventType: 'other',
+      source: 'Manual', confidence: 'medium', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: 'f1', timelineId: 'tl1',
+      trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await executeTool(makeToolUse('update_timeline_event', { id: 'e1', timestamp: '2025-01-15T08:00:00Z' }));
+    const stored = await db.timelineEvents.get('e1');
+    expect(stored!.timestamp).toBe(new Date('2025-01-15T08:00:00Z').getTime());
+  });
+
+  it('updates geo coordinates', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: Date.now(), title: 'Event', eventType: 'other',
+      source: 'Manual', confidence: 'medium', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: 'f1', timelineId: 'tl1',
+      trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await executeTool(makeToolUse('update_timeline_event', { id: 'e1', latitude: 51.5074, longitude: -0.1278 }));
+    const stored = await db.timelineEvents.get('e1');
+    expect(stored!.latitude).toBe(51.5074);
+    expect(stored!.longitude).toBe(-0.1278);
+  });
+
+  it('rejects invalid geo coordinates', async () => {
+    await db.timelineEvents.add({
+      id: 'e1', timestamp: Date.now(), title: 'Event', eventType: 'other',
+      source: 'Manual', confidence: 'medium', linkedIOCIds: [], linkedNoteIds: [], linkedTaskIds: [],
+      mitreAttackIds: [], assets: [], tags: [], starred: false, folderId: 'f1', timelineId: 'tl1',
+      trashed: false, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
+    });
+
+    await executeTool(makeToolUse('update_timeline_event', { id: 'e1', latitude: 200, longitude: -0.1278 }));
+    const stored = await db.timelineEvents.get('e1');
+    expect(stored!.latitude).toBeUndefined();
+    expect(stored!.longitude).toBeUndefined();
+  });
+
+  it('returns error for missing id', async () => {
+    const { result } = await executeTool(makeToolUse('update_timeline_event', {}));
+    expect(JSON.parse(result).error).toContain('id');
+  });
+
+  it('returns error for missing event', async () => {
+    const { result } = await executeTool(makeToolUse('update_timeline_event', { id: 'nonexistent' }));
     expect(JSON.parse(result).error).toContain('not found');
   });
 });

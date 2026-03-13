@@ -10,6 +10,7 @@ export { fetchViaExtensionBridge } from './llm-tools-analysis';
 // Read tools
 import {
   executeSearchNotes, executeSearchAll, executeReadNote,
+  executeReadTask, executeReadIOC, executeReadTimelineEvent,
   executeListTasks, executeListIOCs, executeListTimelineEvents,
   executeGetInvestigationSummary,
   executeListInvestigations, executeGetInvestigationDetails,
@@ -73,9 +74,9 @@ Understand the IR lifecycle (NIST SP 800-61): Preparation, Detection & Analysis,
 
 ## Available Tools
 
-You have 26 tools organized into five categories:
+You have 29 tools organized into five categories:
 
-**Search & Read** (7 tools): search_notes, search_all (cross-entity search), read_note, list_tasks, list_iocs, list_timeline_events, get_investigation_summary.
+**Search & Read** (10 tools): search_notes, search_all (cross-entity search), read_note, read_task, read_ioc, read_timeline_event, list_tasks, list_iocs, list_timeline_events, get_investigation_summary.
 
 **Create & Update** (11 tools): create_note, update_note, create_task, update_task, create_ioc, update_ioc, bulk_create_iocs, create_timeline_event, update_timeline_event, link_entities (bidirectional cross-references between notes, tasks, and timeline events), generate_report (structured investigation report with executive summary, findings, IOC table, timeline, and recommendations).
 
@@ -190,6 +191,9 @@ export async function executeTool(
       case 'search_notes':            result = await executeSearchNotes(inp, folderId); break;
       case 'search_all':              result = await executeSearchAll(inp, folderId); break;
       case 'read_note':               result = await executeReadNote(inp, folderId); break;
+      case 'read_task':               result = await executeReadTask(inp, folderId); break;
+      case 'read_ioc':                result = await executeReadIOC(inp, folderId); break;
+      case 'read_timeline_event':     result = await executeReadTimelineEvent(inp, folderId); break;
       case 'list_tasks':              result = await executeListTasks(inp, folderId); break;
       case 'list_iocs':               result = await executeListIOCs(inp, folderId); break;
       case 'list_timeline_events':    result = await executeListTimelineEvents(inp, folderId); break;

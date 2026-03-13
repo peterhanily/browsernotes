@@ -101,6 +101,95 @@ export async function executeReadNote(input: Record<string, unknown>, folderId?:
   return JSON.stringify({ id: note.id, title: note.title, content, tags: note.tags, createdAt: note.createdAt, updatedAt: note.updatedAt });
 }
 
+export async function executeReadTask(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+
+  let task;
+  if (id) {
+    task = await db.tasks.get(id);
+  } else if (title) {
+    const lower = title.toLowerCase();
+    const all = folderId
+      ? await db.tasks.where('folderId').equals(folderId).and(t => !t.trashed).toArray()
+      : await db.tasks.filter(t => !t.trashed).toArray();
+    task = all.find(t => t.title.toLowerCase() === lower)
+      || all.find(t => t.title.toLowerCase().includes(lower));
+  }
+
+  if (!task) return JSON.stringify({ error: 'Task not found' });
+
+  return JSON.stringify({
+    id: task.id, title: task.title, description: task.description || '',
+    status: task.status, priority: task.priority, completed: task.completed,
+    assigneeId: task.assigneeId, tags: task.tags,
+    comments: task.comments || [],
+    dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
+    createdAt: task.createdAt, updatedAt: task.updatedAt,
+  });
+}
+
+export async function executeReadIOC(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const value = String(input.value || '');
+
+  let ioc;
+  if (id) {
+    ioc = await db.standaloneIOCs.get(id);
+  } else if (value) {
+    const lower = value.toLowerCase();
+    const all = folderId
+      ? await db.standaloneIOCs.where('folderId').equals(folderId).and(i => !i.trashed).toArray()
+      : await db.standaloneIOCs.filter(i => !i.trashed).toArray();
+    ioc = all.find(i => i.value.toLowerCase() === lower)
+      || all.find(i => i.value.toLowerCase().includes(lower));
+  }
+
+  if (!ioc) return JSON.stringify({ error: 'IOC not found' });
+
+  return JSON.stringify({
+    id: ioc.id, type: ioc.type, value: ioc.value, confidence: ioc.confidence,
+    analystNotes: ioc.analystNotes || '', attribution: ioc.attribution,
+    iocSubtype: ioc.iocSubtype, iocStatus: ioc.iocStatus,
+    relationships: ioc.relationships || [], tags: ioc.tags,
+    clsLevel: ioc.clsLevel,
+    createdAt: ioc.createdAt, updatedAt: ioc.updatedAt,
+  });
+}
+
+export async function executeReadTimelineEvent(input: Record<string, unknown>, folderId?: string): Promise<string> {
+  const id = String(input.id || '');
+  const title = String(input.title || '');
+
+  let event;
+  if (id) {
+    event = await db.timelineEvents.get(id);
+  } else if (title) {
+    const lower = title.toLowerCase();
+    const all = folderId
+      ? await db.timelineEvents.where('folderId').equals(folderId).and(e => !e.trashed).toArray()
+      : await db.timelineEvents.filter(e => !e.trashed).toArray();
+    event = all.find(e => e.title.toLowerCase() === lower)
+      || all.find(e => e.title.toLowerCase().includes(lower));
+  }
+
+  if (!event) return JSON.stringify({ error: 'Timeline event not found' });
+
+  return JSON.stringify({
+    id: event.id, title: event.title, description: event.description || '',
+    timestamp: new Date(event.timestamp).toISOString(),
+    timestampEnd: event.timestampEnd ? new Date(event.timestampEnd).toISOString() : undefined,
+    eventType: event.eventType, source: event.source, confidence: event.confidence,
+    actor: event.actor, assets: event.assets,
+    mitreAttackIds: event.mitreAttackIds, linkedIOCIds: event.linkedIOCIds,
+    linkedNoteIds: event.linkedNoteIds, linkedTaskIds: event.linkedTaskIds,
+    latitude: event.latitude, longitude: event.longitude,
+    tags: event.tags, clsLevel: event.clsLevel,
+    comments: event.comments || [],
+    createdAt: event.createdAt, updatedAt: event.updatedAt,
+  });
+}
+
 export async function executeListTasks(input: Record<string, unknown>, folderId?: string): Promise<string> {
   const statusFilter = input.status as TaskStatus | undefined;
   const limit = Math.min(Number(input.limit) || 20, 50);

@@ -306,6 +306,8 @@ function AppInner() {
   const setSelectedFolderId = useCallback((id: string | undefined) => {
     setSelectedFolderIdRaw(id);
     if (!id) setInvestigationMode('local');
+    // Keep agent bridge in sync with the selected investigation
+    import('./lib/agent-bridge').then(m => m.syncBridgeFolderId(id)).catch(() => {});
   }, []);
 
   const [selectedTag, setSelectedTag] = useState<string>();

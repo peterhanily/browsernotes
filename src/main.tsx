@@ -5,10 +5,14 @@ import { AppShell } from './components/Encryption/AppShell'
 import { migrateStorageKeys } from './lib/storage-migration'
 import { migrateIndexedDB } from './lib/db-migration'
 import { clipBuffer } from './lib/clipBuffer'
+import { installAgentBridge } from './lib/agent-bridge'
 
 // Start buffering clip messages immediately — before React mounts and before
 // the encryption lock screen is dismissed — so no postMessage events are lost.
 clipBuffer.startListening();
+
+// Expose window.threatcaddy for external AI agents (Claude Code, Codex, etc.)
+installAgentBridge();
 
 // Migrate legacy BrowserNotes data before React renders
 migrateStorageKeys();

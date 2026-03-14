@@ -626,6 +626,11 @@ export class BotExecutionContext {
     const timeout = Math.min(opts?.timeout || 30_000, 120_000);
     const MAX_OUTPUT = 50 * 1024; // 50KB per stream
 
+    // Validate host: must be non-empty, no control chars, no whitespace, no colons (IPv6 literals), no slashes
+    if (!host || typeof host !== 'string' || /[\s\x00-\x1f:\/\\@]/.test(host)) {
+      throw new Error(`Bot "${config.name}": invalid SSH host — must be a plain hostname or IPv4 address`);
+    }
+
     // Host allowlist check
     const allowedHosts = (this.getConfig().allowedHosts as string[] | undefined) || [];
     if (allowedHosts.length === 0) {
@@ -636,6 +641,7 @@ export class BotExecutionContext {
     }
 
     // DNS resolve + private IP check (reuse SSRF guard)
+    // Resolve FIRST, then verify the resolved address is allowed (prevents DNS rebinding)
     const { address } = await lookup(host);
     if (isPrivateIP(address)) {
       throw new Error(`Bot "${config.name}" blocked from SSH to private IP ${address} (resolved from ${host})`);
@@ -648,14 +654,15 @@ export class BotExecutionContext {
       throw new Error(`Bot "${config.name}": command contains disallowed shell metacharacters (;|&\`$(){}[]<>!). Use simple commands without pipes or chaining.`);
     }
 
-    // Command prefix allowlist
+    // Command prefix allowlist — REQUIRED for SSH (no arbitrary commands allowed)
     const allowedPrefixes = (this.getConfig().allowedCommandPrefixes as string[] | undefined) || [];
-    if (allowedPrefixes.length > 0) {
-      const cmdTrimmed = command.trimStart();
-      const allowed = allowedPrefixes.some(p => cmdTrimmed.startsWith(p));
-      if (!allowed) {
-        throw new Error(`Bot "${config.name}": command not allowed. Must start with one of: ${allowedPrefixes.join(', ')}`);
-      }
+    if (allowedPrefixes.length === 0) {
+      throw new Error(`Bot "${config.name}": allowedCommandPrefixes must be configured for SSH — arbitrary commands are not allowed`);
+    }
+    const cmdTrimmed = command.trimStart();
+    const allowed = allowedPrefixes.some(p => cmdTrimmed.startsWith(p));
+    if (!allowed) {
+      throw new Error(`Bot "${config.name}": command not allowed. Must start with one of: ${allowedPrefixes.join(', ')}`);
     }
 
     // Resolve credentials from config

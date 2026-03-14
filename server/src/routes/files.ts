@@ -6,7 +6,7 @@ import { checkInvestigationAccess } from '../middleware/access.js';
 import { db } from '../db/index.js';
 import { files } from '../db/schema.js';
 import type { AuthUser } from '../types.js';
-import { mkdir, writeFile, stat } from 'node:fs/promises';
+import { mkdir, writeFile, stat, realpath } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
@@ -191,10 +191,18 @@ app.get('/:id', async (c) => {
 
   const filePath = join(STORAGE_PATH, file.storagePath);
 
-  // Path traversal protection
-  const resolvedFilePath = resolve(filePath);
+  // Path traversal protection: resolve() normalizes ".." but doesn't follow symlinks.
+  // Use realpath() to resolve symlinks and verify the true location is inside STORAGE_PATH.
   const basePath = resolve(STORAGE_PATH);
-  if (!resolvedFilePath.startsWith(basePath + '/') && resolvedFilePath !== basePath) {
+  let resolvedFilePath: string;
+  try {
+    resolvedFilePath = await realpath(filePath);
+  } catch {
+    return c.json({ error: 'File not found on disk' }, 404);
+  }
+  const resolvedBasePath = await realpath(basePath).catch(() => basePath);
+  if (!resolvedFilePath.startsWith(resolvedBasePath + '/')) {
+    logger.warn('Path traversal blocked', { fileId, storagePath: file.storagePath, resolved: resolvedFilePath });
     return c.json({ error: 'Invalid file path' }, 403);
   }
 

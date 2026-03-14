@@ -26,13 +26,44 @@ const SERVER_MANAGED_FIELDS = new Set([
   'localOnly', // client-only field — never store on server
 ]);
 
+/** Max allowed size for string fields to prevent oversized payloads */
+const MAX_STRING_LENGTH = 500_000; // 500KB — covers large note content
+const MAX_ARRAY_LENGTH = 5_000;    // e.g. tags, linkedIds
+const MAX_OBJECT_DEPTH = 5;
+
+/**
+ * Validate that a value is a safe, bounded primitive or structure.
+ * Rejects functions, symbols, deeply nested objects, and oversized strings/arrays.
+ */
+function validateValue(value: unknown, depth = 0): boolean {
+  if (value === null || value === undefined) return true;
+  const t = typeof value;
+  if (t === 'boolean' || t === 'number') return true;
+  if (t === 'string') return (value as string).length <= MAX_STRING_LENGTH;
+  if (t === 'function' || t === 'symbol' || t === 'bigint') return false;
+  if (depth > MAX_OBJECT_DEPTH) return false;
+  if (Array.isArray(value)) {
+    return value.length <= MAX_ARRAY_LENGTH && value.every(v => validateValue(v, depth + 1));
+  }
+  if (t === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length > 200) return false; // too many fields
+    return entries.every(([, v]) => validateValue(v, depth + 1));
+  }
+  return false;
+}
+
 function stripServerFields(data: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!data) return {};
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
-    if (!SERVER_MANAGED_FIELDS.has(key)) {
-      clean[key] = value;
+    if (SERVER_MANAGED_FIELDS.has(key)) continue;
+    // Reject unsafe or oversized values
+    if (!validateValue(value)) {
+      logger.warn('Sync: rejected invalid field value', { key, type: typeof value });
+      continue;
     }
+    clean[key] = value;
   }
   return clean;
 }

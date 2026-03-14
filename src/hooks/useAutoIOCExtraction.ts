@@ -65,9 +65,12 @@ export function useAutoIOCExtraction({
     if (lengthDiff < 20) return;
 
     clearTimeout(timerRef.current);
+    // Capture entityId at schedule time so we can detect stale firings
+    const scheduledForId = entityId;
     timerRef.current = setTimeout(() => {
       const currentId = entityIdRef.current;
-      if (!currentId) return;
+      // Discard if entity changed since this extraction was scheduled
+      if (!currentId || currentId !== scheduledForId) return;
       const fresh = extractIOCs(content, { enabledTypes: enabledTypesRef.current, defaultConfidence: defaultConfidenceRef.current });
       if (fresh.length === 0 && !existingAnalysisRef.current) return;
       const merged = mergeIOCAnalysis(existingAnalysisRef.current, fresh);

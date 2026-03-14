@@ -135,13 +135,19 @@ export function preprocessWikiLinks(content: string, notes: WikiLinkTarget[]): s
   }).join('');
 }
 
+/** Shared DOMPurify config — single source of truth for all sanitization. */
+const SANITIZE_CONFIG = {
+  RETURN_DOM_FRAGMENT: false,
+  RETURN_DOM: false,
+  ADD_TAGS: ['input'],
+  ADD_ATTR: ['type', 'checked', 'disabled', 'class', 'data-note-link', 'data-note-id', 'data-entity-type', 'data-entity-id'],
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'base', 'meta', 'link'],
+  FORBID_ATTR: ['style', 'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onsubmit'],
+};
+
 /** Re-sanitize arbitrary HTML using the same DOMPurify config as renderMarkdown. */
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ADD_TAGS: ['input'],
-    ADD_ATTR: ['type', 'checked', 'disabled', 'class', 'data-note-link', 'data-note-id', 'data-entity-type', 'data-entity-id'],
-    FORBID_ATTR: ['style', 'onerror', 'onload'],
-  });
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG) as string;
 }
 
 export function renderMarkdown(content: string, wikiLinkTargets?: WikiLinkTarget[]): string {
@@ -149,9 +155,5 @@ export function renderMarkdown(content: string, wikiLinkTargets?: WikiLinkTarget
   ensureHljsCss();
   const processed = wikiLinkTargets ? preprocessWikiLinks(content, wikiLinkTargets) : content;
   const raw = marked.parse(processed) as string;
-  return DOMPurify.sanitize(raw, {
-    ADD_TAGS: ['input'],
-    ADD_ATTR: ['type', 'checked', 'disabled', 'class', 'data-note-link', 'data-note-id'],
-    FORBID_ATTR: ['style', 'onerror', 'onload'],
-  });
+  return DOMPurify.sanitize(raw, SANITIZE_CONFIG) as string;
 }

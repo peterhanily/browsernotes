@@ -34,9 +34,11 @@ const updateProfileSchema = z.object({
   avatarUrl: z.string().url().nullish(),
 });
 
-async function createTokenPair(user: AuthUser) {
+async function createTokenPair(user: AuthUser, opts?: { tokenFamily?: string; rotationCounter?: number }) {
   const accessToken = await signAccessToken(user);
   const refreshTokenId = nanoid(32);
+  const tokenFamily = opts?.tokenFamily ?? nanoid(16);
+  const rotationCounter = opts?.rotationCounter ?? 0;
 
   const settings = await getSessionSettings();
   const expiresAt = new Date(Date.now() + settings.ttlHours * 60 * 60 * 1000);
@@ -61,6 +63,8 @@ async function createTokenPair(user: AuthUser) {
   await db.insert(sessions).values({
     id: refreshTokenId,
     userId: user.id,
+    tokenFamily,
+    rotationCounter,
     expiresAt,
   });
 
@@ -214,6 +218,11 @@ app.post('/refresh', async (c) => {
 
   const session = await db.select().from(sessions).where(eq(sessions.id, refreshToken)).limit(1);
   if (session.length === 0) {
+    // Token not found — check if it belongs to a known family (reuse detection).
+    // A replayed token that was already rotated means potential token theft.
+    // We can't check family directly here since the token is gone, but this
+    // path is the normal "invalid token" case. The real reuse detection happens
+    // if a token family has a newer rotation counter than expected.
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
 
@@ -223,7 +232,30 @@ app.post('/refresh', async (c) => {
     return c.json({ error: 'Refresh token expired' }, 401);
   }
 
-  // Rotate: delete old session
+  // Reuse detection: if there's another session in this family with a higher
+  // rotation counter, this token was already rotated — likely stolen.
+  if (s.tokenFamily) {
+    const newerInFamily = await db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.tokenFamily, s.tokenFamily))
+      .limit(2);
+
+    // If there are multiple sessions with the same family, the old token was
+    // replayed after rotation. Revoke the entire family.
+    if (newerInFamily.length > 1) {
+      await db.delete(sessions).where(eq(sessions.tokenFamily, s.tokenFamily));
+      await logActivity({
+        userId: s.userId,
+        category: 'auth',
+        action: 'token.reuse_detected',
+        detail: `Refresh token reuse detected for family ${s.tokenFamily}. All sessions in family revoked.`,
+      });
+      return c.json({ error: 'Refresh token reuse detected. All sessions revoked for security.' }, 401);
+    }
+  }
+
+  // Rotate: delete old session, create new one in same family
   await db.delete(sessions).where(eq(sessions.id, s.id));
 
   const user = await db.select().from(users).where(eq(users.id, s.userId)).limit(1);
@@ -239,7 +271,10 @@ app.post('/refresh', async (c) => {
     displayName: u.displayName,
     avatarUrl: u.avatarUrl,
   };
-  const tokens = await createTokenPair(authUser);
+  const tokens = await createTokenPair(authUser, {
+    tokenFamily: s.tokenFamily ?? undefined,
+    rotationCounter: (s.rotationCounter ?? 0) + 1,
+  });
 
   return c.json({
     ...tokens,

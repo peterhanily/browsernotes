@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Activity, FileText, ListChecks, Clock, PenTool,
-  FolderOpen, Tag, Shield, Cloud, Database, Trash2, MessageSquare,
+  FolderOpen, Tag, Shield, Cloud, Database, Trash2, MessageSquare, Bot,
 } from 'lucide-react';
 import type { ActivityLogEntry, ActivityCategory } from '../../types';
 import { ACTIVITY_CATEGORY_LABELS } from '../../types';
@@ -32,6 +32,7 @@ const CATEGORY_ICONS: Record<ActivityCategory, typeof FileText> = {
   ioc: Shield,
   sync: Cloud,
   data: Database,
+  'agent-bridge': Bot,
   chat: MessageSquare,
 };
 

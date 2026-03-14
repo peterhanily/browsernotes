@@ -1,628 +1,381 @@
 # ThreatCaddy Architecture
 
+ThreatCaddy is a threat intelligence investigation platform composed of three main subsystems: a Chrome Extension client, a Team Server, and an Agent Bridge for AI integration.
+
+---
+
 ## 1. System Overview
 
 ThreatCaddy is a local-first, team-capable threat intelligence workbench. Users can run it entirely offline in a browser, or connect to a shared team server for real-time collaboration.
 
-```mermaid
-graph TB
-    subgraph "Browser Client"
-        SPA["React SPA<br/>(Vite + TypeScript)"]
-        IDB["IndexedDB<br/>(Dexie.js)"]
-        ENC["Encryption Middleware<br/>(AES-256-GCM)"]
-        SPA --> ENC --> IDB
-    end
-
-    subgraph "Chrome / Firefox Extension"
-        BG["Background Service Worker"]
-        BR["bridge.js<br/>(Content Script)"]
-        POP["Popup UI"]
-        BR <-->|postMessage| SPA
-        BR <-->|chrome.runtime| BG
-        POP -->|chrome.runtime| BG
-    end
-
-    subgraph "Team Server (Hono + Node.js)"
-        API["REST API<br/>:3001"]
-        WS["WebSocket<br/>/ws"]
-        ADMIN["Admin Panel<br/>:3002"]
-        BOT["Bot Runtime"]
-        SYNC["Sync Service"]
-        API --> SYNC
-        WS --> SYNC
-        BOT --> SYNC
-    end
-
-    subgraph "PostgreSQL"
-        DB[(Database<br/>Drizzle ORM)]
-    end
-
-    subgraph "File Storage"
-        FS["/data/files<br/>(uploads, backups)"]
-    end
-
-    subgraph "Docker Sandbox"
-        DOCK["Ephemeral Containers<br/>(Python, Node, Bash)"]
-    end
-
-    SPA <-->|REST + JWT| API
-    SPA <-->|WebSocket| WS
-    API --> DB
-    ADMIN --> DB
-    BOT --> DB
-    API --> FS
-    BOT --> DOCK
-    BG -->|LLM Streaming| LLM["LLM APIs<br/>(Anthropic, OpenAI,<br/>Gemini, Mistral, Local)"]
-```
-
 ### Component Roles
 
 | Component | Technology | Purpose |
-|-----------|-----------|---------|
+|---|---|---|
 | **Browser Client** | React, Vite, TypeScript, Dexie.js | Investigation workspace -- notes, tasks, timelines, IOCs, whiteboards, chat |
 | **IndexedDB** | Dexie.js (21 schema versions) | Local-first storage. All data persists in the browser first. |
 | **Encryption Middleware** | Web Crypto API (AES-256-GCM) | Transparent field-level encryption at rest in IndexedDB |
-| **Extension** | Chrome MV3 / Firefox WebExtension | Web clipping, LLM API proxy (bypasses CORS), URL fetching |
-| **Team Server** | Hono framework, Node.js 22 | REST API, WebSocket server, bot runtime, admin panel |
-| **PostgreSQL** | v17 (Alpine) via Drizzle ORM | Shared data store for team mode |
+| **Chrome Extension** | Chrome MV3 | Web clipping, LLM API proxy (bypasses CORS), URL fetching |
+| **Team Server** | Hono framework, Node.js | REST API, WebSocket server, bot runtime, admin panel |
+| **PostgreSQL** | Drizzle ORM | Shared data store for team mode |
 | **Admin Panel** | Separate Hono app on port 3002 | Server-rendered HTML admin UI (users, bots, settings, audit) |
 | **Bot Runtime** | In-process (BotManager) | Automated workflows triggered by events, schedules, webhooks |
 | **Docker Sandbox** | dockerode | Isolated code execution for bots (Python, Node.js, Bash) |
+| **Agent Bridge** | Chrome DevTools Protocol (CDP) | Programmatic access for AI agents to read/write investigation data |
 
 ---
 
-## 2. Data Flow
+## 2. Directory Layout
 
-### 2.1 Local-First Architecture
-
-Every entity (note, task, timeline event, IOC, whiteboard, chat thread) is written to IndexedDB first. The server is optional -- the app is fully functional without it.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant SPA as React SPA
-    participant Enc as Encryption Middleware
-    participant IDB as IndexedDB
-    participant SyncQ as _syncQueue (Dexie)
-    participant Server as Team Server
-
-    User->>SPA: Create/edit entity
-    SPA->>Enc: put(entity)
-    Enc->>IDB: Encrypted write
-    Note over IDB: Dexie hook fires
-    IDB->>SyncQ: Enqueue {table, entityId, op, data}
-    SyncQ-->>Server: Debounced push (50ms debounce, 300ms max wait)
 ```
+src/                    Chrome extension source
+  components/           React components
+  hooks/                React hooks (data layer)
+  lib/                  Business logic, tools, export/import
+  types.ts              TypeScript interfaces
+  db.ts                 Dexie database schema
 
-Key tables in Dexie:
-- `_syncQueue` -- outbound changes waiting to be pushed (auto-incrementing `seq`)
-- `_syncMeta` -- tracks `lastSyncTimestamp` for incremental pulls
+server/                 Team server
+  src/
+    routes/             API route handlers
+    middleware/          Auth, rate limiting, RBAC
+    services/           Business logic services
+    db/                 Drizzle schema + migrations
+    ws/                 WebSocket handler
+    bots/               Bot runtime + sandbox
 
-### 2.2 Sync Engine (Client Side)
+agents/                 External agent integrations
+  claude-code/          Claude Code skill + CDP daemon
 
-**File:** `src/lib/sync-engine.ts`
-
-The `SyncEngine` class (singleton) manages bidirectional sync:
-
-1. **Push** -- Drains `_syncQueue`, sends changes via `POST /api/sync/push`. Results are `accepted`, `rejected`, or `conflict`.
-2. **Pull** -- Queries `GET /api/sync/pull?since=<ISO timestamp>` for changes from other clients. Applies them locally with sync hooks disabled (to prevent re-enqueue).
-3. **Safety-net sync** -- Full push+pull every 30 seconds.
-4. **Debounced push** -- Changes trigger a push within 50ms (debounce) with a 300ms maximum wait during continuous typing.
-5. **WebSocket fast path** -- Entity changes received via WebSocket are applied directly via `applyRemoteChange()`, bypassing the pull cycle.
-6. **Conflict resolution** -- Conflicts surface to the UI. Users choose "mine" (re-push local) or "theirs" (overwrite local with server data).
-7. **Initial sync** -- On first connection, all local folders and their content are pushed to the server.
-8. **Folder snapshot** -- When invited to an investigation, the client pulls a full snapshot via `GET /api/sync/snapshot/:folderId`.
-
-### 2.3 Sync Service (Server Side)
-
-**File:** `server/src/services/sync-service.ts`
-
-The server-side sync service implements optimistic concurrency control:
-
-- Every entity has a `version` integer, incremented on each update.
-- `processPush()` compares `clientVersion` against `serverVersion`. On mismatch, it returns `conflict` with the current server data.
-- Soft-delete: `DELETE` operations set `deletedAt` + bump version instead of hard-deleting, so other clients discover deletions on their next pull.
-- Server-managed fields (`id`, `createdBy`, `updatedBy`, `version`, `createdAt`, `updatedAt`, `deletedAt`) are stripped from client payloads -- never trusted from the client.
-
-Authorization on push:
-- Global tables (`tags`, `timelines`) are always accepted.
-- Folder-scoped tables require `editor` role on the folder via `investigationMembers`.
-- New folders auto-create an `owner` membership for the creating user.
-
-### 2.4 Sync Middleware (Client Side)
-
-**File:** `src/lib/sync-middleware.ts`
-
-Dexie table hooks (`creating`, `updating`, `deleting`) on all synced tables automatically capture changes into `_syncQueue`. Hooks run synchronously in the Dexie transaction; the actual queue write is deferred via `setTimeout()` to run in a separate transaction.
-
-Folders marked `localOnly` (and their scoped entities) skip sync entirely.
-
-### 2.5 WebSocket Real-Time Updates
-
-**Files:** `server/src/ws/handler.ts`, `server/src/ws/presence.ts`, `src/lib/ws-client.ts`
-
-```mermaid
-sequenceDiagram
-    participant Client1 as Client A
-    participant WS as WebSocket Server
-    participant Client2 as Client B
-
-    Client1->>WS: connect /ws
-    WS->>Client1: (5s auth timeout starts)
-    Client1->>WS: {type: "auth", token: "..."}
-    WS->>Client1: {type: "auth-ok"}
-
-    Client1->>WS: {type: "subscribe", folderId: "inv-123"}
-    WS->>Client1: {type: "presence", users: [...]}
-
-    Note over Client1: User edits a note
-    Client1->>WS: {type: "entity-change-preview", ...}
-    WS->>Client2: {type: "entity-change", ...}
-    Note over Client2: SyncEngine.applyRemoteChange()
+docs/                   Documentation
 ```
-
-WebSocket message types:
-- `auth` -- First message must contain JWT token (5s timeout)
-- `subscribe` / `unsubscribe` -- Join/leave folder channels (verified against `investigationMembers`)
-- `presence-update` -- Report current view and entity being edited
-- `entity-change-preview` -- Optimistic relay from sender to other subscribers (verified for editor access)
-- `entity-change` -- Server-authoritative entity changes (broadcast after sync push acceptance)
-- `ping` / `pong` -- Keep-alive (25s interval)
-- `access-revoked` -- Sent when a user is removed from an investigation
-
-Rate limits:
-- 30 messages/second per connection
-- 50 messages/second per user (across all connections)
-- Max 10 connections per user
-- Max 64KB per message
-
-### 2.6 Extension Bridge
-
-**Files:** `extension/src/bridge.js`, `extension/src/background.js`
-
-The extension operates as a content script (`bridge.js`) injected into the ThreatCaddy page. It bridges communication between the SPA (which runs in the page's origin) and the extension's background service worker (which has elevated permissions).
-
-```mermaid
-graph LR
-    SPA["React SPA<br/>(window)"] <-->|window.postMessage| Bridge["bridge.js<br/>(content script,<br/>ISOLATED world)"]
-    Bridge <-->|chrome.runtime.connect<br/>chrome.runtime.sendMessage| BG["background.js<br/>(service worker)"]
-    BG -->|fetch with CORS bypass| APIs["LLM APIs /<br/>External URLs"]
-```
-
-Protocol versioning (`TC_PROTOCOL_VERSION = 1`) with capability negotiation (`TC_CAPABILITIES = ['llm_streaming', 'fetch_url', 'clip_import']`).
-
-Message flow for LLM streaming:
-1. SPA posts `TC_LLM_REQUEST` via `window.postMessage`
-2. `bridge.js` opens a long-lived port (`chrome.runtime.connect`) to the background SW
-3. Background SW streams from the LLM API (Anthropic, OpenAI, Gemini, Mistral, or local/Ollama)
-4. Chunks relay back: background -> bridge -> SPA (`TC_LLM_CHUNK`, `TC_LLM_DONE`)
-
-Web clipping flow:
-1. User right-clicks "Save to ThreatCaddy" or uses keyboard shortcut
-2. Background SW injects `getSelectionAsMarkdown()` into the page
-3. Selection is converted to markdown (with inline base64 images) and saved to `chrome.storage.local`
-4. Clips can be sent to the ThreatCaddy app via `sendToTarget()` which opens the target URL and injects clips via `bridge.js`
 
 ---
 
-## 3. Security Architecture
+## 3. Data Model
 
-### 3.1 Client-Side Encryption
+### 3.1 Core Entities
 
-**Files:** `src/lib/crypto.ts`, `src/lib/encryptionMiddleware.ts`, `src/lib/encryptionStore.ts`
+- **Folder (Investigation)** -- The top-level container. Every note, task, timeline event, IOC, and whiteboard belongs to exactly one folder. Folders carry status (active, closed, archived), TLP/PAP classification, and closure resolution metadata.
 
-All sensitive fields in IndexedDB can be encrypted at rest using AES-256-GCM:
+- **Note** -- Rich Markdown content with automatic IOC extraction, inline annotations, and cross-entity links to tasks, timeline events, and other notes.
 
-```
-Passphrase
-    |
-    v (PBKDF2, 600,000 iterations, SHA-256)
-Wrapping Key (AES-KW-256)
-    |
-    v (AES-KW wrap/unwrap)
-Master Key (AES-GCM-256, random)
-    |
-    v (AES-GCM encrypt/decrypt per field)
-Encrypted Field Envelopes {__enc: 1, ct, iv, json?}
-```
+- **Task** -- Kanban-style work items with three columns (todo, in-progress, done). Supports priority levels (none, low, medium, high), inline checklists, and assignees.
 
-- **Master key**: Random AES-256-GCM key, generated once, stored wrapped in IndexedDB
-- **Wrapping key**: Derived from user passphrase via PBKDF2 (600k iterations)
-- **Session key**: Unwrapped master key, held in memory only (lost on tab close), cached in `sessionStorage` for tab refreshes
-- **Recovery phrase**: 24-word BIP39-style phrase (192 bits of entropy) for passphrase recovery
-- **Field-level**: Each encrypted field gets its own random 96-bit IV. Non-string values are JSON-serialized before encryption.
+- **TimelineEvent** -- Temporal records tagged with MITRE ATT&CK tactics, incident response phases, confidence levels, geographic context (latitude/longitude), and threat actor attribution.
 
-Encrypted fields per table (from `ENCRYPTED_FIELDS`):
-- `notes`: title, content, sourceUrl, sourceTitle, color, clsLevel, iocAnalysis
-- `tasks`: title, description, clsLevel, iocAnalysis, comments
-- `folders`: name, description, clsLevel, papLevel
-- `timelineEvents`: title, description, source, actor, rawData, clsLevel, iocAnalysis
-- `whiteboards`: name, elements, appState
-- `chatThreads`: title, messages
-- `standaloneIOCs`: value, analystNotes, clsLevel
+- **StandaloneIOC** -- Indicators of Compromise spanning 13 types: ipv4, ipv6, domain, url, email, md5, sha1, sha256, cve, mitre-attack, yara-rule, sigma-rule, and file-path. Each IOC tracks status, enrichment data, and typed relationships to other IOCs.
 
-The encryption middleware is installed as a Dexie DBCore middleware. It transparently encrypts on `mutate` (add/put) and decrypts on `get`/`getMany`/`query`. Uses `Dexie.waitFor()` to keep IDB transactions alive during async Web Crypto operations.
+- **Whiteboard** -- Excalidraw-based visual collaboration canvas for diagramming attack flows and relationships.
 
-### 3.2 Authentication Model
+- **ChatThread** -- LLM conversation threads with tool-use support, enabling AI-assisted analysis within investigations.
 
-**File:** `server/src/routes/auth.ts`, `server/src/middleware/auth.ts`
+### 3.2 Entity Relationships
 
-- **Password hashing**: Argon2id
-- **JWT algorithm**: EdDSA (Ed25519 key pair)
-- **Access tokens**: 15-minute expiry, contain `sub`, `email`, `role`, `displayName`
-- **Refresh tokens**: Random nanoid(32), stored in `sessions` table, configurable TTL (default 24 hours)
-- **Token rotation**: On refresh, the old session is deleted and a new one is created
-- **Session limits**: Configurable max sessions per user (excess are evicted oldest-first)
-- **Login rate limiting**: Progressive lockout after failed attempts (in-memory, per email)
-- **Bot account isolation**: Accounts with `@threatcaddy.internal` email cannot log in interactively or use the API directly
+All entities support cross-linking through `linkedNoteIds`, `linkedTaskIds`, and `linkedTimelineEventIds` arrays. IOCs use typed relationships with the following link types: resolves-to, downloads, communicates-with, drops, hosts, attributed-to, exploits, uses-technique, detected-by, alerts-on, and related-to.
 
-Registration modes:
-- **Invite-only** (default): Only emails in `allowed_emails` table can register. The invite is consumed on registration.
-- **Open**: Anyone can register.
+### 3.3 Client-Side Storage (IndexedDB via Dexie)
 
-### 3.3 Admin Authentication
+The client database has evolved through 21 schema versions. Tables include: notes, tasks, folders, tags, timelineEvents, timelines, whiteboards, activityLog, standaloneIOCs, chatThreads, noteTemplates, playbookTemplates, integrationTemplates, installedIntegrations, integrationRuns, and two internal sync tables (_syncQueue, _syncMeta).
 
-**File:** `server/src/middleware/admin-auth.ts`, `server/src/services/admin-secret.ts`
+### 3.4 Server-Side Storage (PostgreSQL via Drizzle ORM)
 
-The admin panel runs on a separate port (default 3002) with its own authentication:
+The server schema has 18 migrations and includes all client-side entities plus server-specific tables: users, sessions, investigation_members, server_settings, allowed_emails, bot_configs, bot_runs, admin_users, activity_log, posts, reactions, notifications, files, saved_searches, integration_templates, and backups.
 
-- **Bootstrap secret**: Set via `ADMIN_SECRET` env var, or auto-generated on first launch (written to `/data/files/.admin-secret` with mode 0600). Used to create the first admin user.
-- **Admin JWT**: HMAC-SHA256 signed with a random 32-byte key generated at server startup. Admin tokens have a 1-hour expiry with audience claim `admin-panel`.
-- **In-memory signing key**: Intentionally regenerated on every server restart, invalidating all existing admin sessions. This is a security feature, not a bug.
-- **Admin users**: Stored in `admin_users` table, separate from investigation users. Admin accounts have their own passwords (Argon2id).
-- **CORS**: Admin panel only accepts same-origin requests (rejects all cross-origin).
+Drizzle ORM with the `postgres.js` driver manages the connection pool (max 20 connections). The schema is defined in TypeScript with type-safe queries. Migration files live in `server/src/db/migrations/`.
 
-### 3.4 Role-Based Access Control
+### 3.5 Entity Relationship Summary
 
-Two separate RBAC systems:
+- Users have sessions, investigation memberships, files, backups, and bot configs.
+- Folders contain notes, tasks, timeline events, whiteboards, standalone IOCs, chat threads, and posts.
+- Folders have investigation members that bind users to specific roles.
+- Timelines contain timeline events.
+- Bot configs have bot runs.
+- Posts have reactions, replies (self-referential), and trigger notifications.
 
-**Server roles** (on the `users` table):
-| Role | Capabilities |
-|------|-------------|
-| `admin` | Full server access, can create bots |
-| `analyst` | Standard access, can read bots |
-| `viewer` | Read-only server access |
+---
 
-**Investigation roles** (on the `investigation_members` table):
-| Role | Capabilities |
-|------|-------------|
-| `owner` | Full control, can manage members |
-| `editor` | Can create and modify entities |
-| `viewer` | Can read entities |
+## 4. Sync Protocol
 
-Access check hierarchy: `viewer (0) < editor (1) < owner (2)`.
+ThreatCaddy uses an optimistic concurrency model with full offline support. Every entity is written to IndexedDB first -- the server is optional and the app is fully functional without it.
 
-### 3.5 Bot Sandboxing
+### 4.1 Push
 
-**File:** `server/src/bots/sandbox.ts`
+The client drains the `_syncQueue` table and sends changes via POST to the server. Each change contains a table name, entity ID, operation type (create/update/delete), data payload, version number, and timestamp. The server validates investigation membership, applies conflict resolution, and broadcasts accepted changes to other clients via WebSocket. Results for each change are classified as accepted, rejected, or conflict.
+
+### 4.2 Pull
+
+The client requests all changes since a given timestamp for a specific folder. The server returns changes with version info. A MetadataOnly mode is available for lightweight polling without full payloads.
+
+### 4.3 Snapshot
+
+A full investigation state download used for initial sync when joining an investigation or for recovery after extended offline periods.
+
+### 4.4 Conflict Resolution
+
+The system uses last-writer-wins semantics keyed by version number. Every entity has a `version` integer that increments on each update. When the server receives a change whose version is less than or equal to the current version, it rejects the write and returns the current server data as a conflict. The client surfaces conflicts to the UI where users choose "mine" (re-push local) or "theirs" (overwrite local with server data).
+
+Server-managed fields (id, createdBy, updatedBy, version, createdAt, updatedAt, deletedAt) are stripped from client payloads and never trusted from the client. Delete operations use soft-delete (setting `deletedAt` and bumping the version) so other clients discover deletions on their next pull.
+
+### 4.5 Offline Support
+
+When the client is offline, all mutations are queued in the `_syncQueue` IndexedDB table via Dexie table hooks (creating, updating, deleting) that run synchronously in Dexie transactions. On reconnect, queued changes are replayed in order. A safety-net full push+pull cycle runs every 30 seconds. During continuous typing, changes trigger a push within 50ms (debounce) with a 300ms maximum wait.
+
+### 4.6 Authorization on Push
+
+- Global tables (tags, timelines) are always accepted.
+- Folder-scoped tables require editor role on the folder via investigation_members.
+- New folders auto-create an owner membership for the creating user.
+- Folders marked `localOnly` (and their scoped entities) skip sync entirely.
+
+---
+
+## 5. Security Model
+
+### 5.1 Authentication
+
+**Access tokens** are JWTs signed with EdDSA (Ed25519) and carry a 15-minute TTL. Claims include sub, email, role, and displayName.
+
+**Refresh tokens** are session-based, generated with nanoid(32), and stored in PostgreSQL. The server tracks token families to detect reuse (a signal of token theft). Both TTL (default 24 hours) and maximum sessions per user are configurable. On refresh, the old session is deleted and a new one is created.
+
+**Admin tokens** use a separate HMAC-SHA256 JWT issued on a dedicated admin port (default 3002). They have a 1-hour TTL with an audience claim of `admin-panel`, signed with a random 32-byte key regenerated on each server startup. This intentionally invalidates all admin sessions on restart.
+
+**Passwords** are hashed with Argon2id. Login rate limiting uses progressive lockout after failed attempts (in-memory, per email).
+
+**Registration modes**: Invite-only (default, requiring an email in the `allowed_emails` table) or open registration.
+
+### 5.2 Authorization
+
+Two separate RBAC systems enforce access control:
+
+**Server roles** (on the users table):
+- admin -- Full server access, can create bots.
+- analyst -- Standard access, can read bots.
+- viewer -- Read-only server access.
+
+**Investigation roles** (on the investigation_members table):
+- owner -- Full control, can manage members.
+- editor -- Can create and modify entities.
+- viewer -- Can read entities.
+
+Access check hierarchy: viewer (0) < editor (1) < owner (2). Server roles are enforced via `requireRole` middleware. Investigation membership is enforced via `requireMembership` middleware.
+
+Bot accounts use `@threatcaddy.internal` email addresses and are blocked from interactive login.
+
+### 5.3 Client-Side Encryption
+
+All sensitive fields in IndexedDB can be encrypted at rest using AES-256-GCM. The key hierarchy:
+
+1. **Master key** -- Random AES-256-GCM key generated once, stored wrapped in IndexedDB.
+2. **Wrapping key** -- Derived from user passphrase via PBKDF2 (600,000 iterations, SHA-256).
+3. **Session key** -- Unwrapped master key held in memory only (lost on tab close), cached in sessionStorage for tab refreshes.
+4. **Recovery phrase** -- 24-word BIP39-style phrase (192 bits of entropy) for passphrase recovery.
+
+Each encrypted field gets its own random 96-bit IV. The encryption middleware is installed as a Dexie DBCore middleware, transparently encrypting on mutate (add/put) and decrypting on get/getMany/query. It uses `Dexie.waitFor()` to keep IDB transactions alive during async Web Crypto operations.
+
+Encrypted tables and fields include: notes (title, content, sourceUrl, iocAnalysis), tasks (title, description, comments), folders (name, description), timelineEvents (title, description, source, actor), whiteboards (name, elements, appState), chatThreads (title, messages), and standaloneIOCs (value, analystNotes).
+
+### 5.4 Security Headers
+
+All responses include:
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+- Strict-Transport-Security: max-age=31536000; includeSubDomains
+- X-DNS-Prefetch-Control: off
+- Referrer-Policy: strict-origin-when-cross-origin
+- Content-Security-Policy: default-src 'none'; frame-ancestors 'none' (API server) or nonce-based (admin panel)
+
+### 5.5 Rate Limiting
+
+In-memory sliding window rate limiting, keyed by IP address. Limits are configurable per endpoint.
+
+---
+
+## 6. WebSocket Protocol
+
+Real-time collaboration is powered by WebSocket connections between the client and team server.
+
+**Authentication**: The first message on a new connection must contain a valid JWT (5-second timeout to authenticate).
+
+**Message types**:
+- auth -- JWT authentication on connect.
+- subscribe / unsubscribe -- Join or leave folder channels (verified against investigation_members).
+- presence-update -- Report current view and entity being edited.
+- entity-change-preview -- Optimistic relay from sender to other subscribers (verified for editor access).
+- entity-change -- Server-authoritative entity changes broadcast after sync push acceptance.
+- ping / pong -- Keep-alive (25-second interval).
+- access-revoked -- Sent when a user is removed from an investigation.
+
+**Rate limits**:
+- 30 messages per second per connection.
+- 50 messages per second per user (across all connections).
+- Maximum 10 connections per user.
+- Maximum 64KB per message.
+
+Entity changes received via WebSocket are applied directly via `applyRemoteChange()`, bypassing the normal pull cycle for lower latency.
+
+---
+
+## 7. Export and Import Formats
+
+ThreatCaddy supports multiple interchange formats for interoperability with other threat intelligence tools.
+
+| Format | Direction | Description |
+|---|---|---|
+| JSON | Import/Export | Full database backup and restore, or single-investigation export |
+| CSV | Export | IOC export with configurable column selection |
+| STIX 2.1 | Import/Export | Full bundle with Indicator SDOs, Vulnerability SDOs, Relationship SROs, and TLP markings using official OASIS UUIDs |
+| MISP | Import/Export | Event-level export and import with attribute type mapping |
+| Markdown | Export | Individual note export |
+| HTML Report | Export | Print-friendly, styled investigation report |
+
+Export formats respect TLP classification levels, redacting or omitting data as appropriate.
+
+---
+
+## 8. Agent Bridge (CDP Integration)
+
+The Agent Bridge exposes a `window.threatcaddy` API surface that AI agents can interact with through the Chrome DevTools Protocol.
+
+### 8.1 Capabilities
+
+The bridge provides 29 tools organized into four categories:
+
+- **Search and Read** (10 tools) -- Query and retrieve investigation data.
+- **Create and Update** (11 tools) -- Mutate notes, tasks, IOCs, timeline events, and other entities.
+- **Analysis** (2 tools) -- Perform analytical operations on investigation data.
+- **Web** (1 tool) -- Web-based lookups.
+- **Cross-Investigation** (5 tools) -- Operations that span multiple folders.
+
+### 8.2 Security
+
+Authentication uses a nonce-based challenge: the bridge generates a random nonce at startup, and agents must present it with each request.
+
+### 8.3 Architecture
+
+A persistent Node.js daemon holds the CDP session via a Unix domain socket. This eliminates Chrome's debugging confirmation popup and provides a stable connection for long-running agent workflows. All tool calls are audit-logged to the IndexedDB activityLog table.
+
+---
+
+## 9. Bot System
+
+Bots extend ThreatCaddy with automated workflows for enrichment, monitoring, and correlation.
+
+### 9.1 Bot Types
+
+| Type | Purpose |
+|---|---|
+| enrichment | Enrich IOCs with external threat intel (VirusTotal, AbuseIPDB, etc.) |
+| feed | Ingest threat intel feeds |
+| monitor | Watch for specific conditions and alert |
+| triage | Auto-classify and prioritize |
+| report | Generate reports |
+| correlation | Find relationships across investigations |
+| ai-agent | LLM-powered autonomous agent with tool calling |
+| custom | User-defined logic |
+
+### 9.2 Trigger Types
+
+| Trigger | Mechanism | Details |
+|---|---|---|
+| Event | In-process event bus (BotEventBus) | Fires on entity.created, entity.updated, entity.deleted, investigation.created/closed/archived, post.created, member.added/removed, webhook.received. Event filters narrow triggers to specific tables, folder IDs, or IOC types. |
+| Schedule | Cron expressions via croner library | Any valid cron expression |
+| Webhook | POST /api/bots/:id/webhook | Authenticated via HMAC-SHA256 signature or raw secret comparison (both use timing-safe equality) |
+| Manual | POST /api/bots/:id/trigger | Admin-initiated on-demand execution |
+
+### 9.3 Capability Model
+
+Bots are granted explicit capabilities that gate what operations they can perform:
+
+| Capability | Grants |
+|---|---|
+| read_entities | Search, list, read notes/tasks/IOCs/timeline events |
+| create_entities | Create notes, tasks, IOCs, timeline events |
+| update_entities | Update existing entities |
+| post_to_feed | Post to CaddyShack social feed |
+| notify_users | Send notifications to users |
+| call_external_apis | Make outbound HTTP requests (domain-restricted) |
+| cross_investigation | Search/read across multiple investigations |
+| execute_remote | SSH commands, SOAR playbook triggers |
+| run_code | Execute code in sandboxed Docker containers |
+
+### 9.4 Execution Model
+
+**Concurrency**: Maximum 10 concurrent bot runs (configurable). Excess runs queue up in FIFO order (max 50 queue size). Overflows are dropped.
+
+**Rate limiting**: Token-bucket algorithm per bot with hourly and daily buckets. Default: 100/hour, 1000/day (configurable per bot).
+
+**Timeout**: Default 5 minutes (configurable). AbortController cancels in-flight operations on timeout.
+
+**Circuit breaker**: After 5 consecutive errors or timeouts, the bot is auto-disabled and the bot owner is notified.
+
+**Event chain depth limit**: Events emitted by bot actions carry a depth counter. Chains are terminated at depth 3 to prevent infinite mutual bot loops. Each bot in the chain is tracked via `originBotIds` to prevent amplification (bot A cannot re-trigger itself through bot B). A single event can trigger at most 10 bots (breadth limit).
+
+### 9.5 Sandboxing
 
 Code execution for bots runs in ephemeral Docker containers with strict isolation:
 
 | Control | Setting |
-|---------|---------|
-| Network | `NetworkMode: 'none'` -- completely disabled |
+|---|---|
+| Network | Completely disabled (NetworkMode: 'none') |
 | Filesystem | Read-only root, tmpfs workspace (50MB), tmpfs /tmp (10MB) |
-| Capabilities | All Linux capabilities dropped (`CapDrop: ['ALL']`) |
-| Privilege escalation | Blocked (`no-new-privileges`) |
-| User | `nobody` (UID 65534) |
+| Capabilities | All Linux capabilities dropped |
+| Privilege escalation | Blocked (no-new-privileges) |
+| User | nobody (UID 65534) |
 | PID limit | 64 (prevents fork bombs) |
 | Memory | 128MB hard limit, no swap |
 | CPU | 0.5 CPU |
 | Timeout | Configurable, default 30s, max 120s |
 | Output | 1MB max per stream (stdout/stderr) |
-| Cleanup | `AutoRemove: true` |
+| Cleanup | AutoRemove: true |
 
 Supported languages: Python 3.12, Node.js 22, Bash (Alpine).
 
-### 3.6 Bot Outbound HTTP (SSRF Protection)
-
-**File:** `server/src/bots/bot-context.ts`
+### 9.6 SSRF Protection for Bot HTTP Requests
 
 Bots making outbound HTTP requests are subject to:
-- Domain allowlist (configured per bot, empty = blocked)
-- Pre-flight DNS resolution with private IP check (blocks 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, link-local, loopback, CGNAT, etc.)
-- HTTPS/HTTP only (no other protocols)
-- Redirect following disabled (`redirect: 'error'`)
-- 30-second timeout per request
+- Domain allowlist (configured per bot, empty means blocked).
+- Pre-flight DNS resolution with private IP check (blocks 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, link-local, loopback, CGNAT, etc.).
+- HTTPS/HTTP only (no other protocols).
+- Redirect following disabled.
+- 30-second timeout per request.
 
-### 3.7 Webhook HMAC Verification
+### 9.7 Bot Secret Storage
 
-**File:** `server/src/routes/bots.ts`
-
-Inbound webhooks to bots support two authentication modes:
-1. **HMAC-SHA256 signature**: `X-Webhook-Signature: sha256=<hex>` header. Server computes HMAC of raw body using the bot's webhook secret and compares with timing-safe equality.
-2. **Raw secret comparison**: `X-Webhook-Secret` header compared using `timingSafeEqual`.
-
-The webhook secret is stored encrypted at rest using AES-256-GCM (server-side encryption via `secret-store.ts`) and decrypted only in the BotManager's in-memory cache.
-
-### 3.8 Bot Secret Storage
-
-**File:** `server/src/bots/secret-store.ts`
-
-Bot API keys and secrets are encrypted at rest in the database:
-- Algorithm: AES-256-GCM with 12-byte IV and 16-byte auth tag
-- Key derivation: scrypt from `BOT_MASTER_KEY` env var (or `JWT_PRIVATE_KEY` as fallback)
-- Format: `enc:<iv-b64>:<authTag-b64>:<ciphertext-b64>`
-- Convention: Fields ending in `Key`, `Secret`, `Token`, `Password` are auto-detected as secrets
-- API responses show redacted values (`***configured***` / `***not set***`)
-
-### 3.9 Security Headers
-
-All responses include:
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-- `X-DNS-Prefetch-Control: off`
-- `Referrer-Policy: strict-origin-when-cross-origin`
+Bot API keys and secrets are encrypted at rest in the database using AES-256-GCM with 12-byte IV and 16-byte auth tag. The encryption key is derived via scrypt from the `BOT_MASTER_KEY` environment variable. Fields ending in Key, Secret, Token, or Password are auto-detected as secrets. API responses show redacted placeholders.
 
 ---
 
-## 4. Database Schema
+## 10. Key Design Decisions
 
-**File:** `server/src/db/schema.ts`
+### Local-First with Optional Server Sync
 
-Drizzle ORM with PostgreSQL. Connection pool size: 20 (via `postgres.js`).
+All data is stored in IndexedDB first. The server is optional -- users can run the app as a standalone browser extension without any server. When a server is connected, the sync engine handles bidirectional change propagation. This enables offline work and air-gapped deployments while still supporting team collaboration when needed. Client-side encryption protects data at rest even when syncing, as encrypted envelopes are sent to the server. Local-only folders can be excluded from sync entirely.
 
-### 4.1 Entity Relationship Diagram
+### Separate Admin Panel on a Different Port
 
-```mermaid
-erDiagram
-    users ||--o{ sessions : "has"
-    users ||--o{ investigation_members : "belongs to"
-    users ||--o{ notes : "created by"
-    users ||--o{ tasks : "created by / assigned to"
-    users ||--o{ posts : "authored"
-    users ||--o{ reactions : "reacted"
-    users ||--o{ notifications : "receives"
-    users ||--o{ files : "uploaded"
-    users ||--o{ backups : "owns"
-    users ||--o{ bot_configs : "owns"
+The admin panel runs as a separate Hono app on port 3002 with its own CORS policy (same-origin only), its own JWT signing key, and its own user table. This allows the admin panel to be firewalled separately (e.g., only accessible from a management network) and keeps admin sessions independent from user sessions.
 
-    folders ||--o{ investigation_members : "has members"
-    folders ||--o{ notes : "contains"
-    folders ||--o{ tasks : "contains"
-    folders ||--o{ timeline_events : "contains"
-    folders ||--o{ whiteboards : "contains"
-    folders ||--o{ standalone_iocs : "contains"
-    folders ||--o{ chat_threads : "contains"
-    folders ||--o{ posts : "scoped to"
+### In-Memory JWT Admin Signing Key
 
-    timelines ||--o{ timeline_events : "has events"
+The admin JWT signing key is a random 32-byte value generated at startup and never persisted. All admin sessions are invalidated on server restart -- this is intentional. No key rotation mechanism is needed because a restart achieves it.
 
-    bot_configs ||--o{ bot_runs : "has runs"
+### EdDSA (Ed25519) for User JWT Signing
 
-    posts ||--o{ reactions : "has"
-    posts ||--o{ posts : "replies"
-    posts ||--o{ notifications : "triggers"
-```
+User JWTs are signed with EdDSA using Ed25519 key pairs. This provides smaller keys and signatures than RSA with fast signing and verification. Keys are configured via environment variables in PEM format.
 
-### 4.2 Core Tables
+### Drizzle ORM over Prisma/Knex
 
-**Users & Sessions**
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `users` | id, email (unique), displayName, passwordHash (Argon2id), role (admin/analyst/viewer), active | `@threatcaddy.internal` emails reserved for bot accounts |
-| `sessions` | id (refresh token), userId (FK cascade), expiresAt | Cleaned up hourly |
-| `admin_users` | id, username (unique), displayName, passwordHash | Separate from investigation users |
-
-**Investigation Model**
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `folders` | id, name, icon, color, status (active/closed/archived), clsLevel, papLevel, timelineId, closureResolution | Represents an investigation. Version-tracked for sync. |
-| `investigation_members` | id, folderId, userId (FK cascade), role (owner/editor/viewer) | Unique constraint on (folderId, userId) |
-
-**Entity Tables** (all version-tracked with `createdBy`, `updatedBy`, `version`, `createdAt`, `updatedAt`, `deletedAt`):
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `notes` | id, title, content, folderId, tags (jsonb), pinned, archived, trashed, sourceUrl, clsLevel, iocAnalysis (jsonb), linkedNoteIds/linkedTaskIds/linkedTimelineEventIds (jsonb) | Markdown content with IOC analysis |
-| `tasks` | id, title, description, folderId, status (todo/in-progress/done), priority (none/low/medium/high), assigneeId (FK), completed, order | Kanban board support |
-| `timeline_events` | id, title, description, timestamp, timestampEnd, eventType, source, confidence, folderId, timelineId (FK), mitreAttackIds (jsonb), actor, assets (jsonb), latitude/longitude | Supports MITRE ATT&CK mapping, geolocation |
-| `timelines` | id, name, description, color, order | Named timeline containers |
-| `whiteboards` | id, name, elements (text), appState (text), folderId | Stores Excalidraw state |
-| `standalone_iocs` | id, type, value, confidence, analystNotes, attribution, iocSubtype, iocStatus, folderId, relationships (jsonb) | IOC management with linking |
-| `chat_threads` | id, title, messages (jsonb), model, provider, folderId | AI chat conversations |
-| `tags` | id, name, color | Global (not folder-scoped) |
-
-**Social & Communication**
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `posts` | id, authorId (FK cascade), content, attachments (jsonb), folderId, parentId, replyToId, mentions (jsonb), pinned, deleted | CaddyShack social feed |
-| `reactions` | id, postId (FK cascade), userId (FK cascade), emoji | Unique on (postId, userId, emoji) |
-| `notifications` | id, userId (FK cascade), type, sourceUserId, postId, folderId, message, read | Retained for 90 days (configurable) |
-
-**Bot System**
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `bot_configs` | id, userId (FK), type, name, enabled, triggers (jsonb), config (jsonb, secrets encrypted), capabilities (jsonb), allowedDomains (jsonb), scopeType, scopeFolderIds (jsonb), rateLimitPerHour/PerDay, runCount, errorCount | Bot definition and configuration |
-| `bot_runs` | id, botConfigId (FK cascade), status (running/success/error/timeout/cancelled), trigger, durationMs, entitiesCreated/Updated, apiCallsMade, log (jsonb) | Execution history, retained 90 days |
-
-**Infrastructure**
-
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| `server_settings` | key (PK), value | Key-value store for: admin_secret_hash, registration_mode, server_name, session settings, AI settings, retention settings |
-| `allowed_emails` | email (PK) | Invite-only registration whitelist |
-| `activity_log` | id, userId, category, action, detail, itemId, folderId, timestamp | Audit trail, retained 365 days (configurable) |
-| `files` | id, uploadedBy (FK cascade), filename, mimeType, sizeBytes, storagePath, thumbnailPath, folderId | File attachments (50MB limit) |
-| `backups` | id, userId (FK cascade), name, type (full/differential), scope (all/investigation/entity), entityCount, sizeBytes, storagePath | Encrypted backup metadata (max 50 per user) |
+Drizzle ORM with the postgres.js driver provides a SQL-like TypeScript API that maps closely to actual SQL. It is lightweight with no binary engine dependency (unlike Prisma's Rust engine). Schema is defined in TypeScript with type-safe queries.
 
 ---
 
-## 5. Bot System
+## 11. Data Pruning and Cleanup
 
-### 5.1 Bot Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Created: Admin creates bot
-    Created --> Configured: Set triggers, capabilities, scope
-    Configured --> Enabled: Enable bot
-    Enabled --> Running: Event/schedule/webhook/manual trigger
-    Running --> Success: Execution completes
-    Running --> Error: Exception thrown
-    Running --> Timeout: Exceeds timeout (5m default)
-    Success --> Enabled: Ready for next trigger
-    Error --> Enabled: Error count lt 5
-    Error --> Disabled: Circuit breaker (5 consecutive errors)
-    Timeout --> Enabled: Error count lt 5
-    Timeout --> Disabled: Circuit breaker
-    Enabled --> Disabled: Disable bot
-    Disabled --> Enabled: Re-enable bot
-    Enabled --> Deleted: Delete bot
-    Disabled --> Deleted: Delete bot
-    Deleted --> [*]
-```
-
-### 5.2 Bot Types
-
-| Type | Purpose |
-|------|---------|
-| `enrichment` | Enrich IOCs with external threat intel (VirusTotal, AbuseIPDB, etc.) |
-| `feed` | Ingest threat intel feeds |
-| `monitor` | Watch for specific conditions and alert |
-| `triage` | Auto-classify and prioritize |
-| `report` | Generate reports |
-| `correlation` | Find relationships across investigations |
-| `ai-agent` | LLM-powered autonomous agent with tool calling |
-| `custom` | User-defined logic |
-
-### 5.3 Trigger Types
-
-| Trigger | Mechanism | Events |
-|---------|-----------|--------|
-| **Event** | In-process event bus (`BotEventBus`) | `entity.created`, `entity.updated`, `entity.deleted`, `investigation.created`, `investigation.closed`, `investigation.archived`, `post.created`, `member.added`, `member.removed`, `webhook.received` |
-| **Schedule** | Cron expressions via `croner` library | Any valid cron expression |
-| **Webhook** | `POST /api/bots/:id/webhook` | Authenticated via HMAC-SHA256 or raw secret |
-| **Manual** | `POST /api/bots/:id/trigger` | Admin-initiated |
-
-Event filters narrow triggers to specific tables, folder IDs, or IOC types.
-
-### 5.4 Capability Model
-
-Bots are granted explicit capabilities that gate what operations they can perform:
-
-| Capability | Grants |
-|------------|--------|
-| `read_entities` | Search, list, read notes/tasks/IOCs/timeline events |
-| `create_entities` | Create notes, tasks, IOCs, timeline events |
-| `update_entities` | Update existing entities |
-| `post_to_feed` | Post to CaddyShack social feed |
-| `notify_users` | Send notifications to users |
-| `call_external_apis` | Make outbound HTTP requests (domain-restricted) |
-| `cross_investigation` | Search/read across multiple investigations |
-| `execute_remote` | SSH commands, SOAR playbook triggers |
-| `run_code` | Execute code in sandboxed Docker containers |
-
-### 5.5 Execution Model
-
-**Concurrency**: Max 10 concurrent bot runs (configurable via `BOT_MAX_CONCURRENT_RUNS`). Excess runs queue up (FIFO, max 50 queue size). Overflows are dropped.
-
-**Rate limiting**: Token-bucket algorithm per bot, with hourly and daily buckets. Default: 100/hour, 1000/day (configurable per bot).
-
-**Timeout**: Default 5 minutes (configurable via `BOT_EXECUTION_TIMEOUT_MS`). AbortController is used to cancel in-flight operations.
-
-**Circuit breaker**: After 5 consecutive errors/timeouts, the bot is auto-disabled. The bot owner is notified.
-
-**Event chain depth limit**: Events emitted by bot actions carry a `depth` counter. Chains are terminated at depth 3 to prevent infinite mutual bot loops. Each bot in the chain is tracked via `originBotIds` to prevent amplification (bot A cannot re-trigger itself through bot B).
-
-**Breadth limit**: A single event can trigger at most 10 bots.
-
-### 5.6 Bot Execution Context
-
-**File:** `server/src/bots/bot-context.ts`
-
-The `BotExecutionContext` class provides a safe, capability-gated API for bot implementations:
-
-- **Read operations**: `searchNotes()`, `readNote()`, `listIOCs()`, `listTasks()`, `listTimelineEvents()`, `getInvestigation()`, `listInvestigations()`, `searchAcrossInvestigations()`
-- **Write operations**: `createEntity()`, `updateEntity()`, `createNote()`, `createIOC()`, `createTask()`, `createTimelineEvent()` (all go through sync-service for consistency)
-- **Feed**: `postToFeed()`
-- **Notifications**: `notifyUser()`
-- **External HTTP**: `fetchExternal()` (domain-restricted, SSRF-protected)
-- **SSH**: `execSSH()` (host allowlist, command prefix allowlist, private IP check, shell metacharacter blocking)
-- **Code execution**: `runCode()` (Docker sandbox)
-- **Polling**: `fetchAndPoll()` (fire-and-poll pattern for async APIs)
-
-Every operation checks capabilities, scope, and abort signal. All actions are audited.
-
----
-
-## 6. Key Design Decisions
-
-### ADR-001: Local-First with Optional Server Sync
-
-**Context**: Threat analysts often work on sensitive data that cannot leave their machine. Some teams need collaboration.
-
-**Decision**: All data is stored in IndexedDB first. The server is optional -- users can run the app as a standalone HTML file or browser extension without any server. When a server is connected, a sync engine pushes/pulls changes.
-
-**Consequences**:
-- Works offline and on air-gapped networks
-- Client-side encryption protects data at rest even when syncing (encrypted envelopes are sent to the server)
-- Conflict resolution is needed (version-based optimistic concurrency)
-- Local-only folders can be excluded from sync
-
-### ADR-002: Separate Admin Panel on a Different Port
-
-**Context**: The admin panel manages users, bots, and server settings -- operations that should not be accessible to regular users.
-
-**Decision**: Admin panel runs as a separate Hono app on port 3002 (configurable via `ADMIN_PORT`). It has its own CORS policy (same-origin only), its own JWT signing key (HMAC-SHA256, in-memory), and its own user table (`admin_users`).
-
-**Consequences**:
-- Admin panel can be firewalled separately (e.g., only accessible from management network)
-- Admin sessions are independent from user sessions
-- Admin panel renders server-side HTML (no SPA needed)
-- Separate ports mean separate TLS certificates if needed
-
-### ADR-003: In-Memory JWT Admin Signing Key
-
-**Context**: Admin tokens should be invalidated when the server restarts for security.
-
-**Decision**: The admin JWT signing key is a random 32-byte value generated at startup (`initAdminKey()`). It is never persisted.
-
-**Consequences**:
-- All admin sessions are invalidated on server restart (feature, not bug)
-- No key rotation needed -- restart achieves it
-- Multiple server instances would each have different keys (not an issue -- admin panel is single-instance)
-
-### ADR-004: Drizzle ORM over Prisma/Knex
-
-**Context**: The server needs a TypeScript ORM for PostgreSQL with migration support.
-
-**Decision**: Drizzle ORM with `postgres.js` driver.
-
-**Consequences**:
-- Schema defined in TypeScript (`server/src/db/schema.ts`) with type-safe queries
-- SQL-like API that maps closely to actual SQL (vs Prisma's abstraction)
-- Lightweight -- no query engine binary (vs Prisma's Rust engine)
-- Migration files in `server/src/db/migrations/`
-- Connection pool managed by `postgres.js` (max 20 connections)
-
-### ADR-005: EdDSA (Ed25519) for User JWT Signing
-
-**Context**: User JWTs need to be signed with an asymmetric algorithm so that the public key can be distributed without exposing the private key.
-
-**Decision**: EdDSA with Ed25519 key pair, configured via `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` environment variables (PEM format).
-
-**Consequences**:
-- Smaller keys and signatures than RSA
-- Fast signing and verification
-- Keys must be generated externally (`openssl genpkey -algorithm Ed25519`)
-- Both keys must be provided as environment variables (single-line, `\n`-escaped)
-
----
-
-## 7. Data Pruning & Cleanup
-
-**File:** `server/src/services/cleanup-service.ts`
-
-Runs on startup and every 6 hours:
+A cleanup service runs on startup and every 6 hours to enforce retention policies:
 
 | Data | Default Retention | Configurable |
-|------|------------------|-------------|
+|---|---|---|
 | Notifications | 90 days | Yes (server setting) |
 | Audit log entries | 365 days | Yes (server setting) |
 | Soft-deleted entities (tombstones) | 90 days | Yes (server setting) |

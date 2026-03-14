@@ -752,7 +752,8 @@ export const TAG_COLORS = [
 // Activity Log types
 export type ActivityCategory =
   | 'note' | 'task' | 'timeline' | 'whiteboard'
-  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data' | 'chat';
+  | 'folder' | 'tag' | 'ioc' | 'sync' | 'data' | 'chat'
+  | 'agent-bridge';
 
 export type ActivityAction =
   | 'create' | 'update' | 'delete'
@@ -761,7 +762,8 @@ export type ActivityAction =
   | 'star' | 'unstar'
   | 'analyze' | 'dismiss' | 'push-iocs'
   | 'export' | 'import' | 'share' | 'backup' | 'share-ioc-report'
-  | 'rename';
+  | 'rename'
+  | 'tool.exec' | 'tool.error';
 
 export interface ActivityLogEntry {
   id: string;
@@ -783,8 +785,9 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, { label: string;
   tag:        { label: 'Tag',        color: '#ec4899' },
   ioc:        { label: 'IOC',        color: '#ef4444' },
   sync:       { label: 'Sync',       color: '#06b6d4' },
-  data:       { label: 'Data',       color: '#6366f1' },
-  chat:       { label: 'Chat',       color: '#8b5cf6' },
+  data:            { label: 'Data',         color: '#6366f1' },
+  chat:            { label: 'Chat',         color: '#8b5cf6' },
+  'agent-bridge':  { label: 'Agent',        color: '#14b8a6' },
 };
 
 // ─── Social / Team Types ────────────────────────────────────────

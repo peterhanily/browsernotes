@@ -18,11 +18,14 @@ export const users = pgTable('users', {
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenFamily: text('token_family'),
+  rotationCounter: integer('rotation_counter').notNull().default(0),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   idxSessionsUserId: index('idx_sessions_user_id').on(t.userId),
   idxSessionsExpiresAt: index('idx_sessions_expires_at').on(t.expiresAt),
+  idxSessionsTokenFamily: index('idx_sessions_token_family').on(t.tokenFamily),
 }));
 
 // ─── Investigation Membership ───────────────────────────────────

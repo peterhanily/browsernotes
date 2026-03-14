@@ -3,8 +3,10 @@
  * so external AI agents (Claude Code, Codex, etc.) can interact with
  * the live session via Chrome DevTools Protocol `Runtime.evaluate`.
  *
- * The bridge is intentionally minimal: it exposes executeTool and the
- * current folderId, and lets agents call any of the 29 CaddyAI tools.
+ * Security:
+ * - Nonce validation: callers must present the nonce returned by `installAgentBridge`
+ *   to execute tools, preventing arbitrary page scripts from abusing the bridge.
+ * - Audit logging: every tool call is logged to IndexedDB activityLog.
  */
 
 import { executeTool } from './llm-tools';
@@ -13,14 +15,14 @@ import { db } from '../db';
 import type { ToolUseBlock } from '../types';
 
 interface ThreatCaddyBridge {
-  /** Execute a CaddyAI tool by name with JSON input. Returns JSON string. */
-  exec: (toolName: string, input: Record<string, unknown>) => Promise<string>;
+  /** Execute a CaddyAI tool by name with JSON input. Requires valid nonce. Returns JSON string. */
+  exec: (nonce: string, toolName: string, input: Record<string, unknown>) => Promise<string>;
   /** List available tool names */
   tools: () => string[];
   /** Get the currently selected investigation (folder) ID, if any */
   folderId: () => string | undefined;
-  /** Set the active investigation by ID */
-  setFolderId: (id: string | undefined) => void;
+  /** Set the active investigation by ID. Requires valid nonce. */
+  setFolderId: (nonce: string, id: string | undefined) => void;
   /** List investigations with basic metadata */
   investigations: () => Promise<string>;
   /** Bridge version for compatibility checks */
@@ -28,11 +30,40 @@ interface ThreatCaddyBridge {
 }
 
 let activeFolderId: string | undefined;
+let bridgeNonce: string | undefined;
+
+function generateNonce(): string {
+  const array = new Uint8Array(24);
+  crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function validateNonce(nonce: string): void {
+  if (!bridgeNonce || nonce !== bridgeNonce) {
+    throw new Error('Invalid agent bridge nonce');
+  }
+}
+
+async function logBridgeCall(toolName: string, folderId: string | undefined, isError: boolean) {
+  try {
+    await db.activityLog.add({
+      id: `agent-log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      category: 'agent-bridge',
+      action: isError ? 'tool.error' : 'tool.exec',
+      detail: `Agent bridge called ${toolName}${folderId ? ` in investigation ${folderId}` : ''}`,
+      itemTitle: toolName,
+      timestamp: Date.now(),
+    });
+  } catch {
+    // Don't let logging failures break tool execution
+  }
+}
 
 const bridge: ThreatCaddyBridge = {
-  version: '1.0.0',
+  version: '1.1.0',
 
-  async exec(toolName: string, input: Record<string, unknown> = {}): Promise<string> {
+  async exec(nonce: string, toolName: string, input: Record<string, unknown> = {}): Promise<string> {
+    validateNonce(nonce);
     const toolUse: ToolUseBlock = {
       type: 'tool_use',
       id: `agent-${Date.now()}`,
@@ -40,6 +71,7 @@ const bridge: ThreatCaddyBridge = {
       input,
     };
     const { result, isError } = await executeTool(toolUse, activeFolderId);
+    await logBridgeCall(toolName, activeFolderId, isError);
     if (isError) throw new Error(result);
     // Notify the UI to reload when a write tool succeeds
     if (isWriteTool(toolName)) {
@@ -56,7 +88,8 @@ const bridge: ThreatCaddyBridge = {
     return activeFolderId;
   },
 
-  setFolderId(id: string | undefined): void {
+  setFolderId(nonce: string, id: string | undefined): void {
+    validateNonce(nonce);
     activeFolderId = id;
   },
 
@@ -70,9 +103,16 @@ const bridge: ThreatCaddyBridge = {
   },
 };
 
-/** Call once at app startup to expose the bridge on window. */
-export function installAgentBridge(): void {
+/**
+ * Call once at app startup to expose the bridge on window.
+ * Returns the nonce that agents must present with each exec/setFolderId call.
+ * The nonce is available on `window.__tcNonce` for the CDP daemon to read.
+ */
+export function installAgentBridge(): string {
+  bridgeNonce = generateNonce();
   (window as unknown as Record<string, unknown>).threatcaddy = bridge;
+  (window as unknown as Record<string, unknown>).__tcNonce = bridgeNonce;
+  return bridgeNonce;
 }
 
 /** Keep the bridge folderId in sync with the app's selected folder. */

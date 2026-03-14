@@ -24,6 +24,7 @@ import userRoutes from './routes/users.js';
 import botRoutes from './routes/bots.js';
 import integrationRoutes from './routes/integrations.js';
 import savedSearchRoutes from './routes/saved-searches.js';
+import taxiiRoutes from './routes/taxii.js';
 import adminRoutes from './routes/admin/index.js';
 import { botManager } from './bots/bot-manager.js';
 import { prePullSandboxImages } from './bots/sandbox.js';
@@ -65,6 +66,7 @@ app.use('*', async (c, next) => {
   c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   c.header('X-DNS-Prefetch-Control', 'off');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
 });
 
 app.use('*', requestId);
@@ -161,6 +163,7 @@ app.route('/api/users', userRoutes);
 app.route('/api/bots', botRoutes);
 app.route('/api/integrations', integrationRoutes);
 app.route('/api/saved-searches', savedSearchRoutes);
+app.route('/api/taxii', taxiiRoutes);
 
 // WebSocket endpoint — token sent as first message, not in URL
 app.get('/ws', upgradeWebSocket(() => {

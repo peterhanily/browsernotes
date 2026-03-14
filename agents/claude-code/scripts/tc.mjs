@@ -194,13 +194,18 @@ async function runDaemon(targetId, wsUrl) {
     process.exit(1);
   }
 
-  // Verify bridge
+  // Verify bridge and read nonce for authenticated calls
+  let tcNonce;
   try {
     const check = await evalInPage(cdp, sessionId, 'typeof window.threatcaddy');
     if (check !== 'object') {
       process.stderr.write('Daemon: ThreatCaddy bridge not found on this tab.\n');
       cdp.close();
       process.exit(1);
+    }
+    tcNonce = await evalInPage(cdp, sessionId, 'window.__tcNonce');
+    if (!tcNonce) {
+      process.stderr.write('Daemon: warning — bridge nonce not found, calls may fail.\n');
     }
   } catch (e) {
     process.stderr.write(`Daemon: bridge check failed: ${e.message}\n`);
@@ -255,7 +260,7 @@ async function runDaemon(targetId, wsUrl) {
           result = await evalInPage(cdp, sessionId, 'window.threatcaddy.folderId()');
           break;
         case 'folder_set':
-          await evalInPage(cdp, sessionId, `window.threatcaddy.setFolderId(${JSON.stringify(args[0])})`);
+          await evalInPage(cdp, sessionId, `window.threatcaddy.setFolderId(${JSON.stringify(tcNonce)}, ${JSON.stringify(args[0])})`);
           result = `Active investigation set to: ${args[0]}`;
           break;
         case 'tools':
@@ -265,7 +270,7 @@ async function runDaemon(targetId, wsUrl) {
           const toolName = args[0];
           const input = args[1] ? JSON.parse(args[1]) : {};
           const inputJson = JSON.stringify(input);
-          const expr = `window.threatcaddy.exec(${JSON.stringify(toolName)}, ${inputJson})`;
+          const expr = `window.threatcaddy.exec(${JSON.stringify(tcNonce)}, ${JSON.stringify(toolName)}, ${inputJson})`;
           result = await evalInPage(cdp, sessionId, expr);
           break;
         }

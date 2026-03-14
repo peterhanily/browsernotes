@@ -8,7 +8,7 @@
  */
 
 import { executeTool } from './llm-tools';
-import { TOOL_DEFINITIONS } from './llm-tool-defs';
+import { TOOL_DEFINITIONS, isWriteTool } from './llm-tool-defs';
 import { db } from '../db';
 import type { ToolUseBlock } from '../types';
 
@@ -41,6 +41,10 @@ const bridge: ThreatCaddyBridge = {
     };
     const { result, isError } = await executeTool(toolUse, activeFolderId);
     if (isError) throw new Error(result);
+    // Notify the UI to reload when a write tool succeeds
+    if (isWriteTool(toolName)) {
+      window.dispatchEvent(new CustomEvent('threatcaddy:entities-changed'));
+    }
     return result;
   },
 

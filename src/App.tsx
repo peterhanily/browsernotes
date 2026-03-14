@@ -190,6 +190,14 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadFolders, notes.reload, tasks.reload, timeline.reload, reloadTimelines, reloadWhiteboards, standaloneIOCsHook.reload, chatsHook.reload, reloadTags, noteTemplatesHook.reload, playbooksHook.reload]);
 
+  // Reload UI when external agents write data via the agent bridge
+  useEffect(() => {
+    const handler = () => { notes.reload(); tasks.reload(); timeline.reload(); standaloneIOCsHook.reload(); };
+    window.addEventListener('threatcaddy:entities-changed', handler);
+    return () => window.removeEventListener('threatcaddy:entities-changed', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes.reload, tasks.reload, timeline.reload, standaloneIOCsHook.reload]);
+
   const syncedFolderIds = useMemo(() => {
     const localIds = new Set(folders.map(f => f.id));
     return new Set(remoteInvestigations.filter(r => localIds.has(r.folderId)).map(r => r.folderId));

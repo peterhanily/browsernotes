@@ -9,13 +9,15 @@ Interact with a live ThreatCaddy investigation session running in Chrome. Create
 
 ## Prerequisites
 
-- Chrome with remote debugging enabled: `chrome://inspect/#remote-debugging` → toggle on
+- Chrome launched with `--remote-debugging-port=9222` (recommended, no popups)
+  - macOS: `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222`
+  - Alternative: `chrome://inspect/#remote-debugging` → toggle on (shows allow popup each time)
 - ThreatCaddy open in a Chrome tab with an investigation selected
 - Node.js 22+
 
 ## Commands
 
-All commands use `scripts/tc.mjs`.
+All commands use `scripts/tc.mjs`. The first command spawns a background daemon that holds the Chrome CDP session open. Chrome's "Allow debugging" popup fires once; all subsequent commands reuse the session silently. The daemon auto-exits after 20 minutes idle.
 
 ### Check connection
 
@@ -39,6 +41,12 @@ scripts/tc.mjs folder <investigation_id>
 
 ```bash
 scripts/tc.mjs exec <tool_name> '<json_input>'
+```
+
+### Stop the daemon
+
+```bash
+scripts/tc.mjs stop
 ```
 
 ## Available Tools (29)

@@ -31,6 +31,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
     "marked": "^17.0.3",
+    "minisearch": "^7.2.0",
     "nanoid": "^5.1.6",
     "pako": "^2.1.0",
     "papaparse": "^5.5.3",

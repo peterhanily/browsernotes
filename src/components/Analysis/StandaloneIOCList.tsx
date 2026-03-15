@@ -234,6 +234,7 @@ export function StandaloneIOCList({
     <th
       className={`${className} cursor-pointer select-none hover:text-gray-300 transition-colors`}
       onClick={() => handleSort(field)}
+      aria-sort={sortField === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <span className="inline-flex items-center gap-0.5">
         {label}
@@ -512,7 +513,7 @@ export function StandaloneIOCList({
             <TableVirtuoso
               data={filteredSortedIOCs}
               components={{
-                Table: (props) => <table {...props} className="w-full min-w-[640px] text-xs" />,
+                Table: (props) => <table {...props} className="w-full min-w-[640px] text-xs" aria-label="IOC list" />,
                 TableHead: forwardRef((props, ref) => <thead ref={ref} {...props} />),
                 TableRow: (props) => <tr {...props} className="border-b border-gray-800/50 group" />,
                 TableBody: forwardRef((props, ref) => <tbody ref={ref} {...props} />),
@@ -520,7 +521,7 @@ export function StandaloneIOCList({
               fixedHeaderContent={() => (
                 <tr className="border-b border-gray-800 bg-gray-900">
                   <th className="text-left text-gray-500 font-medium py-2 pr-1 w-8">
-                    <input type="checkbox" checked={filteredSortedIOCs.length > 0 && selectedIds.size === filteredSortedIOCs.length} onChange={toggleSelectAll} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                    <input type="checkbox" checked={filteredSortedIOCs.length > 0 && selectedIds.size === filteredSortedIOCs.length} onChange={toggleSelectAll} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" aria-label="Select all IOCs" />
                   </th>
                   <SortHeader field="value" label="Value" className="text-left text-gray-500 font-medium py-2 pr-2" />
                   <SortHeader field="type" label="Type" className="text-left text-gray-500 font-medium py-2 px-2" />
@@ -541,7 +542,7 @@ export function StandaloneIOCList({
                 return (
                   <>
                     <td className="py-2 pr-1 w-8">
-                      <input type="checkbox" checked={selectedIds.has(ioc.id)} onChange={() => toggleSelect(ioc.id)} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" />
+                      <input type="checkbox" checked={selectedIds.has(ioc.id)} onChange={() => toggleSelect(ioc.id)} className="rounded border-gray-600 bg-gray-800 text-accent focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer" aria-label={`Select IOC ${ioc.value}`} />
                     </td>
                     <td className="py-2 pr-2 text-gray-200 font-mono max-w-[240px] truncate">{ioc.value}</td>
                     <td className="py-2 px-2">

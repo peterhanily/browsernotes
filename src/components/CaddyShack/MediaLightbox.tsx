@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import type { PostAttachment } from '../../types';
 
@@ -16,6 +16,7 @@ interface MediaLightboxProps {
 export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxProps) {
   const [index, setIndex] = useState(initialIndex);
   const item = items[index];
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const goNext = useCallback(() => {
     setIndex((i) => (i + 1) % items.length);
@@ -25,6 +26,7 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
     setIndex((i) => (i - 1 + items.length) % items.length);
   }, [items.length]);
 
+  // Keyboard navigation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -35,11 +37,23 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose, goNext, goPrev]);
 
+  // Focus trap: auto-focus dialog on mount
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    return () => { prev?.focus(); };
+  }, []);
+
   if (!item) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Media viewer: ${item.filename}`}
+      tabIndex={-1}
+      className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center outline-none"
       onClick={onClose}
     >
       {/* Top bar */}
@@ -52,6 +66,7 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
               download={item.filename}
               className="p-2 rounded-full hover:bg-white/10 text-white"
               onClick={(e) => e.stopPropagation()}
+              aria-label={`Download ${item.filename}`}
             >
               <Download size={18} />
             </a>
@@ -59,6 +74,7 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 text-white"
+            aria-label="Close media viewer"
           >
             <X size={18} />
           </button>
@@ -71,12 +87,14 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
           <button
             onClick={(e) => { e.stopPropagation(); goPrev(); }}
             className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white z-10"
+            aria-label="Previous media"
           >
             <ChevronLeft size={24} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); goNext(); }}
             className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white z-10"
+            aria-label="Next media"
           >
             <ChevronRight size={24} />
           </button>
@@ -103,7 +121,7 @@ export function MediaLightbox({ items, initialIndex, onClose }: MediaLightboxPro
 
       {/* Counter */}
       {items.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-3 py-1 rounded-full" role="status" aria-live="polite">
           {index + 1} / {items.length}
         </div>
       )}

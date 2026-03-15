@@ -2,7 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Zap, Loader2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { IntegrationExecutor } from '../../lib/integration-executor';
+import type { ExecutionOptions } from '../../lib/integration-executor';
 import { IntegrationResultModal } from './IntegrationResultModal';
 import { db } from '../../db';
 import type { IntegrationRun, InstalledIntegration, IntegrationTemplate } from '../../types/integration-types';
@@ -19,6 +21,7 @@ interface RunIntegrationMenuProps {
 
 export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onComplete, onOpenSettings }: RunIntegrationMenuProps) {
   const { addToast } = useToast();
+  const { connected, serverUrl, getAccessToken } = useAuth();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [resultRun, setResultRun] = useState<IntegrationRun | null>(null);
@@ -53,6 +56,10 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
 
       let pendingNoteId: string | null = null;
       const executor = new IntegrationExecutor();
+      const execOptions: ExecutionOptions | undefined =
+        connected && serverUrl
+          ? { useServerProxy: { serverUrl, getAccessToken } }
+          : undefined;
       const run = await executor.run(
         match.template,
         match.installation,
@@ -185,6 +192,8 @@ export function RunIntegrationMenu({ ioc, investigation, matching, addRun, onCom
             addToast('info', message);
           },
         },
+        undefined,
+        execOptions,
       );
 
       await addRun(run);

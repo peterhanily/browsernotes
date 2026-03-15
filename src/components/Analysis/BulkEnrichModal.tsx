@@ -1,7 +1,9 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Zap, Loader2, X, CheckCircle2, AlertTriangle, XCircle, Pause, Play } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { useAuth } from '../../contexts/AuthContext';
 import { IntegrationExecutor } from '../../lib/integration-executor';
+import type { ExecutionOptions } from '../../lib/integration-executor';
 import { db } from '../../db';
 import type { IntegrationRun, InstalledIntegration, IntegrationTemplate } from '../../types/integration-types';
 import type { StandaloneIOC } from '../../types';
@@ -72,6 +74,8 @@ export function BulkEnrichModal({
   investigation,
   onCompleted,
 }: BulkEnrichModalProps) {
+  const { connected, serverUrl, getAccessToken } = useAuth();
+
   // Phase: 'configure' → 'running' → 'done'
   const [phase, setPhase] = useState<'configure' | 'running' | 'done'>('configure');
   const [skipAlreadyEnriched, setSkipAlreadyEnriched] = useState(true);
@@ -168,6 +172,10 @@ export function BulkEnrichModal({
     const controller = new AbortController();
     abortRef.current = controller;
     const executor = new IntegrationExecutor();
+    const execOptions: ExecutionOptions | undefined =
+      connected && serverUrl
+        ? { useServerProxy: { serverUrl, getAccessToken } }
+        : undefined;
     const newResults: IOCResult[] = [];
 
     // Phase 1a: top-level try/finally so any unhandled error transitions to 'done'
@@ -301,6 +309,7 @@ export function BulkEnrichModal({
                 onNotify: () => {},
               },
               controller.signal,
+              execOptions,
             );
 
             // Phase 2a: mark domain as used after the request completes
@@ -353,7 +362,7 @@ export function BulkEnrichModal({
       }
       onCompleted?.(finalStats);
     }
-  }, [effectivePlan, addRun, investigation, createNotes, onCompleted]);
+  }, [effectivePlan, addRun, investigation, createNotes, onCompleted, connected, serverUrl, getAccessToken]);
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
